@@ -75,7 +75,7 @@ spec:
       volumes:
       - name: frontend-conf-volume
         secret:
-          secretName: config
+          secretName: ps-dash-config
           items:
           - key: conf
             path: config.json
