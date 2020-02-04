@@ -58,7 +58,7 @@ spec:
     spec:
       containers:
       - name: ps-dash
-        image: sand-ci/ps-dash:latest
+        image: sandci/ps-dash:latest
         ports:
           - containerPort: 5000
         livenessProbe:
@@ -71,11 +71,11 @@ spec:
           timeoutSeconds: 10
         volumeMounts:
         - name: frontend-conf-volume
-          mountPath: "/etc/ml-front-conf/"
+          mountPath: "/etc/ps-dash/"
       volumes:
       - name: frontend-conf-volume
         secret:
           secretName: config
           items:
-          - key: mlconf
-            path: mlfront-config.json
+          - key: conf
+            path: config.json
