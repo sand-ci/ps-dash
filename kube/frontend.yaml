@@ -58,7 +58,7 @@ spec:
     spec:
       containers:
       - name: ps-dash
-        image: sandci/ps-dash:latest
+        image: ivukotic/ps-dash:latest
         ports:
           - containerPort: 5000
         livenessProbe:

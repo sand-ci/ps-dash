@@ -4,9 +4,8 @@ LABEL maintainer="Ilija Vukotic"
 
 ENV PYTHONUNBUFFERED 1
 
-RUN pip install --no-cache-dir -r requirements.txt
-
 COPY src /src/
+RUN pip install --no-cache-dir -r /src/requirements.txt
 
 EXPOSE 5000
 
