@@ -1,30 +1,48 @@
+import pandas as pd
+import plotly_express as px
+import plotly.express as px
 import dash
-import dash_core_components as dcc
 import dash_html_components as html
+import dash_core_components as dcc
+from dash.dependencies import Input, Output
 
-external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
-
-# app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-app = dash.Dash(__name__)
-
-server = app.server
-
-app.layout = html.Div([
-    html.H2('Hello World'),
-    dcc.Dropdown(
-        id='dropdown',
-        options=[{'label': i, 'value': i} for i in ['LA', 'NYC', 'MTL']],
-        value='LA'
-    ),
-    html.Div(id='display-value')
-])
+import getpass
+import DatasetBuilder as build
 
 
-@app.callback(dash.dependencies.Output('display-value', 'children'),
-              [dash.dependencies.Input('dropdown', 'value')])
-def display_value(value):
-    return 'You have selected "{}"'.format(value)
+def LoadBubbleChartData(isDev):
+    if isDev:
+        mdf = pd.read_csv('data.csv')
+    else:
+        mdf = build.BubbleChartDataset()
+    return mdf
 
+username = getpass.getuser()
+isDev = True if username == 'petya' else False
 
-if __name__ == '__main__':
-    app.run_server(debug=True)
+df = LoadBubbleChartData(isDev)
+
+app = dash.Dash(
+    __name__, external_stylesheets=["https://codepen.io/chriddyp/pen/bWLwgP.css"]
+)
+
+app.layout = html.Div(
+    [
+        html.H3("Demo: Plotly Express in Dash"),
+
+        html.Div(
+            dcc.Graph(figure=px.scatter(df, x="period", y="host",
+                      size=df["mean"].fillna(value=0), color="host", 
+                      hover_name="host", size_max=45, height=700)
+                  .update(layout={
+                      'title':'Avg Packet Loss from 01-12-2019 to 22-01-2020',
+                      'xaxis':{'title':'Period'},
+                      'yaxis':{'title':'Hosts'},
+                      'paper_bgcolor':'rgba(0,0,0,0)',
+                      'plot_bgcolor':'rgba(0,0,0,0)'
+                  }),
+                 ),)
+    ]
+)
+
+app.run_server(debug=False)
