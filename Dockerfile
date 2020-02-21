@@ -15,8 +15,7 @@ ENV PYTHONUNBUFFERED 1
 
 COPY src /src/
 
-RUN apk add --update --no-cache py3-numpy
-ENV PYTHONPATH=/usr/lib/python3.7/site-packages
+RUN pip install --no-cache-dir numpy
 
 RUN pip install --no-cache-dir -r /src/requirements.txt
 
