@@ -14,6 +14,9 @@ ENV PYTHONUNBUFFERED 1
 #     cython3
 
 COPY src /src/
+
+RUN apk add --update --no-cache py3-numpy
+
 RUN pip install --no-cache-dir -r /src/requirements.txt
 
 EXPOSE 5000
