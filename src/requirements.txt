@@ -7,3 +7,4 @@ dash-html-components==0.6.0
 dash-renderer==0.7.2
 dash==0.17.4
 plotly
+pandas

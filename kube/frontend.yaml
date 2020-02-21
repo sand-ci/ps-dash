@@ -2,7 +2,7 @@ kind: Service
 apiVersion: v1
 metadata:
   name: ps-dash
-  namespace: maniac-ml
+  namespace: perfsonar-platform
   labels:
     k8s-app: ps-dash
 spec:
@@ -19,7 +19,7 @@ apiVersion: extensions/v1beta1
 kind: Ingress
 metadata:
   name: ps-dash
-  namespace: maniac-ml
+  namespace: perfsonar-platform
   labels:
     k8s-app: ps-dash
   annotations:
@@ -43,7 +43,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ps-dash 
-  namespace: maniac-ml
+  namespace: perfsonar-platform
   labels:
     k8s-app: ps-dash
 spec:
