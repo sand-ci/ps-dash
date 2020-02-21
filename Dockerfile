@@ -1,7 +1,9 @@
-FROM python:alpine 
+FROM python:3-alpine
 
 LABEL maintainer="Ilija Vukotic"
 
+RUN apk add --update --no-cache py3-numpy
+ENV PYTHONPATH=/usr/lib/python3.7/site-packages
 ENV PYTHONUNBUFFERED 1
 
 # RUN apt-get update
