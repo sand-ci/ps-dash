@@ -50,6 +50,7 @@ RUN apk add --no-cache --virtual build-dependencies python3 \
 COPY src /src/
 
 RUN pip install --no-cache-dir -r /src/requirements.txt
+RUN pip3 install pandas
 
 EXPOSE 5000
 
