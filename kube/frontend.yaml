@@ -80,4 +80,4 @@ spec:
           secretName: ps-dash-config
           items:
           - key: conf
-            path: config.json
+            path: creds.key
