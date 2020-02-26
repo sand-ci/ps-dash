@@ -17,6 +17,7 @@ def LoadBubbleChartData(isDev):
         mdf = build.BubbleChartDataset()
     return mdf
 
+
 username = getpass.getuser()
 isDev = True if username == 'petya' else False
 
@@ -32,17 +33,17 @@ app.layout = html.Div(
 
         html.Div(
             dcc.Graph(figure=px.scatter(df, x="period", y="host",
-                      size=df["mean"].fillna(value=0), color="host", 
-                      hover_name="host", size_max=45, height=700)
-                  .update(layout={
-                      'title':'Avg Packet Loss from 01-12-2019 to 22-01-2020',
-                      'xaxis':{'title':'Period'},
-                      'yaxis':{'title':'Hosts'},
-                      'paper_bgcolor':'rgba(0,0,0,0)',
-                      'plot_bgcolor':'rgba(0,0,0,0)'
-                  }),
-                 ),)
+                                        size=df["mean"].fillna(value=0), color="host",
+                                        hover_name="host", size_max=45, height=700)
+                      .update(layout={
+                          'title': 'Avg Packet Loss from 01-12-2019 to 22-01-2020',
+                          'xaxis': {'title': 'Period'},
+                          'yaxis': {'title': 'Hosts'},
+                          'paper_bgcolor': 'rgba(0,0,0,0)',
+                          'plot_bgcolor': 'rgba(0,0,0,0)'
+                      }),
+                      ),)
     ]
 )
 
-app.run_server(debug=False)
+app.run_server(port=80, debug=False)
