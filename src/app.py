@@ -46,4 +46,4 @@ app.layout = html.Div(
     ]
 )
 
-app.run_server(port=80, debug=False)
+app.run_server(port=80, host='0.0.0.0', debug=False)
