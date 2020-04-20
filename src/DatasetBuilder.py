@@ -129,7 +129,7 @@ def CountTestsGroupedByHost():
     dateFrom = '2020-03-23 10:00'
     dateTo = '2020-03-23 10:10'
 
-    minutesDiff = calcMinutes4Period(dateFrom, dateTo)
+    minutesDiff = CalcMinutes4Period(dateFrom, dateTo)
 
     p_data = ProcessDataInChunks('ps_packetloss', dateFrom, dateTo, MakeChunks(minutesDiff))
     o_data = ProcessDataInChunks('ps_owd', dateFrom, dateTo, MakeChunks(minutesDiff))
