@@ -23,7 +23,7 @@ isDev = True if username == 'petya' else False
 
 df = LoadBubbleChartData(isDev)
 
-host_df = CountTestsGroupedByHost()
+host_df = build.CountTestsGroupedByHost()
 
 def generate_table(dataframe, max_rows=1000):
     return html.Table([
