@@ -7,7 +7,7 @@ from functools import partial
 from contextlib import contextmanager
 import datetime
 import time
-import requests 
+import requests
 import os
 import datetime
 import pandas as pd
@@ -15,11 +15,12 @@ import pandas as pd
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import scan
 
+
 def ConnectES():
     user = None
     passwd = None
     if user is None and passwd is None:
-        with open("creds.key") as f:
+        with open("/etc/ps-dash/creds.key") as f:
             user = f.readline().strip()
             passwd = f.readline().strip()
     credentials = (user, passwd)
@@ -27,22 +28,21 @@ def ConnectES():
 
     if es.ping() == True:
         return es
-    else: print("Connection Unsuccessful")
-
+    else:
+        print("Connection Unsuccessful")
 
 
 def GetTimeRanges(start, end, intv):
     t_format = "%Y-%m-%d %H:%M"
-    start = datetime.datetime.strptime(start,t_format)
+    start = datetime.datetime.strptime(start, t_format)
     end = datetime.datetime.strptime(end, t_format)
-    diff = (end - start ) / intv
+    diff = (end - start) / intv
 
     for i in range(intv):
         t = (start + diff * i).strftime(t_format)
-        yield int(time.mktime(datetime.datetime.strptime(t, t_format).timetuple())*1000)
-        
-    yield int(time.mktime(end.timetuple())*1000)
+        yield int(time.mktime(datetime.datetime.strptime(t, t_format).timetuple()) * 1000)
 
+    yield int(time.mktime(end.timetuple()) * 1000)
 
 
 # Read data for each source from psconfig.opensciencegrid.org and get total number of destinations
@@ -76,85 +76,86 @@ def LoadDestInfoFromPSConfig(dateFrom, dateTo):
                         elif test['members']['type'] == 'disjoint':
                             temp.extend(test['members']['a_members'])
                             temp.extend(test['members']['a_members'])
-                        else: print('type is', test['members']['type'], host)
+                        else:
+                            print('type is', test['members']['type'], host)
 
             dests = list(set(temp))
             if host in temp:
                 dests.remove(host)
-            src2dests[host] = {'conf_count_dests':len(dests), 'members': dests, 'from': dateFrom, 'to': dateTo}
-            
+            src2dests[host] = {'conf_count_dests': len(dests), 'members': dests, 'from': dateFrom, 'to': dateTo}
+
         df = pd.DataFrame(src2dests)
         df = df.transpose().reset_index()
 
-        df = df.rename(columns={'index':'host'})
+        df = df.rename(columns={'index': 'host'})
         df.to_csv('psconfig_dest_info.csv', index=False)
-            
-    return df
 
+    return df
 
 
 def GetHostsMetaData():
     # The query is aggregating results by month, host, ipv4 and ipv6. The order is ascending.
     # That way we ensure the last added host name in the ip_data dictionary is the most recent one. We add it at position 0.
     query = {
-      "size" : 0,
-      "_source" : False,
-      "aggregations" : {
-        "perf_meta" : {
-          "composite" : {
-            "size" : 9999,
-            "sources": [
-              {
-                "ts" : {
-                  "terms" : {
-                    "script" : {
-                      "source" : "InternalSqlScriptUtils.dateTrunc(params.v0,InternalSqlScriptUtils.docValue(doc,params.v1),params.v2)",
-                      "lang" : "painless",
-                      "params" : {
-                        "v0" : "month",
-                        "v1" : "timestamp",
-                        "v2" : "Z"
-                      }
-                    },
-                    "missing_bucket" : True,
-                    "value_type" : "long",
-                    "order" : "asc"
-                  }
+        "size": 0,
+        "_source": False,
+        "aggregations": {
+            "perf_meta": {
+                "composite": {
+                    "size": 9999,
+                    "sources": [
+                        {
+                            "ts": {
+                                "terms": {
+                                    "script": {
+                                        "source": "InternalSqlScriptUtils.dateTrunc(params.v0,InternalSqlScriptUtils.docValue(doc,params.v1),params.v2)",
+                                        "lang": "painless",
+                                        "params": {
+                                            "v0": "month",
+                                            "v1": "timestamp",
+                                            "v2": "Z"
+                                        }
+                                    },
+                                    "missing_bucket": True,
+                                    "value_type": "long",
+                                    "order": "asc"
+                                }
+                            }
+                        },
+                        {
+                            "host": {
+                                "terms": {
+                                    "field": "host.keyword",
+                                    "missing_bucket": True
+                                }
+                            }
+                        },
+                        {
+                            "ipv4": {
+                                "terms": {
+                                    "field": "external_address.ipv4_address",
+                                    "missing_bucket": True
+                                }
+                            }
+                        },
+                        {
+                            "ipv6": {
+                                "terms": {
+                                    "field": "external_address.ipv6_address",
+                                    "missing_bucket": True
+                                }
+                            }
+                        }
+                    ]
                 }
-              },
-              {
-                "host" : {
-                  "terms" : {
-                    "field" : "host.keyword",
-                    "missing_bucket" : True
-                    }
-                }
-              },
-              {
-                "ipv4" : {
-                  "terms" : {
-                    "field" : "external_address.ipv4_address",
-                    "missing_bucket" : True
-                    }
-                }
-              },
-              {
-                "ipv6" : {
-                  "terms" : {
-                    "field" : "external_address.ipv6_address",
-                    "missing_bucket" : True
-                  }
-                }
-              }
-            ]
-          }
+            }
         }
-      }
     }
 
     data = es.search(index="ps_meta", body=query)
 
     ip_data = {}
+
     def Add2Dict(ip, host):
         temp = []
         if (ip in ip_data):
@@ -162,7 +163,7 @@ def GetHostsMetaData():
                 temp.append(host)
                 temp.extend(ip_data[ip])
                 ip_data[ip] = temp
-        else: 
+        else:
             ip_data[ip] = [host]
 
     host_list = []
@@ -195,40 +196,42 @@ meta = GetHostsMetaData()
 hosts_meta = meta['hosts']
 ips_meta = meta['ips']
 
-### That method should be run as a pre-step before ProcessHosts.
-### It will fix all hosts beforehand and then look up hosts dictionary during the parallel processing of the dataset.
+# That method should be run as a pre-step before ProcessHosts.
+# It will fix all hosts beforehand and then look up hosts dictionary during the parallel processing of the dataset.
+
+
 def GetIdxUniqueHosts(idx, fld, timeFrom, timeTo):
     query = {
-          "size":0,
-          "query": {
-            "bool":{
-              "must":[
-                {
-                  "range": {
-                    "timestamp": {
-                      "gte": timeFrom,
-                      "lte": timeTo
+        "size": 0,
+        "query": {
+            "bool": {
+                "must": [
+                    {
+                        "range": {
+                            "timestamp": {
+                                "gte": timeFrom,
+                                "lte": timeTo
+                            }
+                        }
                     }
-                  }
-                }
-              ]
+                ]
             }
-          },
-          "aggs":{
-            "unique":{
-                "terms":{
-                    "field":fld,
+        },
+        "aggs": {
+            "unique": {
+                "terms": {
+                    "field": fld,
                     "size": 9999
                 }
             }
-          }
         }
-    
+    }
+
     data = es.search(index=idx, body=query)
 
     for item in data["aggregations"]["unique"]["buckets"]:
         host_val = item['key']
-        
+
         if host_val in hosts:
             if hosts[host_val] != 'unresolved':
                 host_val = hosts[host_val]
@@ -240,20 +243,18 @@ def GetIdxUniqueHosts(idx, fld, timeFrom, timeTo):
             elif (host_['unresolved']):
                 unresolved[host_['unresolved'][0]] = host_['unresolved'][1]
                 hosts[host_val] = 'unresolved'
-                
+
     return hosts
 
-  
+
 def StartProcess(fromDate, toDate):
-  GetIdxUniqueHosts()
-  ProcessHosts()
-  
+    GetIdxUniqueHosts()
+    ProcessHosts()
 
 
-
-#### Fix hosts by: 
-####   replacing IP addresses with correct host names: 
-####   removing documents that are not part of the configuration
+# Fix hosts by:
+# replacing IP addresses with correct host names:
+# removing documents that are not part of the configuration
 def FixHosts(item, unres):
     with lock:
         fields = []
@@ -275,7 +276,8 @@ def FixHosts(item, unres):
             if hosts[fld_val] != 'unresolved':
                 isOK = True
                 item[fld] = hosts[fld_val]
-            else: isOK = False
+            else:
+                isOK = False
 
             statusOK.append(isOK)
 
@@ -290,9 +292,7 @@ def FixHosts(item, unres):
         if (all(statusOK)):
             return item
 
-
-
-### Process the dataset in parallel
+# Process the dataset in parallel
 def ProcessHosts(data, saveUnresolved):
 
     @contextmanager
@@ -308,7 +308,7 @@ def ProcessHosts(data, saveUnresolved):
         results = []
         for doc in pool.imap_unordered(partial(FixHosts, unres=unresolved), data):
             if (i > 0) and (i % 100000 == 0):
-                print('Next',i,'items')
+                print('Next', i, 'items')
             if doc is not None:
                 results.append(doc)
             i = i + 1
@@ -322,21 +322,19 @@ def ProcessHosts(data, saveUnresolved):
 
         for key, val in dict(unresolved).items():
             if not (not_found['host'].str.contains(key).any()):
-                not_found.loc[len(not_found)+1] = [key, val]
+                not_found.loc[len(not_found) + 1] = [key, val]
 
         not_found.sort_values(['host', 'message'], ascending=[True, False], inplace=True)
         not_found.to_csv('not_found.csv', index=False)
-    
+
     return results
 
-
-
-### Try to resolve IP addresses that were filled for host names and thus exclude data not relevant to the project
-### If it's a host name, verify it's part of the configuration, i.e. search in ps_meta
-###   If it's an IP - try to resolve 
-###     If it cannot be resolved
-###         search the IP in ps_meta for the corresponding host name
-###         If not - mark it unresolved
+# Try to resolve IP addresses that were filled for host names and thus exclude data not relevant to the project
+# If it's a host name, verify it's part of the configuration, i.e. search in ps_meta
+# If it's an IP - try to resolve
+# If it cannot be resolved
+# search the IP in ps_meta for the corresponding host name
+# If not - mark it unresolved
 def ResolveHost(host):
     is_host = re.match(".*[a-zA-Z].*", host)
     h = ''
@@ -369,5 +367,4 @@ def ResolveHost(host):
             u.append(inst.args)
 
     return {'resolved': h, 'unresolved': u}
-
 
