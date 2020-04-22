@@ -10,27 +10,10 @@ import numpy as np
 import pandas as pd
 
 import helpers as hp
-import helpers1 as hp1
 
-
-def ConnectES():
-    user = None
-    passwd = None
-    if user is None and passwd is None:
-        with open("/etc/ps-dash/creds.key") as f:
-            user = f.readline().strip()
-            passwd = f.readline().strip()
-    credentials = (user, passwd)
-    es = Elasticsearch(['atlas-kibana.mwt2.org:9200'], timeout=240, http_auth=credentials)
-
-    if es.ping() == True:
-        return es
-    else:
-        print("Connection Unsuccessful")
 
 
 def queryAvgPacketLossbyHost(fld, group, fromDate, toDate):
-    es = ConnectES()
 
     query = {
         "size": 0,
@@ -73,13 +56,13 @@ def queryAvgPacketLossbyHost(fld, group, fromDate, toDate):
         }
     }
 
-    data = es.search("ps_packetloss", body=query)
+    data = hp.es.search(index="ps_packetloss", body=query)
 
     result = []
     unknown = []
 
     for host in data['aggregations']['host']['buckets']:
-        resolved = hp.ResolveHost(es, host['key'])
+        resolved = hp.ResolveHost(hp.es, host['key'])
         if (resolved['resolved']):
             h = resolved['resolved']
         elif (len(resolved['unknown'][0]) != 0) and (resolved['unknown'][0] not in unknown):
@@ -130,57 +113,93 @@ def CountTestsGroupedByHost():
     dateTo = '2020-03-23 10:10'
 
     minutesDiff = CalcMinutes4Period(dateFrom, dateTo)
+    p_data = ProcessDataInChunks('ps_packetloss', dateFrom, dateTo, chunks=hp.MakeChunks(minutesDiff))
+    o_data = ProcessDataInChunks('ps_owd', dateFrom, dateTo, 1)
 
-    p_data = ProcessDataInChunks('ps_packetloss', dateFrom, dateTo, MakeChunks(minutesDiff))
-    o_data = ProcessDataInChunks('ps_owd', dateFrom, dateTo, MakeChunks(minutesDiff))
+    pl_config = hp.LoadDestInfoFromPSConfig('ps_packetloss', dateFrom, dateTo)
+    owd_config = hp.LoadDestInfoFromPSConfig('ps_owd', dateFrom, dateTo)
 
-    config = hp.LoadDestInfoFromPSConfig(dateFrom, dateTo)
     pldf = pd.DataFrame(p_data)
     owdf = pd.DataFrame(o_data)
 
-    agg_df1 = pldf.groupby(['src_host', 'dest_host']).agg({'packet_loss':'mean'}).round(2).reset_index()
-    host_df0 = agg_df1.groupby(['src_host']).size().reset_index().rename(columns={0:'packet_loss-total_dests'})
-    host_df1 = agg_df1.groupby(['src_host']).agg({'packet_loss':'mean'}).reset_index()
-    host_df = pd.merge(host_df1, host_df0, how='left', left_on=['src_host'], right_on=['src_host'])
-    host_df.rename(columns={'src_host': 'host'}, inplace=True)
-    ddf = pd.merge(host_df, config[['host', 'conf_count_dests']], how='outer', left_on=['host'], right_on=['host'])
-
-    agg_df1 = owdf.groupby(['src_host', 'dest_host']).agg({'delay_mean':'mean'}).round(2).reset_index()
-    host_df0 = agg_df1.groupby(['src_host']).size().reset_index().rename(columns={0:'owd-total_dests'})
-    host_df1 = agg_df1.groupby(['src_host']).agg({'delay_mean':'mean'}).reset_index()
-    host_df = pd.merge(host_df1, host_df0, how='left', left_on=['src_host'], right_on=['src_host'])
+    host_df0 = pldf.groupby(['src_host']).size().reset_index().rename(columns={0:'packet_loss-total_dests'})
+    host_df = pldf.groupby(['src_host']).agg({'packet_loss':'mean'}).reset_index()
+    host_df = pd.merge(host_df0, host_df, how='outer', left_on=['src_host'], right_on=['src_host'])
     host_df.rename(columns={'src_host': 'host'}, inplace=True)
 
-    ddf = pd.merge(host_df, ddf, how='outer', left_on=['host'], right_on=['host'])
+    ddf0 = pd.merge(host_df, pl_config[['host', 'conf_count_dests']], how='left', left_on=['host'], right_on=['host'])
+
+    host_df0 = owdf.groupby(['src_host']).size().reset_index().rename(columns={0:'owd-total_dests'})
+    host_df = owdf.groupby(['src_host']).agg({'delay_mean':'mean'}).reset_index()
+    host_df = pd.merge(host_df0, host_df, how='outer', left_on=['src_host'], right_on=['src_host'])
+    host_df.rename(columns={'src_host': 'host'}, inplace=True)
+
+    ddf1 = pd.merge(host_df, owd_config[['host', 'conf_count_dests']], how='left', left_on=['host'], right_on=['host'])
+
+
+    ddf = pd.merge(ddf0, ddf1, how='outer', left_on=['host', 'conf_count_dests'], right_on=['host', 'conf_count_dests'])
 
     return ddf[['host', 'delay_mean', 'packet_loss', 'conf_count_dests', 'owd-total_dests',  'packet_loss-total_dests']]
 
 
 def RunQuery(idx, time_from, time_to):
+    field = 'packet_loss' if idx == 'ps_packetloss' else 'delay_mean'
     query = {
-      "size": 0,
-      "query": {
-        "bool":{
-          "must":[
-            {
-              "range": {
-                "timestamp": {
-                  "gte": time_from,
-                  "lt": time_to
+              "size" : 0,
+              "_source" : False,
+              "query" : {
+                "range" : {
+                  "timestamp" : {
+                    "from" : time_from,
+                    "to" : time_to
+                  }
+                }
+              },
+              "aggregations" : {
+                "groupby" : {
+                  "composite" : {
+                    "size" : 10000,
+                    "sources" : [
+                      {
+                        "src_host" : {
+                          "terms" : {
+                            "field" : "src_host",
+                            "missing_bucket" : True,
+                            "order" : "asc"
+                          }
+                        }
+                      },
+                      {
+                        "dest_host" : {
+                          "terms" : {
+                            "field" : "dest_host",
+                            "missing_bucket" : True,
+                            "order" : "asc"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "aggregations" : {
+                    "mean_field" : {
+                      "avg" : {
+                        "field" : field
+                      }
+                    }
+                  }
                 }
               }
             }
-          ]
-        }
-      }
-    }
 
 
-    results = scan(hp.es, index=idx, query=query)
+    results = hp.es.search( index=idx, body=query)
 
     data = []
-    for d in results:
-        data.append(d['_source'])
+    data1 = []
+    for item in results["aggregations"]["groupby"]["buckets"]:
+        data1.append(item)
+        data.append({'dest_host':item['key']['dest_host'], 'src_host':item['key']['src_host'], 
+                     field: item['mean_field']['value'], 'num_tests': item['doc_count']})
             
     return data
 
