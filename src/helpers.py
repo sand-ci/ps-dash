@@ -20,7 +20,7 @@ def ConnectES():
     user = None
     passwd = None
     if user is None and passwd is None:
-        with open("creds.key") as f:
+        with open("/etc/ps-dash/creds.key") as f:
             user = f.readline().strip()
             passwd = f.readline().strip()
     credentials = (user, passwd)
