@@ -44,56 +44,72 @@ def GetTimeRanges(start, end, intv):
         
     yield int(time.mktime(end.timetuple())*1000)
 
+    
+def GetDestinationsFromPSConfig(host):
+    url = "http://psconfig.opensciencegrid.org/pub/auto/" + host.lower()
+    r = requests.get(url)
+    data = r.json()
+    
+    s2d = []
+    if 'message' not in data:
+        temp = []
+        for test in data['tests']:
+
+            if test['parameters']['type'] == 'perfsonarbuoy/owamp':
+
+                if test['members']['type'] == 'mesh':
+                    temp.extend(test['members']['members'])
+                elif test['members']['type'] == 'disjoint':
+                    temp.extend(test['members']['a_members'])
+                    temp.extend(test['members']['a_members'])
+                else: print('type is different', test['members']['type'], host)
+
+        dests = list(set(temp)) 
+
+        if host in temp:
+            dests.remove(host)
+        s2d = [host, len(dests), dests]
+    return s2d
+
 
 
 # Read data for each source from psconfig.opensciencegrid.org and get total number of destinations
 # as well as all members for each type of mesh/disjoing
-def LoadDestInfoFromPSConfig(idx, dateFrom, dateTo):
+def LoadPSConfigData(idx, dateFrom, dateTo):
+    # Get all hosts for both fields - source and destination
+    time_range = list(GetTimeRanges(dateFrom, dateTo, 1))
+    hosts = {}
+    hosts = GetIdxUniqueHosts(idx, 'src_host', time_range[0], time_range[-1])
+    hosts.update(GetIdxUniqueHosts(idx, 'dest_host', time_range[0], time_range[-1]))
+    uhosts = list(set(v for v in hosts.values() if v != 'unresolved'))
+
+    # If file was creted recently only update with new information
     try:
-        df = pd.read_csv(str(dateFrom+'_'+dateTo+'_'+idx+'psconfig.csv'))
-    except (pd.io.common.EmptyDataError, FileNotFoundError) as error:
-        time_range = list(GetTimeRanges(dateFrom, dateTo, 1))
-        uhosts = []
-        for field in ['src_host', 'dest_host']:
-            GetIdxUniqueHosts(idx, field, time_range[0], time_range[-1])
+        created = os.path.getmtime('psconfig.csv')
+        now = time.time()
 
-        uhosts = list(v for v in hosts.values() if v != 'unresolved')
+        if (int(now-created)/(60*60*24)) > 7:
+            os.remove('psconfig.csv')
+            print('PSConfig data is older than a week. The file will be recreated.')
+            LoadDestInfoFromPSConfig(idx, dateFrom, dateTo)
+        else: dest_df = pd.read_csv('psconfig.csv')
+    except (FileNotFoundError) as error:
+        dest_df = pd.DataFrame(columns=['host', 'total_num_of_dests', 'members'])
 
-        src2dests = {}
-        for host in uhosts:
-            url = "http://psconfig.opensciencegrid.org/pub/auto/" + host
-            r = requests.get(url)
-            data = r.json()
-            if 'message' not in data:
-            
-              for test in data['tests']:
-                temp = []
-                if test['parameters']['type'] == 'perfsonarbuoy/owamp':
-#                 print(host)
-                  if test['members']['type'] == 'mesh':
-#                   print(temp)
-                    temp.extend(test['members']['members'])
-                  elif test['members']['type'] == 'disjoint':
-#                   print(temp)
-                    temp.extend(test['members']['a_members'])
-                    temp.extend(test['members']['a_members'])
-                  else: print('type is', test['members']['type'], host)
-#                 print(temp)
-                  dests = set(temp)
-                  if host in temp:
-                      dests.remove(host)
-                  src2dests[host] = {'conf_count_dests':len(dests), 'members': dests, 'from': dateFrom, 'to': dateTo}
-        
-        if len(src2dests) > 0:
-            df = pd.DataFrame(src2dests)
-            df = df.transpose().reset_index()
+    changed = False
+    for h in uhosts:
+        if h not in dest_df['host'].values:
+            conf = GetDestinationsFromPSConfig(h)
+            if len(conf) > 0:
+                changed = True
+                dest_df = dest_df.append({'host':conf[0], 'total_num_of_dests':conf[1], 'members':conf[2]}, ignore_index=True)
 
-            df = df.rename(columns={'index':'host'})
-            df.to_csv(str(dateFrom+'_'+dateTo+'_'+idx+'psconfig.csv'), index=False)
-            
-    return df
+    if changed is True:
+        dest_df.to_csv('psconfig.csv', index=False)
 
-  
+    return dest_df
+
+
 def CalcMinutes4Period(dateFrom, dateTo):
     fmt = '%Y-%m-%d %H:%M'
     d1 = datetime.strptime(dateFrom, fmt)
@@ -195,7 +211,7 @@ def GetHostsMetaData():
         if ipv6 is not None:
             Add2Dict(ipv6, host)
 
-        if host not in host_list:
+        if (host not in host_list) and (host is not None) and (len(host) > 0):
             host_list.append(host)
 
     return {'hosts': host_list, 'ips': ip_data}
@@ -259,11 +275,6 @@ def GetIdxUniqueHosts(idx, fld, timeFrom, timeTo):
                 hosts[host_val] = 'unresolved'
                 
     return hosts
-
-  
-def StartProcess(fromDate, toDate):
-  GetIdxUniqueHosts()
-  ProcessHosts()
   
 
 

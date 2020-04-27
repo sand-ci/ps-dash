@@ -116,30 +116,32 @@ def CountTestsGroupedByHost():
     p_data = ProcessDataInChunks('ps_packetloss', dateFrom, dateTo, chunks=hp.MakeChunks(minutesDiff))
     o_data = ProcessDataInChunks('ps_owd', dateFrom, dateTo, 1)
 
-    pl_config = hp.LoadDestInfoFromPSConfig('ps_packetloss', dateFrom, dateTo)
-    owd_config = hp.LoadDestInfoFromPSConfig('ps_owd', dateFrom, dateTo)
+    pl_config = hp.LoadPSConfigData('ps_packetloss', dateFrom, dateTo)
+    owd_config = hp.LoadPSConfigData('ps_owd', dateFrom, dateTo)
 
     pldf = pd.DataFrame(p_data)
     owdf = pd.DataFrame(o_data)
+
 
     host_df0 = pldf.groupby(['src_host']).size().reset_index().rename(columns={0:'packet_loss-total_dests'})
     host_df = pldf.groupby(['src_host']).agg({'packet_loss':'mean'}).reset_index()
     host_df = pd.merge(host_df0, host_df, how='outer', left_on=['src_host'], right_on=['src_host'])
     host_df.rename(columns={'src_host': 'host'}, inplace=True)
 
-    ddf0 = pd.merge(host_df, pl_config[['host', 'conf_count_dests']], how='left', left_on=['host'], right_on=['host'])
+    ddf0 = pd.merge(host_df, pl_config, how='left', left_on=['host'], right_on=['host'])
 
     host_df0 = owdf.groupby(['src_host']).size().reset_index().rename(columns={0:'owd-total_dests'})
     host_df = owdf.groupby(['src_host']).agg({'delay_mean':'mean'}).reset_index()
     host_df = pd.merge(host_df0, host_df, how='outer', left_on=['src_host'], right_on=['src_host'])
     host_df.rename(columns={'src_host': 'host'}, inplace=True)
 
-    ddf1 = pd.merge(host_df, owd_config[['host', 'conf_count_dests']], how='left', left_on=['host'], right_on=['host'])
+    ddf1 = pd.merge(host_df, owd_config, how='left', left_on=['host'], right_on=['host'])
 
+    ddf = pd.merge(ddf0[['host', 'packet_loss-total_dests', 'packet_loss', 'total_num_of_dests']],
+                   ddf1[['host', 'owd-total_dests', 'delay_mean', 'total_num_of_dests']],
+                   how='outer', left_on=['host', 'total_num_of_dests'], right_on=['host', 'total_num_of_dests'])
 
-    ddf = pd.merge(ddf0, ddf1, how='outer', left_on=['host', 'conf_count_dests'], right_on=['host', 'conf_count_dests'])
-
-    return ddf[['host', 'delay_mean', 'packet_loss', 'conf_count_dests', 'owd-total_dests',  'packet_loss-total_dests']]
+    return ddf[['host', 'delay_mean', 'packet_loss', 'total_num_of_dests', 'owd-total_dests',  'packet_loss-total_dests']]
 
 
 def RunQuery(idx, time_from, time_to):
