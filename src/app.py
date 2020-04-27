@@ -41,8 +41,8 @@ app = dash.Dash(
     __name__, external_stylesheets=["https://codepen.io/chriddyp/pen/bWLwgP.css"]
 )
 
-# app.layout = html.Div(
-#     generate_table(host_df)
+app.layout = html.Div(
+    generate_table(host_df)
 #     [
 #         html.H3("Demo: Plotly Express in Dash"),
 
@@ -59,7 +59,7 @@ app = dash.Dash(
 #                       }),
 #                       ),)
 #     ]
-# )
+)
 
 app.run_server(port=80, host='0.0.0.0', debug=False)
 
