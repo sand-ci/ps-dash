@@ -15,6 +15,7 @@ import pandas as pd
 
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import scan
+import getpass
 
 def ConnectES():
     user = None
@@ -45,11 +46,27 @@ def GetTimeRanges(start, end, intv):
     yield int(time.mktime(end.timetuple())*1000)
 
     
+def CalcMinutes4Period(dateFrom, dateTo):
+    fmt = '%Y-%m-%d %H:%M'
+    d1 = datetime.strptime(dateFrom, fmt)
+    d2 = datetime.strptime(dateTo, fmt)
+    time_delta = d2-d1
+
+    return (time_delta.days*24*60 + time_delta.seconds//60)
+
+
+def MakeChunks(minutes):
+    if minutes < 60:
+        return 1
+    else:
+        return round(minutes / 60)
+
+
 def GetDestinationsFromPSConfig(host):
     url = "http://psconfig.opensciencegrid.org/pub/auto/" + host.lower()
     r = requests.get(url)
     data = r.json()
-    
+
     s2d = []
     if 'message' not in data:
         temp = []
@@ -78,11 +95,10 @@ def GetDestinationsFromPSConfig(host):
 def LoadPSConfigData(idx, dateFrom, dateTo):
     # Get all hosts for both fields - source and destination
     time_range = list(GetTimeRanges(dateFrom, dateTo, 1))
-    hosts = {}
-    hosts = GetIdxUniqueHosts(idx, 'src_host', time_range[0], time_range[-1])
-    hosts.update(GetIdxUniqueHosts(idx, 'dest_host', time_range[0], time_range[-1]))
+    hosts = GetIdxUniqueHosts(idx, time_range[0], time_range[-1])
     uhosts = list(set(v for v in hosts.values() if v != 'unresolved'))
 
+    print('Loading PSConfig data for ', idx, '...')
     # If file was creted recently only update with new information
     try:
         created = os.path.getmtime('psconfig.csv')
@@ -109,21 +125,6 @@ def LoadPSConfigData(idx, dateFrom, dateTo):
 
     return dest_df
 
-
-def CalcMinutes4Period(dateFrom, dateTo):
-    fmt = '%Y-%m-%d %H:%M'
-    d1 = datetime.strptime(dateFrom, fmt)
-    d2 = datetime.strptime(dateTo, fmt)
-    daysDiff = (d2-d1).seconds
-
-    return round((d2-d1).seconds / 60)
-
-
-def MakeChunks(minutes):
-    if minutes < 60:
-        return 1
-    else:
-        return round(minutes / 60)
 
 
 def GetHostsMetaData():
@@ -217,111 +218,77 @@ def GetHostsMetaData():
     return {'hosts': host_list, 'ips': ip_data}
 
 
-manager = mp.Manager()
-unresolved = manager.dict()
-hosts = manager.dict()
-lock = mp.Lock()
+if getpass.getuser() != 'petya':
+    manager = mp.Manager()
+    unresolved = manager.dict()
+    hosts = manager.dict()
+    lock = mp.Lock()
 
-es = ConnectES()
-# Collects all hosts existing in ps_meta index
-meta = GetHostsMetaData()
-hosts_meta = meta['hosts']
-ips_meta = meta['ips']
+    es = ConnectES()
+    # Collects all hosts existing in ps_meta index
+    meta = GetHostsMetaData()
+    hosts_meta = meta['hosts']
+    ips_meta = meta['ips']
 
 ### That method should be run as a pre-step before ProcessHosts.
 ### It will fix all hosts beforehand and then look up hosts dictionary during the parallel processing of the dataset.
-def GetIdxUniqueHosts(idx, fld, timeFrom, timeTo):
-    query = {
-          "size":0,
-          "query": {
-            "bool":{
-              "must":[
-                {
-                  "range": {
-                    "timestamp": {
-                      "gte": timeFrom,
-                      "lte": timeTo
+def GetIdxUniqueHosts(idx, timeFrom, timeTo):
+    global hosts
+
+    hfields = list(es.indices.get_mapping('ps_packetloss*').values())[0]['mappings']['properties'].keys()
+    for fld in hfields:
+        if 'host' in fld:
+            query = {
+                  "size":0,
+                  "query": {
+                    "bool":{
+                      "must":[
+                        {
+                          "range": {
+                            "timestamp": {
+                              "gte": timeFrom,
+                              "lte": timeTo
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "aggs":{
+                    "unique":{
+                        "terms":{
+                            "field":fld,
+                            "size": 9999
+                        }
                     }
                   }
                 }
-              ]
-            }
-          },
-          "aggs":{
-            "unique":{
-                "terms":{
-                    "field":fld,
-                    "size": 9999
-                }
-            }
-          }
-        }
-    
-    data = es.search(index=idx, body=query)
 
-    for item in data["aggregations"]["unique"]["buckets"]:
-        host_val = item['key']
-        
-        if host_val in hosts:
-            if hosts[host_val] != 'unresolved':
-                host_val = hosts[host_val]
-        # If host is not in hosts already, try to resolve it then add the result to the shared dictionary
-        else:
-            host_ = ResolveHost(item['key'])
-            if (host_['resolved']):
-                hosts[host_val] = host_['resolved']
-            elif (host_['unresolved']):
-                unresolved[host_['unresolved'][0]] = host_['unresolved'][1]
-                hosts[host_val] = 'unresolved'
-                
+            data = es.search(index=idx, body=query)
+
+            for item in data["aggregations"]["unique"]["buckets"]:
+                host_val = item['key']
+
+                if host_val in hosts:
+                    if hosts[host_val] != 'unresolved':
+                        host_val = hosts[host_val]
+                # If host is not in hosts already, try to resolve it then add the result to the shared dictionary
+                else:
+                    host_ = ResolveHost(item['key'])
+                    if (host_['resolved']):
+                        hosts[host_val] = host_['resolved']
+                    elif (host_['unresolved']):
+                        unresolved[host_['unresolved'][0]] = host_['unresolved'][1]
+                        hosts[host_val] = 'unresolved'
+
     return hosts
-  
-
-
-
-#### Fix hosts by: 
-####   replacing IP addresses with correct host names: 
-####   removing documents that are not part of the configuration
-def FixHosts(item, unres):
-    with lock:
-        fields = []
-        for i in item.keys():
-            if 'host' in i:
-                fields.append(i)
-
-        isOK = False
-        statusOK = []
-        for fld in fields:
-
-            ip_fld = fld[:fld.index('_')]
-            try:
-                fld_val = item[fld] if item[fld] != '' else item[ip_fld]
-            except:
-                continue
-
-            # Check status of host already resolved by GetIdxUniqueHosts
-            if hosts[fld_val] != 'unresolved':
-                isOK = True
-                item[fld] = hosts[fld_val]
-            else: isOK = False
-
-            statusOK.append(isOK)
-
-#             logging the process
-#             import os.path
-#             with open(r'log.csv', 'a', newline='') as csvfile:
-#                 fieldnames = ['field','value','resolved','isOK']
-#                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-#                 writer.writeheader()
-#                 writer.writerow({'field':fld,'value':fld_val,'resolved':hosts[fld_val],'isOK': isOK})
-
-        if (all(statusOK)):
-            return item
 
 
 
 ### Process the dataset in parallel
-def ProcessHosts(data, saveUnresolved):
+def ProcessHosts(index, data, tsFrom, tsTo, saveUnresolved):
+
+    GetIdxUniqueHosts(index, tsFrom, tsTo)
 
     @contextmanager
     def poolcontext(*args, **kwargs):
@@ -354,8 +321,48 @@ def ProcessHosts(data, saveUnresolved):
 
         not_found.sort_values(['host', 'message'], ascending=[True, False], inplace=True)
         not_found.to_csv('not_found.csv', index=False)
-    
+
     return results
+
+
+
+#### Fix hosts by: 
+####   replacing IP addresses with correct host names: 
+####   removing documents that are not part of the configuration
+def FixHosts(item, unres):
+    with lock:
+        fields = []
+        for i in item.keys():
+            if 'host' in i:
+                fields.append(i)
+
+        isOK = False
+        statusOK = []
+        for fld in fields:
+            ip_fld = fld[:fld.index('_')]
+            try:
+                fld_val = item[fld] if item[fld] != '' else item[ip_fld]
+            except:
+                continue
+
+            # Check status of host already resolved by GetIdxUniqueHosts
+            if hosts[fld_val] != 'unresolved':
+                isOK = True
+                item[fld] = hosts[fld_val]
+            else: isOK = False
+
+            statusOK.append(isOK)
+
+#             logging the process
+#             import os.path
+#             with open(r'log.csv', 'a', newline='') as csvfile:
+#                 fieldnames = ['field','value','resolved','isOK']
+#                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+#                 writer.writeheader()
+#                 writer.writerow({'field':fld,'value':fld_val,'resolved':hosts[fld_val],'isOK': isOK})
+
+        if (all(statusOK)):
+            return item
 
 
 
@@ -397,5 +404,3 @@ def ResolveHost(host):
             u.append(inst.args)
 
     return {'resolved': h, 'unresolved': u}
-
-
