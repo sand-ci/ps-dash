@@ -12,7 +12,6 @@ import datetime as dt
 import getpass
 import templates as tmpl
 import DatasetBuilder as build
-import homepage as home
 
 
 username = getpass.getuser()
