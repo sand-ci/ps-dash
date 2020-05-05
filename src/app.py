@@ -65,4 +65,4 @@ def update_hostsTable(dateFrom, dateTo):
 # app.config.suppress_callback_exceptions = True
 app.enable_dev_tools(debug=True, dev_tools_props_check=False)
 
-app.run_server(debug=True)
+app.run_server(port=80, debug=True)
