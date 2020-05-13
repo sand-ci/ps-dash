@@ -25,12 +25,13 @@ def ConnectES():
             user = f.readline().strip()
             passwd = f.readline().strip()
     credentials = (user, passwd)
-    es = Elasticsearch(['atlas-kibana.mwt2.org:9200'], timeout=240, http_auth=credentials)
+
+    es_url = 'localhost:9200' if getpass.getuser() == 'petya' else 'atlas-kibana.mwt2.org:9200'
+    es = Elasticsearch([es_url], timeout=240, http_auth=credentials)
 
     if es.ping() == True:
         return es
     else: print("Connection Unsuccessful")
-
 
 
 def GetTimeRanges(start, end, intv):
@@ -42,10 +43,10 @@ def GetTimeRanges(start, end, intv):
     for i in range(intv):
         t = (start + diff * i).strftime(t_format)
         yield int(time.mktime(datetime.strptime(t, t_format).timetuple())*1000)
-        
+
     yield int(time.mktime(end.timetuple())*1000)
 
-    
+
 def CalcMinutes4Period(dateFrom, dateTo):
     fmt = '%Y-%m-%d %H:%M'
     d1 = datetime.strptime(dateFrom, fmt)
@@ -60,6 +61,17 @@ def MakeChunks(minutes):
         return 1
     else:
         return round(minutes / 60)
+
+
+def getValueField(idx):
+    if idx == 'ps_packetloss':
+        val_fld = 'packet_loss'
+    elif idx == 'ps_owd':
+        val_fld = 'delay_mean'
+    elif idx == 'ps_retransmits':
+        val_fld = 'retransmits'
+
+    return val_fld
 
 
 def GetDestinationsFromPSConfig(host):
@@ -81,7 +93,7 @@ def GetDestinationsFromPSConfig(host):
                     temp.extend(test['members']['a_members'])
                 else: print('type is different', test['members']['type'], host)
 
-        dests = list(set(temp)) 
+        dests = list(set(temp))
 
         if host in temp:
             dests.remove(host)
@@ -142,7 +154,7 @@ def GetHostsMetaData():
                 "ts" : {
                   "terms" : {
                     "script" : {
-                      "source" : "InternalSqlScriptUtils.dateTrunc(params.v0,InternalSqlScriptUtils.docValue(doc,params.v1),params.v2)",
+                      "source" :"InternalSqlScriptUtils.dateTrunc(params.v0,InternalSqlScriptUtils.docValue(doc,params.v1),params.v2)",
                       "lang" : "painless",
                       "params" : {
                         "v0" : "month",
@@ -218,24 +230,24 @@ def GetHostsMetaData():
     return {'hosts': host_list, 'ips': ip_data}
 
 
-if getpass.getuser() != 'petya':
-    manager = mp.Manager()
-    unresolved = manager.dict()
-    hosts = manager.dict()
-    lock = mp.Lock()
+manager = mp.Manager()
+unresolved = manager.dict()
+hosts = manager.dict()
+lock = mp.Lock()
 
-    es = ConnectES()
-    # Collects all hosts existing in ps_meta index
-    meta = GetHostsMetaData()
-    hosts_meta = meta['hosts']
-    ips_meta = meta['ips']
+es = ConnectES()
+# Collects all hosts existing in ps_meta index
+meta = GetHostsMetaData()
+hosts_meta = meta['hosts']
+ips_meta = meta['ips']
 
 ### That method should be run as a pre-step before ProcessHosts.
 ### It will fix all hosts beforehand and then look up hosts dictionary during the parallel processing of the dataset.
 def GetIdxUniqueHosts(idx, timeFrom, timeTo):
     global hosts
-
-    hfields = list(es.indices.get_mapping('ps_packetloss*').values())[0]['mappings']['properties'].keys()
+    print('Get all unique hosts for',idx,'and fix them...')
+    start = time.time()
+    hfields = list(es.indices.get_mapping(str(idx+'*')).values())[0]['mappings']['properties'].keys()
     for fld in hfields:
         if 'host' in fld:
             query = {
@@ -280,15 +292,18 @@ def GetIdxUniqueHosts(idx, timeFrom, timeTo):
                     elif (host_['unresolved']):
                         unresolved[host_['unresolved'][0]] = host_['unresolved'][1]
                         hosts[host_val] = 'unresolved'
-
+    print("Took: %ss" % (int(time.time() - start)))
     return hosts
 
 
 
 ### Process the dataset in parallel
-def ProcessHosts(index, data, tsFrom, tsTo, saveUnresolved):
-
+def ProcessHosts(index, data, tsFrom, tsTo, inParallel, saveUnresolved):
+    print('Start:', time.strftime("%H:%M:%S", time.localtime()))
     GetIdxUniqueHosts(index, tsFrom, tsTo)
+
+    print('Process items...')
+    start = time.time()
 
     @contextmanager
     def poolcontext(*args, **kwargs):
@@ -296,8 +311,11 @@ def ProcessHosts(index, data, tsFrom, tsTo, saveUnresolved):
         yield pool
         pool.terminate()
 
-    start = time.time()
-    print('Start:', time.strftime("%H:%M:%S", time.localtime()))
+
+    processes = 1
+    if inParallel is True:
+        processes=mp.cpu_count()
+
     with poolcontext(processes=mp.cpu_count()) as pool:
         i = 0
         results = []
@@ -307,6 +325,7 @@ def ProcessHosts(index, data, tsFrom, tsTo, saveUnresolved):
             if doc is not None:
                 results.append(doc)
             i = i + 1
+
     print("Time elapsed = %ss" % (int(time.time() - start)))
 
     if saveUnresolved:

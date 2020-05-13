@@ -1,8 +1,13 @@
+host_table_cell = [
+                    {
+                        'if': {
+                            'column_id': 'id',
+                        },
+                        'display': 'none'
+                    }
+                ]
+
 host_table_cond = [
-#             {
-#                 'if': {'row_index': 'odd'},
-#                 'backgroundColor': 'rgb(248, 248, 248)'
-#             },
             {
                 'if': {
                     'column_id': 'packet_loss-total_dests',
@@ -75,3 +80,4 @@ bubble_chart_layout = {
                       'plot_bgcolor':'rgba(0,0,0,0)',
                       'font': {'size': 10}
                   }
+

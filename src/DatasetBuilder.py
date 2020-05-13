@@ -1,7 +1,7 @@
 import re
 import socket
 import ipaddress
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 
 from elasticsearch import Elasticsearch
@@ -10,188 +10,121 @@ import numpy as np
 import pandas as pd
 
 import helpers as hp
+import queries as qrs
+import os
 
 
-
-def queryAvgValuebyHost(idx, fromDate, toDate):
-    val_fld = 'packet_loss' if idx == 'ps_packetloss' else 'delay_mean'
-    def runQuery(fld):
-        query = {
-            "size": 0,
-            "query": {
-                "bool": {
-                    "must": [
-                        {
-                            "range": {
-                                "timestamp": {
-                                    "gte": fromDate,
-                                    "lte": toDate
-                                }
-                            }
-                        }
-                    ]
-                }
-            },
-            "aggs": {
-                "host": {
-                    "terms": {
-                        "field": fld,
-                        "size": 9999
-                    },
-                    "aggs": {
-                        "period": {
-                            "date_histogram": {
-                                "field": "timestamp",
-                                "calendar_interval": "day"
-                            },
-                            "aggs": {
-                                val_fld: {
-                                    "avg": {
-                                        "field": val_fld
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        return hp.es.search(index=idx, body=query)
-
-    result = {}
-    for ft in ['src_host', 'dest_host']:
-        data = runQuery(ft)
-        temp = []
-        for host in data['aggregations']['host']['buckets']:
-            for period in host['period']['buckets']:
-                temp.append({'host': host['key'], 'period': period['key'],val_fld: period[val_fld]['value']})
-
-        result[ft] = temp
-    return result
-
+ntpdf = qrs.GetNTP()
 
 
 def BubbleChartDataset(idx, dateFrom, dateTo, fld_type):
     time_range = list(hp.GetTimeRanges(dateFrom, dateTo, 1))
-    data = queryAvgValuebyHost(idx, time_range[0], time_range[1])
+    data = qrs.queryAvgValuebyHost(idx, time_range[0], time_range[1])
     df = pd.DataFrame(data[fld_type])
     df['period'] = pd.to_datetime(df['period'], unit='ms')
     return df
 
 
 
-def CountTestsGroupedByHost(isDev, dateFrom, dateTo):
-    if isDev == True:
-        return pd.read_csv("df.csv")
-    else:
-        minutesDiff = hp.CalcMinutes4Period(dateFrom, dateTo)
-        p_data = ProcessDataInChunks(AggBySrcDestIP, 'ps_packetloss', dateFrom, dateTo, chunks=1)
-        o_data = ProcessDataInChunks(AggBySrcDestIP, 'ps_owd', dateFrom, dateTo, chunks=1)
+def LossDelayTestCountGroupedbyHost(dateFrom, dateTo):
+    # dateFrom = '2020-03-23 10:00'
+    # dateTo = '2020-03-23 10:10'
 
-        pl_config = hp.LoadPSConfigData('ps_packetloss', dateFrom, dateTo)
-        owd_config = hp.LoadPSConfigData('ps_owd', dateFrom, dateTo)
+    minutesDiff = hp.CalcMinutes4Period(dateFrom, dateTo)
+    p_data = ProcessDataInChunks(qrs.AggBySrcDestIP, 'ps_packetloss', dateFrom, dateTo,
+                                 chunks=1, inParallel=False)
+    o_data = ProcessDataInChunks(qrs.AggBySrcDestIP, 'ps_owd', dateFrom, dateTo,
+                                 chunks=1, inParallel=False)
 
-        pldf = pd.DataFrame(p_data)
-        owdf = pd.DataFrame(o_data)
+    pl_config = hp.LoadPSConfigData('ps_packetloss', dateFrom, dateTo)
+    owd_config = hp.LoadPSConfigData('ps_owd', dateFrom, dateTo)
+
+    pldf = pd.DataFrame(p_data)
+    owdf = pd.DataFrame(o_data)
+
+    host_df0 = pldf.groupby(['src_host']).size().reset_index().rename(columns={0:'packet_loss-total_dests'})
+    host_df = pldf.groupby(['src_host']).agg({'packet_loss':'mean'}).reset_index()
+    host_df = pd.merge(host_df0, host_df, how='outer', left_on=['src_host'], right_on=['src_host'])
+    host_df.rename(columns={'src_host': 'host'}, inplace=True)
+
+    ddf0 = pd.merge(host_df, pl_config, how='left', left_on=['host'], right_on=['host'])
+
+    host_df0 = owdf.groupby(['src_host']).size().reset_index().rename(columns={0:'owd-total_dests'})
+    host_df = owdf.groupby(['src_host']).agg({'delay_mean':'mean'}).reset_index()
+    host_df = pd.merge(host_df0, host_df, how='outer', left_on=['src_host'], right_on=['src_host'])
+    host_df.rename(columns={'src_host': 'host'}, inplace=True)
+
+    ddf1 = pd.merge(host_df, owd_config, how='left', left_on=['host'], right_on=['host'])
+
+    ddf = pd.merge(ddf0[['host', 'packet_loss-total_dests', 'packet_loss', 'total_num_of_dests']],
+                   ddf1[['host', 'owd-total_dests', 'delay_mean', 'total_num_of_dests']],
+                   how='outer', left_on=['host', 'total_num_of_dests'], right_on=['host', 'total_num_of_dests'])
+
+    return ddf[['host', 'delay_mean', 'packet_loss', 'total_num_of_dests', 'owd-total_dests',  'packet_loss-total_dests']]
 
 
-        host_df0 = pldf.groupby(['src_host']).size().reset_index().rename(columns={0:'packet_loss-total_dests'})
-        host_df = pldf.groupby(['src_host']).agg({'packet_loss':'mean'}).reset_index()
-        host_df = pd.merge(host_df0, host_df, how='outer', left_on=['src_host'], right_on=['src_host'])
-        host_df.rename(columns={'src_host': 'host'}, inplace=True)
+def SrcDestLossDelayNTP(host, dateFrom, dateTo):
+    global ntpdf
+    print('ntp data is already loaded:',len(ntpdf))
+    def buildDataFrames(index, args):
+        data = ProcessDataInChunks(qrs.AggBySrcDestIPv6QueryHost, index, dateFrom, dateTo, 1, args, False)
+        dff = pd.DataFrame(data)
+        if len(data)> 0:
+            dff['ts'] = pd.to_datetime(dff['ts'], unit='ms')
+        return dff
 
-        ddf0 = pd.merge(host_df, pl_config, how='left', left_on=['host'], right_on=['host'])
+#     pldf = buildDataFrames('ps_packetloss', ['ccperfsonar2.in2p3.fr'])
+#     owddf = buildDataFrames('ps_owd', ['ccperfsonar2.in2p3.fr'])
 
-        host_df0 = owdf.groupby(['src_host']).size().reset_index().rename(columns={0:'owd-total_dests'})
-        host_df = owdf.groupby(['src_host']).agg({'delay_mean':'mean'}).reset_index()
-        host_df = pd.merge(host_df0, host_df, how='outer', left_on=['src_host'], right_on=['src_host'])
-        host_df.rename(columns={'src_host': 'host'}, inplace=True)
+    pldf = buildDataFrames('ps_packetloss', [host])
+    owddf = buildDataFrames('ps_owd', [host])
 
-        ddf1 = pd.merge(host_df, owd_config, how='left', left_on=['host'], right_on=['host'])
+#     ntpdf = PrepareNTPData([pldf, owddf], dateTo).reset_index()
+#     ntpdf = PrepareNTPData([pldf, owddf], dateTo)
 
-        ddf = pd.merge(ddf0[['host', 'packet_loss-total_dests', 'packet_loss', 'total_num_of_dests']],
-                       ddf1[['host', 'owd-total_dests', 'delay_mean', 'total_num_of_dests']],
-                       how='outer', left_on=['host', 'total_num_of_dests'], right_on=['host', 'total_num_of_dests'])
+    df = pd.merge(pldf, owddf, how='left', 
+            left_on=['src_host', 'dest_host', 'ipv6', 'ts'], 
+            right_on=['src_host', 'dest_host', 'ipv6', 'ts'])
 
-        return ddf[['host', 'delay_mean', 'packet_loss', 'total_num_of_dests', 'owd-total_dests',  'packet_loss-total_dests']]
+    df = pd.merge(df, ntpdf, how='left', left_on=['src_host'], right_on=['host'])
+    df = df.drop(['host'], axis = 1)
+    df.rename(columns = {'ntp_delay': "src_ntp", "doc_count_x": "src_test_count"}, inplace = True)
+    df = pd.merge(df, ntpdf, how='left', left_on=['dest_host'], right_on=['host'])
+    df = df.drop(['host'], axis = 1)
+    df.rename(columns = {'ntp_delay': "dest_ntp", "doc_count_y": "dest_test_count"}, inplace = True)
 
-
-
-def AggBySrcDestIP(idx, time_from, time_to):
-    field = 'packet_loss' if idx == 'ps_packetloss' else 'delay_mean'
-    query = {
-              "size" : 0,
-              "_source" : False,
-              "query" : {
-                "range" : {
-                  "timestamp" : {
-                    "from" : time_from,
-                    "to" : time_to
-                  }
-                }
-              },
-              "aggregations" : {
-                "groupby" : {
-                  "composite" : {
-                    "size" : 10000,
-                    "sources" : [
-                      {
-                        "src_host" : {
-                          "terms" : {
-                            "field" : "src_host",
-                            "missing_bucket" : True,
-                            "order" : "asc"
-                          }
-                        }
-                      },
-                      {
-                        "ipv6" : {
-                          "terms" : {
-                            "field" : "ipv6",
-                            "missing_bucket" : True,
-                            "order" : "asc"
-                          }
-                        }
-                      },
-                      {
-                        "dest_host" : {
-                          "terms" : {
-                            "field" : "dest_host",
-                            "missing_bucket" : True,
-                            "order" : "asc"
-                          }
-                        }
-                      }
-                    ]
-                  },
-                  "aggregations" : {
-                    "mean_field" : {
-                      "avg" : {
-                        "field" : field
-                      }
-                    }
-                  }
-                }
-              }
-            }
-
-    results = hp.es.search( index=idx, body=query)
-
-    data = []
-    data1 = []
-    for item in results["aggregations"]["groupby"]["buckets"]:
-        data1.append(item)
-        data.append({'dest_host':item['key']['dest_host'], 'src_host':item['key']['src_host'], 'ipv6':item['key']['ipv6'],
-                     field: item['mean_field']['value'], 'num_tests': item['doc_count']})
-
-    return data
+    print('Data is ready')
+    return df[['ts', 'src_host', 'dest_host', 'ipv6', 'packet_loss',
+               'delay_mean', 'src_ntp', 'dest_ntp', 'src_test_count','dest_test_count']]
 
 
 
-def ProcessDataInChunks(func, idx, dateFrom, dateTo, chunks):
+def PrepareNTPData(dfs, dateTo):
+    print('Collect NTP data from ps_meta...')
+    unique_hosts = []
+    for d in dfs:
+        unique_hosts.extend(set(list(d['src_host'].unique()) + list(d['dest_host'].unique())))
+
+    ntp_from = datetime.strftime(datetime.strptime(dateTo,'%Y-%m-%d %H:%M') - timedelta(hours = 24), '%Y-%m-%d %H:%M')
+    ntp_period = hp.GetTimeRanges(ntp_from, dateTo, 1)
+    ntp_ts = [next(ntp_period), next(ntp_period)]
+    ntp_info = []
+    for uh in unique_hosts:
+        ntp_info.extend(qrs.QueryNTPDelay('ps_meta', ntp_ts[0], ntp_ts[1], [uh]))
+
+    ntpdf = pd.DataFrame(ntp_info)
+    ntpdf['ts'] = pd.to_datetime(ntpdf['ts'], unit='ms')
+    ntpdf.set_index('ts', inplace = True)
+    ntpdf['ntp_delay'] = ntpdf['ntp_delay'].fillna(ntpdf.groupby([ntpdf['host'], ntpdf.index.day])['ntp_delay'].transform('mean'))
+
+    return ntpdf
+
+
+
+
+def ProcessDataInChunks(func, idx, dateFrom, dateTo, chunks, args=[], inParallel=False):
     start = time.time()
-    print('>>> Main process starts for index', idx, 'at:', time.strftime("%H:%M:%S", time.localtime()))
+    print('>>> Main process start:', time.strftime("%H:%M:%S", time.localtime()))
 
     time_range = list(hp.GetTimeRanges(dateFrom, dateTo, chunks))
 
@@ -199,9 +132,12 @@ def ProcessDataInChunks(func, idx, dateFrom, dateTo, chunks):
     for i in range(len(time_range)-1):
         curr_t = time_range[i]
         next_t = time_range[i+1]
-        print('interval' , i, curr_t, next_t)
-        results = func(idx, curr_t, next_t)
-        prdata = hp.ProcessHosts(index=idx, data=results, tsFrom=time_range[0], tsTo=time_range[-1], saveUnresolved=True)
+        print(i, curr_t, next_t, args)
+        if len(args) > 0:
+            results = func(idx, curr_t, next_t, args)
+        else: results = func(idx, curr_t, next_t)
+
+        prdata = hp.ProcessHosts(index=idx, data=results, tsFrom=time_range[0], tsTo=time_range[-1], inParallel=inParallel, saveUnresolved=False)
 
         percetage = round(((len(results)-len(prdata))/ len(results))*100) if len(results) > 0 else 0
         print('before:', len(results), 'after:', len(prdata), 'reduced by', percetage, '%')
@@ -212,3 +148,23 @@ def ProcessDataInChunks(func, idx, dateFrom, dateTo, chunks):
     print(">>> Overall elapsed = %ss" % (int(time.time() - start)))
 
     return data
+
+
+def RefreshData():
+    for period in [1, 12, 24, 72, 168]:
+        dateTo = datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M')
+        dateFrom = datetime.strftime(datetime.now() - timedelta(hours = period), '%Y-%m-%d %H:%M')
+        file_name = "data/LossDelayTestCountGroupedbyHost-"+str(period)+".csv"
+        df_tab = LossDelayTestCountGroupedbyHost(dateFrom, dateTo)
+        df_tab.to_csv(file_name, index = False)
+
+
+def StartCron():
+    import atexit
+    from apscheduler.schedulers.background import BackgroundScheduler
+    print('Start cron')
+    cron = BackgroundScheduler()
+    cron.add_job(func=RefreshData, trigger="interval", minutes=60)
+    cron.start()
+    # Shut down the scheduler when exiting the app
+    atexit.register(lambda: cron.shutdown())

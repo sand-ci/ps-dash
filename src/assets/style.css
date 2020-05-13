@@ -1,0 +1,20 @@
+.header {
+    margin: 10px;
+}
+
+.period-btns {
+    float: right;
+    margin-bottom: 0;
+}
+
+.data-table {
+    margin: 0 30px 30px 30px;
+}
+
+.selected-text, .desc-text {
+    display: none;
+}
+
+.loading-component1 {
+    margin: 20px;
+}
