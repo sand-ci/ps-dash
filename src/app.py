@@ -139,6 +139,3 @@ app.config.suppress_callback_exceptions = True
 app.enable_dev_tools(debug=False, dev_tools_props_check=False)
 
 app.run_server(debug=False)
-=======
-app.run_server(port=80, debug=True)
->>>>>>> ff56085066db17e1c9eeb24f688e2d8df01e8538
