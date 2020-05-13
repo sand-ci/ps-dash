@@ -92,7 +92,6 @@ app.layout = html.Div(
 )
 
 
-<<<<<<< HEAD
 @app.callback([Output('count', 'children'),
                Output('hosts-table', 'children'),
                Output('loader1', 'is_loading')],
