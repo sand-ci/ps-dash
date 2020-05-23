@@ -5,6 +5,7 @@ flask==1.0.2
 dash-core-components==1.8.0
 dash-html-components==1.0.2
 dash_bootstrap_components
+dash_daq
 dash==1.9.0
 plotly
 plotly_express

@@ -25,6 +25,25 @@ def BubbleChartDataset(idx, dateFrom, dateTo, fld_type):
     return df
 
 
+def SrcDestTables(host):
+    dateTo = datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M')
+    dateFrom = datetime.strftime(datetime.now() - timedelta(hours = 24), '%Y-%m-%d %H:%M')
+    pdata = ProcessDataInChunks(qrs.GetPairsForAHost, 'ps_packetloss', dateFrom, dateTo,
+                                 chunks=1, args=[host], inParallel=False)
+    odata = ProcessDataInChunks(qrs.GetPairsForAHost, 'ps_owd', dateFrom, dateTo,
+                                 chunks=1, args=[host], inParallel=False)
+    pdf = pd.DataFrame(pdata, columns=['src_host', 'dest_host', 'packet_loss'])
+    pdf['packet_loss(%)'] = round(pdf['packet_loss']*100,3) if len(pdf) > 0 else 'N/A'
+    odf = pd.DataFrame(odata, columns=['src_host', 'dest_host', 'delay_mean'])
+    odf['delay_mean'] = round(odf['delay_mean'],3)  if len(odf) > 0 else 'N/A'
+    df = pd.merge(pdf, odf, how='outer',
+            left_on=['src_host', 'dest_host'],
+            right_on=['src_host', 'dest_host'])
+    df = df[['src_host', 'dest_host', 'packet_loss(%)', 'delay_mean']]
+    as_source = df[df['src_host']==host].sort_values(['packet_loss(%)', 'delay_mean'], ascending=False)
+    as_destination = df[df['dest_host']==host].sort_values(['packet_loss(%)', 'delay_mean'], ascending=False)
+    return [as_source, as_destination]
+
 
 def LossDelayTestCountGroupedbyHost(dateFrom, dateTo):
     # dateFrom = '2020-03-23 10:00'
