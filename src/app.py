@@ -1,6 +1,7 @@
 import plotly.express as px
 import dash
 import dash_table
+import dash_daq as daq
 import dash_html_components as html
 import dash_core_components as dcc
 import dash_bootstrap_components as dbc
@@ -36,7 +37,10 @@ def hosts_table(df_tab):
 app.layout = html.Div(
     [
         dbc.Row([
-            dbc.Col(html.H4(id='count'), width=9),
+            dbc.Col(html.H4(id='count')),
+            dbc.Col( dbc.Row([html.P('Read from preprocessed dataset'),
+                    daq.ToggleSwitch(size=40, id='read_from_db', className="read-db-switch"),
+                    html.P('Read from ElasticSearch')],justify="center",)),
             dbc.Col(
                 dbc.FormGroup(
                     [
@@ -58,8 +62,7 @@ app.layout = html.Div(
                 )
         ], no_gutters = True, justify="around", className="header"),
         dbc.Row([
-            dbc.Col(dcc.Loading(loading_state={'is_loading':True}, 
-                                className='loading-component1', id="loader1", color="#b3aaaa"), width=12),
+            dbc.Col(dcc.Loading(className='loading-component1', id="loader1", color="#b3aaaa", fullscreen=True), width=12),
             dbc.Col(html.Div(id='hosts-table', className="data-table"), width=12)
         ]),
         dbc.Row([
@@ -68,68 +71,95 @@ app.layout = html.Div(
                     dbc.Col(html.H5("Selected host: "), width='auto', id="selected", className='selected-text'),
                     dbc.Col(html.H5(html.Div(id='selected-host')), width='auto')
                     ]),
-                dbc.Row(html.Div(html.P('Packet loss, delay, number of tests for the past hour.'), className='desc-text', id="description"))
+                dbc.Row(html.Div(html.P('Tests in the past 24 hours '), className='desc-text', id="description"))
             ])
         ], justify="around", className="header"),
         dbc.Row([
-            dbc.Col(dcc.Loading(loading_state={'is_loading':True}, className='loading-component', id="loader", color="#b3aaaa"))
+            dbc.Col(dcc.Loading(className='loading-component', id="loader", color="#b3aaaa"))
         ]),
-        html.Div(
-                dash_table.DataTable(
-                    id='datatable-details', 
-                    style_data_conditional= tmpl.host_table_cond,
-                    style_cell_conditional=tmpl.host_table_cell,
-                    style_header=tmpl.host_table_header,
-                    style_cell={'font-family':'sans-serif'},
-                    sort_action="native",
-                    sort_mode="multi",
-                    page_action="native",
-                    page_current= 0,
-                    page_size= 20
-                ),
-                className="data-table"),
+        dbc.Row([
+            dbc.Col([
+                html.H5("Host as source", id="as_src_txt",className="data-table"),
+                html.Div(
+                        dash_table.DataTable(
+                            id='datatable-src', 
+                            style_data_conditional= tmpl.host_table_cond,
+                            style_cell_conditional=tmpl.host_table_cell,
+                            style_header=tmpl.host_table_header,
+                            style_cell={'font-family':'sans-serif'},
+                            sort_action="native",
+                            sort_mode="multi",
+                            page_action="native",
+                            page_current= 0,
+                            page_size= 10
+                        ),
+                        className="data-table")
+                ]),
+            dbc.Col([
+                html.H5("Host as destination", id="as_dest_txt", className="data-table"),
+                html.Div(
+                        dash_table.DataTable(
+                            id='datatable-dest', 
+                            style_data_conditional= tmpl.host_table_cond,
+                            style_cell_conditional=tmpl.host_table_cell,
+                            style_header=tmpl.host_table_header,
+                            style_cell={'font-family':'sans-serif'},
+                            sort_action="native",
+                            sort_mode="multi",
+                            page_action="native",
+                            page_current= 0,
+                            page_size= 10
+                        ),
+                        className="data-table")
+            ])
+        ]),
     ]
 )
 
 
 @app.callback([Output('count', 'children'),
                Output('hosts-table', 'children'),
-               Output('loader1', 'is_loading')],
-              [Input(component_id='radioitems-period', component_property='value')])
-def update_hostsTable(period):
-    df_tab = pd.read_csv("data/LossDelayTestCountGroupedbyHost-"+str(period)+".csv")
-#     dateTo = datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M')
-#     dateFrom = datetime.strftime(datetime.now() - timedelta(hours = period), '%Y-%m-%d %H:%M')
-#     df_tab = build.LossDelayTestCountGroupedbyHost(dateFrom, dateTo)
+               Output('loader1', 'loading_state')],
+              [Input('radioitems-period', 'value'),
+               Input('read_from_db', 'value')])
+def update_hostsTable(period, read_from_db):
+    if (read_from_db == True):
+        dateTo = datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M')
+        dateFrom = datetime.strftime(datetime.now() - timedelta(hours = period), '%Y-%m-%d %H:%M')
+        df_tab = build.LossDelayTestCountGroupedbyHost(dateFrom, dateTo)
+    else:
+        df_tab = pd.read_csv("data/LossDelayTestCountGroupedbyHost-"+str(period)+".csv")
     df_tab['id'] = df_tab['host']
     df_tab.set_index('host', inplace=True, drop=False)
     return u'''Number of hosts for the period: {}'''.format(len(df_tab)), hosts_table(df_tab), False
 
 @app.callback(
     [Output('selected-host', 'children'),
-     Output(component_id='selected', component_property='style'),
-     Output(component_id='description', component_property='style')],
+     Output('selected', 'style'),
+     Output('description', 'style'),
+     Output('as_src_txt', 'style'),
+     Output('as_dest_txt', 'style'),],
     [Input('datatable-row-ids', 'active_cell')])
 def get_host(active_cell):
     active_row_id = active_cell['row_id'] if active_cell else None
     if active_row_id:
-        show_selected_style = {'display': 'block', 'padding': '0 5px'} 
-    return active_row_id, show_selected_style, show_selected_style
+        show_css = {'display': 'block', 'padding': '0 5px'} 
+    return active_row_id, show_css, show_css, show_css, show_css
 
 @app.callback(
-    [Output('datatable-details', 'data'),
-     Output('datatable-details', 'columns'),
-     Output('loader', 'is_loading')],
+     [Output('datatable-src', 'data'),
+      Output('datatable-src', 'columns'),
+      Output('datatable-dest', 'data'),
+      Output('datatable-dest', 'columns'),
+      Output('loader', 'loading_state')],
     [Input('selected-host', 'children')])
 def get_details(host):
-#     print('>>>>>', host, type(host))
     if (host is not None) or (host != '') or (host != 'None'):
-        print('--------------------')
-        dateTo = datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M')
-        dateFrom = datetime.strftime(datetime.now() - timedelta(hours = 1), '%Y-%m-%d %H:%M')
-        df_tab = build.SrcDestLossDelayNTP(host, dateFrom, dateTo)
-        columns=[{"name": i, "id": i} for i in df_tab.columns]
-        return df_tab.to_dict('records'), columns, False
+        data = build.SrcDestTables(host)
+        as_source = data[0]
+        as_destination = data[1]
+        columns=[{"name": i, "id": i} for i in as_source.columns]
+        return as_source.to_dict('records'), columns, as_destination.to_dict('records'), columns, False
     else:
         return '', '', False
 
