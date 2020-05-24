@@ -13,8 +13,8 @@ from datetime import datetime, timedelta
 import templates as tmpl
 import DatasetBuilder as build
 
-external_stylesheets = [dbc.themes.BOOTSTRAP, "style.css"]
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+external_stylesheets = [dbc.themes.BOOTSTRAP]
+app = dash.Dash(__name__, external_stylesheets=external_stylesheets, suppress_callback_exceptions=True, prevent_initial_callbacks=True)
 
 build.StartCron()
 
@@ -121,7 +121,8 @@ app.layout = html.Div(
                Output('hosts-table', 'children'),
                Output('loader1', 'loading_state')],
               [Input('radioitems-period', 'value'),
-               Input('read_from_db', 'value')])
+               Input('read_from_db', 'value')],
+             prevent_initial_call=False)
 def update_hostsTable(period, read_from_db):
     if (read_from_db == True):
         dateTo = datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M')
@@ -144,7 +145,8 @@ def get_host(active_cell):
     active_row_id = active_cell['row_id'] if active_cell else None
     if active_row_id:
         show_css = {'display': 'block', 'padding': '0 5px'} 
-    return active_row_id, show_css, show_css, show_css, show_css
+        return active_row_id, show_css, show_css, show_css, show_css
+    else: raise dash.exceptions.PreventUpdate
 
 @app.callback(
      [Output('datatable-src', 'data'),
@@ -152,19 +154,16 @@ def get_host(active_cell):
       Output('datatable-dest', 'data'),
       Output('datatable-dest', 'columns'),
       Output('loader', 'loading_state')],
-    [Input('selected-host', 'children')])
+     [Input('selected-host', 'children')])
 def get_details(host):
-    if (host is not None) or (host != '') or (host != 'None'):
+    if host is not None:
         data = build.SrcDestTables(host)
         as_source = data[0]
         as_destination = data[1]
         columns=[{"name": i, "id": i} for i in as_source.columns]
         return as_source.to_dict('records'), columns, as_destination.to_dict('records'), columns, False
     else:
-        return '', '', False
+        raise dash.exceptions.PreventUpdate
 
-
-app.config.suppress_callback_exceptions = True
-app.enable_dev_tools(debug=False, dev_tools_props_check=False)
 
 app.run_server(debug=False)
