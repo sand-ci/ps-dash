@@ -166,4 +166,4 @@ def get_details(host):
         raise dash.exceptions.PreventUpdate
 
 
-app.run_server(debug=False)
+app.run_server(debug=False, port=80)
