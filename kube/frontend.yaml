@@ -11,7 +11,7 @@ spec:
   - name: http
     protocol: TCP
     port: 80
-    targetPort: 80
+    targetPort: 8050
   selector:
     k8s-app: ps-dash
 ---
