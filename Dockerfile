@@ -19,7 +19,6 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     zip \
     vim 
 
-
 RUN pip3 install --upgrade pip
 
 COPY src /src/
