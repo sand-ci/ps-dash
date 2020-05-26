@@ -26,6 +26,6 @@ COPY src /src/
 
 RUN pip3 install --no-cache-dir -r /src/requirements.txt
 
-EXPOSE 5000
+EXPOSE 8050
 
 ENTRYPOINT ["python3", "/src/app.py"]
