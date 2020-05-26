@@ -58,11 +58,11 @@ spec:
     spec:
       containers:
       - name: ps-dash
-        image: ivukotic/ps-dash:latest
+        image: sand-ci/ps-dash:latest
         # command: ["sleep"]
         # args: ["36500000"]
         ports:
-          - containerPort: 80
+          - containerPort: 8050
         # livenessProbe:
         #   httpGet:
         #     scheme: HTTP
