@@ -60,3 +60,65 @@
     margin-top: 50px;
 }
 
+/**********   Header   **********/
+
+.header {
+    margin: 10px;
+}
+
+.header h4 {
+    padding-left: 20px;
+}
+
+/**********   Switch button   **********/
+
+.read-db-switch {
+    margin: 0 15px;
+}
+
+.sc-bdVaJa.epRheK, .sc-bdVaJa.ljjuxx {
+    width: 10px;
+    height: 10px;
+    margin: 0 5px;
+}
+
+.epRheK.daq-toggleswitch--light__indicator--on {
+    background-color: gray;
+}
+
+/**********   Period buttons   **********/
+
+.period-btns {
+    float: right;
+    margin-bottom: 0;
+}
+
+/**********   Data table   **********/
+
+.data-table {
+    margin: 0 30px 30px 30px;
+}
+
+.data-table tbody tr.selected td {
+    background: none repeat scroll 0 0 #FFCF8B;
+    color: #FFFFFF !important;
+}
+
+.selected-text, .desc-text, #as_src_txt, #as_dest_txt {
+    display: none;
+}
+
+/**********   Loaders   **********/
+
+.loading-component1 {
+    margin: 50px 0 0 0;
+}
+
+.loading-component1 .dash-spinner.dash-default-spinner {
+    margin-bottom: 300px;
+}
+
+.loading-component {
+    margin-top: 50px;
+}
+

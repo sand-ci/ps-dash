@@ -1,3 +1,6 @@
+colors = {'warning': '#f7dba7',
+          'ok': '#9bc191'}
+
 host_table_cell = [
                     {
                         'if': {
@@ -13,15 +16,15 @@ host_table_cond = [
                     'column_id': 'packet_loss-total_dests',
                     'filter_query': '{packet_loss-total_dests} < {total_num_of_dests}'
                 },
-                'backgroundColor': 'rgb(153, 61, 61)',
-                'color': 'white',
+                'backgroundColor': colors['warning'],
+                'color': 'black',
             },
             {
                 'if': {
                     'column_id': 'packet_loss-total_dests',
                     'filter_query': '{packet_loss-total_dests} eq {total_num_of_dests}'
                 },
-                'backgroundColor': '#3D9970',
+                'backgroundColor': colors['ok'],
                 'color': 'white',
             },
             {
@@ -29,15 +32,15 @@ host_table_cond = [
                     'column_id': 'owd-total_dests',
                     'filter_query': '{owd-total_dests} < {total_num_of_dests}'
                 },
-                'backgroundColor': 'rgb(153, 61, 61)',
-                'color': 'white',
+                'backgroundColor': colors['warning'],
+                'color': 'black',
             },
             {
                 'if': {
                     'column_id': 'owd-total_dests',
                     'filter_query': '{owd-total_dests} eq {total_num_of_dests}'
                 },
-                'backgroundColor': '#3D9970',
+                'backgroundColor': colors['ok'],
                 'color': 'white',
             },
             {
@@ -45,24 +48,24 @@ host_table_cond = [
                     'column_id': 'delay_mean',
                     'filter_query': '{delay_mean} < 0'
                 },
-                'backgroundColor': 'rgb(153, 61, 61)',
-                'color': 'white',
+                'backgroundColor': colors['warning'],
+                'color': 'black',
             },
             {
                 'if': {
                     'column_id': 'packet_loss',
                     'filter_query': '{packet_loss} > 0.1'
                 },
-                'backgroundColor': 'rgb(230, 165, 3)',
-                'color': 'white',
+                'backgroundColor': colors['warning'],
+                'color': 'black',
             },
             {
                 'if': {
                     'column_id': 'packet_loss',
                     'filter_query': '{packet_loss} eq 1'
                 },
-                'backgroundColor': 'rgb(153, 61, 61)',
-                'color': 'white',
+                'backgroundColor': colors['warning'],
+                'color': 'black',
             }
         ]
 

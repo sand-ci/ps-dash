@@ -14,7 +14,12 @@ import queries as qrs
 import os
 
 
-ntpdf = qrs.GetNTP()
+def PrepareHostsMetaData():
+    dateTo = datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M')
+    dateFrom = datetime.strftime(datetime.now() - timedelta(hours = 24), '%Y-%m-%d %H:%M')
+    time_range = list(hp.GetTimeRanges(dateFrom, dateTo, 1))
+    for index in ['ps_packetloss', 'ps_owd']:
+        hp.GetIdxUniqueHosts(index, time_range[0], time_range[1])
 
 
 def BubbleChartDataset(idx, dateFrom, dateTo, fld_type):
@@ -82,6 +87,66 @@ def LossDelayTestCountGroupedbyHost(dateFrom, dateTo):
     return ddf[['host', 'delay_mean', 'packet_loss', 'total_num_of_dests', 'owd-total_dests',  'packet_loss-total_dests']]
 
 
+def LossDelaySubplotData(dateFrom, dateTo, args):
+    time_range = list(hp.GetTimeRanges(dateFrom, dateTo, 1))
+    tsFrom = time_range[0]
+    tsTo = time_range[1]
+
+    src = args[0]
+    dest = args[1]
+    def buildDataFrame(idx):
+        data = qrs.PairAverageValuesQuery(idx, tsFrom, tsTo, [src, dest])
+        df = pd.DataFrame(data)
+        if data:
+            df['ts'] = pd.to_datetime(df['ts'], unit='ms')
+            df.sort_values('ts')
+        return df
+
+    pldf = buildDataFrame('ps_packetloss')
+    owddf = buildDataFrame('ps_owd')
+
+    agg_interval = 30
+
+    def findPercentageOfTestsDone(df, fld):
+        def findRatio(row):
+            if pd.isna(row['doc_count']):
+                count = '0'
+            else: count = str(round((row['doc_count']/agg_interval)*100))+'%'
+            return count
+        if not df.empty:
+            df[str(fld+'_tests_done')] = df.apply(lambda x: findRatio(x), axis=1)
+            df.rename(columns={'doc_count': str(fld+'_doc_count')}, inplace=True)
+
+    findPercentageOfTestsDone(pldf, 'pl')
+    findPercentageOfTestsDone(owddf, 'owd')
+
+    try:
+        df = pd.merge(pldf, owddf, left_on=['ts', 'ipv6'], right_on=['ts', 'ipv6'],
+                      left_index=False, right_index=False, how='outer')
+    except KeyError:
+        df = pldf if not pldf.empty else owddf
+    print(len(df), len(pldf), len(owddf), dateFrom, dateTo, args)
+    df.sort_values('ts', inplace=True)
+    # in case one of the dataframes is empty, we add empty columns
+    if not "delay_mean" in df:
+        df['delay_mean'] = ''
+        df['owd_tests_done'] = ''
+        df['owd_doc_count'] = ''
+    elif not "packet_loss" in df:
+        df['delay_mean'] = ''
+        df['owd_tests_done'] = ''
+        df['owd_doc_count'] = ''
+
+    def isSymetric(idx, ipv6):
+        return qrs.PairSymmetryQuery(idx, tsFrom, tsTo, [dest, src, ipv6])
+
+    pl_symmetry = {'ipv6':isSymetric('ps_packetloss', True), 'ipv4':isSymetric('ps_packetloss', False)}
+    owd_symmetry = {'ipv6':isSymetric('ps_owd', True), 'ipv4':isSymetric('ps_owd', False)}
+    ntp = qrs.GetNTP(tsFrom, tsTo, [src, dest])
+
+    return {'ipv6df': df[df['ipv6']==True], 'ipv4df': df[df['ipv6']==False], 'ntp': ntp, 'pl_symmetry': pl_symmetry, 'owd_symmetry': owd_symmetry}
+
+
 def SrcDestLossDelayNTP(host, dateFrom, dateTo):
     global ntpdf
     print('ntp data is already loaded:',len(ntpdf))
@@ -92,17 +157,11 @@ def SrcDestLossDelayNTP(host, dateFrom, dateTo):
             dff['ts'] = pd.to_datetime(dff['ts'], unit='ms')
         return dff
 
-#     pldf = buildDataFrames('ps_packetloss', ['ccperfsonar2.in2p3.fr'])
-#     owddf = buildDataFrames('ps_owd', ['ccperfsonar2.in2p3.fr'])
-
     pldf = buildDataFrames('ps_packetloss', [host])
     owddf = buildDataFrames('ps_owd', [host])
 
-#     ntpdf = PrepareNTPData([pldf, owddf], dateTo).reset_index()
-#     ntpdf = PrepareNTPData([pldf, owddf], dateTo)
-
     df = pd.merge(pldf, owddf, how='left', 
-            left_on=['src_host', 'dest_host', 'ipv6', 'ts'], 
+            left_on=['src_host', 'dest_host', 'ipv6', 'ts'],
             right_on=['src_host', 'dest_host', 'ipv6', 'ts'])
 
     df = pd.merge(df, ntpdf, how='left', left_on=['src_host'], right_on=['host'])
@@ -115,7 +174,6 @@ def SrcDestLossDelayNTP(host, dateFrom, dateTo):
     print('Data is ready')
     return df[['ts', 'src_host', 'dest_host', 'ipv6', 'packet_loss',
                'delay_mean', 'src_ntp', 'dest_ntp', 'src_test_count','dest_test_count']]
-
 
 
 def PrepareNTPData(dfs, dateTo):
@@ -137,8 +195,6 @@ def PrepareNTPData(dfs, dateTo):
     ntpdf['ntp_delay'] = ntpdf['ntp_delay'].fillna(ntpdf.groupby([ntpdf['host'], ntpdf.index.day])['ntp_delay'].transform('mean'))
 
     return ntpdf
-
-
 
 
 def ProcessDataInChunks(func, idx, dateFrom, dateTo, chunks, args=[], inParallel=False):
@@ -173,6 +229,8 @@ def RefreshData():
     for period in [1, 12, 24, 72, 168]:
         dateTo = datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M')
         dateFrom = datetime.strftime(datetime.now() - timedelta(hours = period), '%Y-%m-%d %H:%M')
+        if os.path.exists("data") == False:
+            os.mkdir("data")
         file_name = "data/LossDelayTestCountGroupedbyHost-"+str(period)+".csv"
         df_tab = LossDelayTestCountGroupedbyHost(dateFrom, dateTo)
         df_tab.to_csv(file_name, index = False)
@@ -183,7 +241,7 @@ def StartCron():
     from apscheduler.schedulers.background import BackgroundScheduler
     print('Start cron')
     cron = BackgroundScheduler()
-    cron.add_job(func=RefreshData, trigger="interval", minutes=60)
+    cron.add_job(func=PrepareHostsMetaData, trigger="interval", minutes=60, start_date=datetime.now())
+    cron.add_job(func=RefreshData, trigger="interval", minutes=60, start_date=datetime.now())
     cron.start()
-    # Shut down the scheduler when exiting the app
     atexit.register(lambda: cron.shutdown())

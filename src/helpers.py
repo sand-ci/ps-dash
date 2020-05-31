@@ -34,7 +34,7 @@ def ConnectES():
     else: print("Connection Unsuccessful")
 
 
-def GetTimeRanges(start, end, intv):
+def GetTimeRanges(start, end, intv=1):
     t_format = "%Y-%m-%d %H:%M"
     start = datetime.strptime(start,t_format)
     end = datetime.strptime(end, t_format)
@@ -65,13 +65,13 @@ def MakeChunks(minutes):
 
 def getValueField(idx):
     if idx == 'ps_packetloss':
-        val_fld = 'packet_loss'
+        return 'packet_loss'
     elif idx == 'ps_owd':
-        val_fld = 'delay_mean'
+        return 'delay_mean'
     elif idx == 'ps_retransmits':
-        val_fld = 'retransmits'
+        return 'retransmits'
 
-    return val_fld
+    return None
 
 
 def GetDestinationsFromPSConfig(host):
@@ -240,6 +240,7 @@ es = ConnectES()
 meta = GetHostsMetaData()
 hosts_meta = meta['hosts']
 ips_meta = meta['ips']
+replaced_ips_with_hosts = manager.dict()
 
 ### That method should be run as a pre-step before ProcessHosts.
 ### It will fix all hosts beforehand and then look up hosts dictionary during the parallel processing of the dataset.
@@ -392,6 +393,7 @@ def FixHosts(item, unres):
 ###         search the IP in ps_meta for the corresponding host name
 ###         If not - mark it unresolved
 def ResolveHost(host):
+    global replaced_ips_with_hosts
     is_host = re.match(".*[a-zA-Z].*", host)
     h = ''
     u = []

@@ -1,4 +1,7 @@
+from urllib.parse import urlparse, parse_qs
+
 import plotly.express as px
+import flask
 import dash
 import dash_table
 import dash_daq as daq
@@ -13,114 +16,64 @@ from datetime import datetime, timedelta
 import templates as tmpl
 import DatasetBuilder as build
 
-external_stylesheets = [dbc.themes.BOOTSTRAP]
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets, suppress_callback_exceptions=True, prevent_initial_callbacks=True)
+import index
+import pair_plots_page
+import subplots
 
 build.StartCron()
 
+external_stylesheets = [dbc.themes.BOOTSTRAP]
+server = flask.Flask(__name__)
+app = dash.Dash(__name__, server=server, external_stylesheets=external_stylesheets,
+                suppress_callback_exceptions=True, prevent_initial_callbacks=True)
 
-def hosts_table(df_tab):
-    return dash_table.DataTable(
-        id='datatable-row-ids',
-        columns=[{"name": i, "id": i} for i in df_tab.columns],
-        data=df_tab.to_dict('records'),
-        style_data_conditional=tmpl.host_table_cond,
-        style_cell_conditional=tmpl.host_table_cell,
-        style_header=tmpl.host_table_header,
-        style_cell={'font-family': 'sans-serif'},
-        sort_action="native",
-        sort_mode="multi",
-        page_action="native",
-        page_current=0,
-        page_size=20
-    )
+def serve_layouts(layout_dict):
+    def serve_layouts_closure():
+        if not flask.has_request_context():
+            return html.Div()
+
+        referer = flask.request.headers.get('Referer', '')
+
+        path = urlparse(referer).path
+        pages = path.split('/')
+
+        query = ''
+        query_string = urlparse(referer).query
+        if query_string:
+            query = parse_qs(query_string)
+        print(query)
+
+        if len(pages) < 2 or not pages[1]:
+            return layout_dict['index']
+
+        page = pages[1]
+        if page in layout_dict:
+            if page == 'pair':
+                return layout_dict[page](query)
+            else: return layout_dict[page]
+
+    return serve_layouts_closure
+
+# Here we pass the URL query parameters to the pair-plot page
+def show_pair_plots(pair):
+    dateTo = datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M')
+    dateFrom = datetime.strftime(datetime.now() - timedelta(hours = 24), '%Y-%m-%d %H:%M')
+    src = pair['src'][0]
+    dest = pair['dest'][0]
+
+    data = build.LossDelaySubplotData(dateFrom, dateTo, [src, dest])
+    fig = subplots.PacketlossDelaySubplots(data = data, title = str("Report for "+src+" -> "+dest+" Period: "+dateFrom+"  -  "+dateTo))
+
+    return pair_plots_page.GenerateLayout(fig)
 
 
-app.layout = html.Div(
-    [
-        dbc.Row([
-            dbc.Col(html.H4(id='count')),
-            dbc.Col(dbc.Row([html.P('Read from preprocessed dataset'),
-                             daq.ToggleSwitch(size=40, id='read_from_db', className="read-db-switch"),
-                             html.P('Read from ElasticSearch')], justify="center",)),
-            dbc.Col(
-                dbc.FormGroup(
-                    [
-                        dbc.RadioItems(
-                            options=[
-                                {"label": "1H", "value": 1},
-                                {"label": "12H", "value": 12},
-                                {"label": "1D", "value": 24},
-                                {"label": "3D", "value": 72},
-                                {"label": "7D", "value": 168},
-                            ],
-                            value=1,
-                            id="radioitems-period",
-                            className="period-btns",
-                            inline=True,
-                        ),
-                    ]
-                )
-            )
-        ], no_gutters=True, justify="around", className="header"),
-        dbc.Row([
-            dbc.Col(dcc.Loading(className='loading-component1', id="loader1", color="#b3aaaa", fullscreen=True), width=12),
-            dbc.Col(html.Div(id='hosts-table', className="data-table"), width=12)
-        ]),
-        dbc.Row([
-            dbc.Col([
-                dbc.Row([
-                    dbc.Col(html.H5("Selected host: "), width='auto', id="selected", className='selected-text'),
-                    dbc.Col(html.H5(html.Div(id='selected-host')), width='auto')
-                ]),
-                dbc.Row(html.Div(html.P('Tests in the past 24 hours '), className='desc-text', id="description"))
-            ])
-        ], justify="around", className="header"),
-        dbc.Row([
-            dbc.Col(dcc.Loading(className='loading-component', id="loader", color="#b3aaaa"))
-        ]),
-        dbc.Row([
-            dbc.Col([
-                html.H5("Host as source", id="as_src_txt", className="data-table"),
-                html.Div(
-                    dash_table.DataTable(
-                        id='datatable-src',
-                        style_data_conditional=tmpl.host_table_cond,
-                        style_cell_conditional=tmpl.host_table_cell,
-                        style_header=tmpl.host_table_header,
-                        style_cell={'font-family': 'sans-serif'},
-                        sort_action="native",
-                        sort_mode="multi",
-                        page_action="native",
-                        page_current=0,
-                        page_size=10
-                    ),
-                    className="data-table")
-            ]),
-            dbc.Col([
-                html.H5("Host as destination", id="as_dest_txt", className="data-table"),
-                html.Div(
-                    dash_table.DataTable(
-                        id='datatable-dest',
-                        style_data_conditional=tmpl.host_table_cond,
-                        style_cell_conditional=tmpl.host_table_cell,
-                        style_header=tmpl.host_table_header,
-                        style_cell={'font-family': 'sans-serif'},
-                        sort_action="native",
-                        sort_mode="multi",
-                        page_action="native",
-                        page_current=0,
-                        page_size=10
-                    ),
-                    className="data-table")
-            ])
-        ]),
-    ]
-)
+app.layout = serve_layouts({'index': index.layout,
+                            'pair': show_pair_plots})
 
 
 @app.callback([Output('count', 'children'),
-               Output('hosts-table', 'children'),
+               Output('datatable-row-ids', 'data'),
+               Output('datatable-row-ids', 'columns'),
                Output('loader1', 'loading_state')],
               [Input('radioitems-period', 'value'),
                Input('read_from_db', 'value')],
@@ -134,7 +87,9 @@ def update_hostsTable(period, read_from_db):
         df_tab = pd.read_csv("data/LossDelayTestCountGroupedbyHost-" + str(period) + ".csv")
     df_tab['id'] = df_tab['host']
     df_tab.set_index('host', inplace=True, drop=False)
-    return u'''Number of hosts for the period: {}'''.format(len(df_tab)), hosts_table(df_tab), False
+    columns=[{"name": i, "id": i} for i in df_tab.columns]
+    return u'''Number of hosts for the period: {}'''.format(len(df_tab)), df_tab.to_dict('records'), columns, False
+
 
 
 @app.callback(
@@ -170,5 +125,24 @@ def get_details(host):
     else:
         raise dash.exceptions.PreventUpdate
 
+@app.callback(
+    [Output('change-url', 'href')],
+    [Input('datatable-src', 'active_cell'), Input('datatable-src', 'data'),
+     Input('datatable-dest', 'active_cell'), Input('datatable-dest', 'data')])
+def changeURL(active_cell_src, src_data, active_cell_dest, dest_data):
+    if active_cell_src is not None and src_data is not None:
+        df = pd.DataFrame(src_data)
+        pair = df.loc[active_cell_src['row']][['src_host', 'dest_host']].to_list()
+        return [str("pair/?src="+pair[0]+"&dest="+pair[1])]
+    elif active_cell_dest is not None and dest_data is not None:
+        df = pd.DataFrame(dest_data)
+        pair = df.loc[active_cell_dest['row']][['src_host', 'dest_host']].to_list()
+        return [str("pair/?src="+pair[0]+"&dest="+pair[1])]
+    else:
+        raise dash.exceptions.PreventUpdate
+
 
 app.run_server(debug=False, port=8050, host='0.0.0.0')
+
+if __name__ == '__main__':
+    app.run_server()
