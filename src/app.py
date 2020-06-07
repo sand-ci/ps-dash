@@ -141,5 +141,4 @@ def changeURL(active_cell_src, src_data, active_cell_dest, dest_data):
         raise dash.exceptions.PreventUpdate
 
 
-if __name__ == '__main__':
-    app.run_server()
+app.run_server(debug=False, port=8050, host='0.0.0.0')
