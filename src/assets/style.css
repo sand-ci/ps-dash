@@ -33,7 +33,7 @@
 
 /**********   Data table   **********/
 
-.data-table {
+.base {
     margin: 0 30px 30px 30px;
 }
 
@@ -122,3 +122,13 @@
     margin-top: 50px;
 }
 
+.removed-hosts-title {
+    margin-top: 20px;
+    width: 50%;
+    float: left;
+}
+
+.dash-spreadsheet-menu {
+    float: right;
+    margin-top: 15px;
+}

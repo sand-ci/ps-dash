@@ -19,6 +19,7 @@ import DatasetBuilder as build
 import index
 import pair_plots_page
 import subplots
+import removed_hosts
 
 build.StartCron()
 
@@ -41,7 +42,6 @@ def serve_layouts(layout_dict):
         query_string = urlparse(referer).query
         if query_string:
             query = parse_qs(query_string)
-        print(query)
 
         if len(pages) < 2 or not pages[1]:
             return layout_dict['index']
@@ -68,7 +68,9 @@ def show_pair_plots(pair):
 
 
 app.layout = serve_layouts({'index': index.layout,
-                            'pair': show_pair_plots})
+                            'pair': show_pair_plots,
+                            'removed': removed_hosts.layout})
+
 
 
 @app.callback([Output('count', 'children'),
@@ -77,19 +79,18 @@ app.layout = serve_layouts({'index': index.layout,
                Output('loader1', 'loading_state')],
               [Input('radioitems-period', 'value'),
                Input('read_from_db', 'value')],
-              prevent_initial_call=False)
+             prevent_initial_call=False)
 def update_hostsTable(period, read_from_db):
     if (read_from_db == True):
         dateTo = datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M')
-        dateFrom = datetime.strftime(datetime.now() - timedelta(hours=period), '%Y-%m-%d %H:%M')
+        dateFrom = datetime.strftime(datetime.now() - timedelta(hours = period), '%Y-%m-%d %H:%M')
         df_tab = build.LossDelayTestCountGroupedbyHost(dateFrom, dateTo)
     else:
-        df_tab = pd.read_csv("data/LossDelayTestCountGroupedbyHost-" + str(period) + ".csv")
+        df_tab = pd.read_csv("data/LossDelayTestCountGroupedbyHost-"+str(period)+".csv")
     df_tab['id'] = df_tab['host']
     df_tab.set_index('host', inplace=True, drop=False)
     columns=[{"name": i, "id": i} for i in df_tab.columns]
     return u'''Number of hosts for the period: {}'''.format(len(df_tab)), df_tab.to_dict('records'), columns, False
-
 
 
 @app.callback(
@@ -97,24 +98,22 @@ def update_hostsTable(period, read_from_db):
      Output('selected', 'style'),
      Output('description', 'style'),
      Output('as_src_txt', 'style'),
-     Output('as_dest_txt', 'style'), ],
+     Output('as_dest_txt', 'style'),],
     [Input('datatable-row-ids', 'active_cell')])
 def get_host(active_cell):
     active_row_id = active_cell['row_id'] if active_cell else None
     if active_row_id:
-        show_css = {'display': 'block', 'padding': '0 5px'}
+        show_css = {'display': 'block', 'padding': '0 5px'} 
         return active_row_id, show_css, show_css, show_css, show_css
-    else:
-        raise dash.exceptions.PreventUpdate
-
+    else: raise dash.exceptions.PreventUpdate
 
 @app.callback(
-    [Output('datatable-src', 'data'),
-     Output('datatable-src', 'columns'),
-     Output('datatable-dest', 'data'),
-     Output('datatable-dest', 'columns'),
-     Output('loader', 'loading_state')],
-    [Input('selected-host', 'children')])
+     [Output('datatable-src', 'data'),
+      Output('datatable-src', 'columns'),
+      Output('datatable-dest', 'data'),
+      Output('datatable-dest', 'columns'),
+      Output('loader', 'loading_state')],
+     [Input('selected-host', 'children')])
 def get_details(host):
     if host is not None:
         data = build.SrcDestTables(host)
@@ -141,8 +140,6 @@ def changeURL(active_cell_src, src_data, active_cell_dest, dest_data):
     else:
         raise dash.exceptions.PreventUpdate
 
-
-app.run_server(debug=False, port=8050, host='0.0.0.0')
 
 if __name__ == '__main__':
     app.run_server()

@@ -5,6 +5,7 @@ import itertools
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import scan
 import helpers as hp
+import time
 
 
 def GetPairsForAHost(idx, time_from, time_to, args):
@@ -175,8 +176,8 @@ def GetNTP(date_from, date_to, args):
                 res[item['key']['host']] = round(ntp, 4)
             else: res[item['key']['host']] = 'None'
 
-        if host not in res:
-            res[host] = 'N/A'
+#         if host not in res:
+#             res[host] = 'N/A'
         return res
 
     data = []

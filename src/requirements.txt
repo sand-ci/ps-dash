@@ -13,3 +13,4 @@ plotly_express
 numpy
 pandas
 apscheduler
+ipwhois

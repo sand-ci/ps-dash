@@ -36,7 +36,7 @@ layout = html.Div(
         ], no_gutters = True, justify="around", className="header"),
         dbc.Row([
             dbc.Col(dcc.Loading(className='loading-component1', id="loader1", color="#b3aaaa", fullscreen=True), width=12),
-            dbc.Col(html.P('Click on a row to select a host', className="data-table"), width=12),
+            dbc.Col(html.P('Click on a row to select a host', className="base"), width=12),
             dbc.Col(html.Div(
                             dash_table.DataTable(
                                 id='datatable-row-ids',
@@ -50,7 +50,7 @@ layout = html.Div(
                                 page_current= 0,
                                 page_size= 20
                             ),    
-                    className="data-table"
+                    className="base"
             ), width=12)
         ]),
         dbc.Row([
@@ -89,10 +89,10 @@ layout = html.Div(
                             page_current= 0,
                             page_size= 10
                         ),
-                        className="data-table")
+                        className="base")
                 ]),
             dbc.Col([
-                html.H5("Host as destination", id="as_dest_txt", className="data-table"),
+                html.H5("Host as destination", id="as_dest_txt", className="base"),
                 html.Div(
                         dash_table.DataTable(
                             id='datatable-dest', 
@@ -106,7 +106,7 @@ layout = html.Div(
                             page_current= 0,
                             page_size= 10
                         ),
-                        className="data-table")
+                        className="base")
             ])
         ]),
     ]

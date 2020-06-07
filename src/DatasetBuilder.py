@@ -8,6 +8,7 @@ from elasticsearch import Elasticsearch
 from elasticsearch.helpers import scan
 import numpy as np
 import pandas as pd
+from ipwhois import IPWhois
 
 import helpers as hp
 import queries as qrs
@@ -28,6 +29,31 @@ def BubbleChartDataset(idx, dateFrom, dateTo, fld_type):
     df = pd.DataFrame(data[fld_type])
     df['period'] = pd.to_datetime(df['period'], unit='ms')
     return df
+
+
+def RemovedHosts():
+    if len(hp.hosts) == 0:
+        PrepareHostsMetaData()
+
+    def getIPWhoIs(row):
+        item = row['Host']
+        is_host = re.match(".*[a-zA-Z].*", item)
+        val = ''
+        try:
+            obj = IPWhois(item)
+            res = obj.lookup_whois()
+            val = res['asn_description']
+        except Exception as inst:
+            if is_host:
+                val = ''
+            else: val = inst.args
+        return val
+
+    removed = pd.DataFrame(hp.unresolved.items(), columns=['Host', 'Message'])
+    removed['IPWhois_ASN_desc'] = removed.apply(getIPWhoIs, axis=1)
+    removed['Keep'] = 'N'
+
+    return removed
 
 
 def SrcDestTables(host):

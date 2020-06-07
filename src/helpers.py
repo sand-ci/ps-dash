@@ -240,7 +240,6 @@ es = ConnectES()
 meta = GetHostsMetaData()
 hosts_meta = meta['hosts']
 ips_meta = meta['ips']
-replaced_ips_with_hosts = manager.dict()
 
 ### That method should be run as a pre-step before ProcessHosts.
 ### It will fix all hosts beforehand and then look up hosts dictionary during the parallel processing of the dataset.
@@ -393,7 +392,6 @@ def FixHosts(item, unres):
 ###         search the IP in ps_meta for the corresponding host name
 ###         If not - mark it unresolved
 def ResolveHost(host):
-    global replaced_ips_with_hosts
     is_host = re.match(".*[a-zA-Z].*", host)
     h = ''
     u = []
@@ -409,7 +407,11 @@ def ResolveHost(host):
                 u.append("Host not found in ps_meta index")
         else:
             # Sometimes host name is not resolved and instead IP address is added. Try to resolve the given IP
-            if (socket.gethostbyaddr(host)[0] in hosts_meta):
+            if host == '127.0.0.1':
+                print(host)
+                u.append(host)
+                u.append("Incorrect value for host")
+            elif (socket.gethostbyaddr(host)[0] in hosts_meta):
                 h = socket.gethostbyaddr(host)[0]
             elif (host in ips_meta):
                 h = ips_meta[host][0]
@@ -422,6 +424,6 @@ def ResolveHost(host):
             h = ips_meta[host][0]
         else:
             u.append(host)
-            u.append(inst.args)
+            u.append(str("socket exception: "+inst.args[1]))
 
     return {'resolved': h, 'unresolved': u}
