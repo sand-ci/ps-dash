@@ -9,10 +9,24 @@ from elasticsearch.helpers import scan
 import numpy as np
 import pandas as pd
 from ipwhois import IPWhois
+import os
 
 import helpers as hp
 import queries as qrs
-import os
+import HostsMetaData as hmd
+
+
+packetloss = hmd.HostsMetaData('ps_packetloss')
+pls = packetloss.df
+
+owd = hmd.HostsMetaData('ps_owd')
+owd = owd.df
+
+throughput = hmd.HostsMetaData('ps_throughput')
+thp = throughput.df
+
+retransmits = hmd.HostsMetaData('ps_retransmits')
+rtt = retransmits.df
 
 
 def PrepareHostsMetaData():

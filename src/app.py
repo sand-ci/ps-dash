@@ -20,6 +20,7 @@ import index
 import pair_plots_page
 import subplots
 import removed_hosts
+import host_map
 
 build.StartCron()
 
@@ -69,7 +70,8 @@ def show_pair_plots(pair):
 
 app.layout = serve_layouts({'index': index.layout,
                             'pair': show_pair_plots,
-                            'removed': removed_hosts.layout})
+                            'removed': removed_hosts.layout,
+                            'general_info': host_map.layout_all})
 
 
 

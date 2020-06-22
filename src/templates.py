@@ -10,6 +10,15 @@ host_table_cell = [
                     }
                 ]
 
+gen_info_table_cell = [
+                    {
+                        'if': {
+                            'column_id': 'ip',
+                        },
+                        'width': '300px'
+                    }
+                ]
+
 host_table_cond = [
             {
                 'if': {

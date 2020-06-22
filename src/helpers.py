@@ -70,6 +70,8 @@ def getValueField(idx):
         return 'delay_mean'
     elif idx == 'ps_retransmits':
         return 'retransmits'
+    elif idx == 'ps_throughput':
+        return 'throughput'
 
     return None
 
@@ -104,13 +106,14 @@ def GetDestinationsFromPSConfig(host):
 
 # Read data for each source from psconfig.opensciencegrid.org and get total number of destinations
 # as well as all members for each type of mesh/disjoing
-def LoadPSConfigData(idx, dateFrom, dateTo):
+def LoadPSConfigData(idx_host_list, dateFrom, dateTo):
+    start = time.time()
     # Get all hosts for both fields - source and destination
-    time_range = list(GetTimeRanges(dateFrom, dateTo, 1))
-    hosts = GetIdxUniqueHosts(idx, time_range[0], time_range[-1])
-    uhosts = list(set(v for v in hosts.values() if v != 'unresolved'))
+#     time_range = list(GetTimeRanges(dateFrom, dateTo, 1))
+#     hosts = GetIdxUniqueHosts(idx, time_range[0], time_range[-1])
+#     uhosts = list(set(v for v in hosts.values() if v != 'unresolved'))
 
-    print('Loading PSConfig data for ', idx, '...')
+    print('Loading PSConfig data...')
     # If file was creted recently only update with new information
     try:
         created = os.path.getmtime('psconfig.csv')
@@ -119,13 +122,13 @@ def LoadPSConfigData(idx, dateFrom, dateTo):
         if (int(now-created)/(60*60*24)) > 7:
             os.remove('psconfig.csv')
             print('PSConfig data is older than a week. The file will be recreated.')
-            LoadDestInfoFromPSConfig(idx, dateFrom, dateTo)
+            LoadDestInfoFromPSConfig(idx_host_list, dateFrom, dateTo)
         else: dest_df = pd.read_csv('psconfig.csv')
     except (FileNotFoundError) as error:
         dest_df = pd.DataFrame(columns=['host', 'total_num_of_dests', 'members'])
 
     changed = False
-    for h in uhosts:
+    for h in idx_host_list:
         if h not in dest_df['host'].values:
             conf = GetDestinationsFromPSConfig(h)
             if len(conf) > 0:
