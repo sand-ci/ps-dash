@@ -11,7 +11,29 @@ from HostsMetaData import HostsMetaData
 
 
 class GeneralDataLoader():
-    def __init__(self):
+
+    defaultEnd = datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M')
+    defaultStart = datetime.strftime(datetime.now() - timedelta(days = 3), '%Y-%m-%d %H:%M')
+
+    @property
+    def dateFrom(self):
+        return self._dateFrom
+
+    @dateFrom.setter
+    def dateFrom(self, value):
+        self._dateFrom = int(time.mktime(datetime.strptime(value, "%Y-%m-%d %H:%M").timetuple())*1000)
+
+    @property
+    def dateTo(self):
+        return self._dateTo
+
+    @dateTo.setter
+    def dateTo(self, value):
+        self._dateTo = int(time.mktime(datetime.strptime(value, "%Y-%m-%d %H:%M").timetuple())*1000)
+
+    def __init__(self, dateFrom = defaultStart,  dateTo = defaultEnd):
+        self.dateFrom = dateFrom
+        self.dateTo = dateTo
         self.pls = pd.DataFrame()
         self.owd = pd.DataFrame()
         self.thp = pd.DataFrame()
@@ -21,10 +43,10 @@ class GeneralDataLoader():
 
     def UpdateGeneralInfo(self):
         print('Update')
-        self.pls = HostsMetaData('ps_packetloss').df
-        self.owd = HostsMetaData('ps_owd').df
-        self.thp = HostsMetaData('ps_throughput').df
-        self.rtm = HostsMetaData('ps_retransmits').df
+        self.pls = HostsMetaData('ps_packetloss', self.dateFrom, self.dateTo).df
+        self.owd = HostsMetaData('ps_owd', self.dateFrom, self.dateTo).df
+        self.thp = HostsMetaData('ps_throughput', self.dateFrom, self.dateTo).df
+        self.rtm = HostsMetaData('ps_retransmits', self.dateFrom, self.dateTo).df
         self.latency_df = pd.merge(self.pls, self.owd, how='outer')
         self.throughput_df = pd.merge(self.thp, self.rtm, how='outer')
         self.all_df = pd.merge(self.latency_df, self.throughput_df, how='outer')
@@ -72,11 +94,6 @@ class SiteDataLoader(GeneralDataLoader):
         self.thread.start()
 
     def InOutDf(self, idx, idx_df):
-        dateTo = datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M')
-        dateFrom = datetime.strftime(datetime.now() - timedelta(days = 3), '%Y-%m-%d %H:%M')
-        def getTS(value):
-            return int(time.mktime(datetime.strptime(value, "%Y-%m-%d %H:%M").timetuple())*1000)
-        
         in_out_values = []
         sstart = time.time()
 
@@ -84,7 +101,7 @@ class SiteDataLoader(GeneralDataLoader):
             meta_df = idx_df.copy()
 
             start = time.time()
-            df = pd.DataFrame(qrs.queryDailyAvg(idx, t, getTS(dateFrom), getTS(dateTo))).reset_index()
+            df = pd.DataFrame(qrs.queryDailyAvg(idx, t, self.dateFrom, self.dateTo)).reset_index()
             print("Query took %ss" % (int(time.time() - start)))
 
 
