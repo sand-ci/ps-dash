@@ -54,5 +54,4 @@ def siteTables(interval):
 
     return elem_list
 
-if __name__ == '__main__':
-    app.run_server(debug=False)
+app.run_server(debug=False, port=8050, host='0.0.0.0')
