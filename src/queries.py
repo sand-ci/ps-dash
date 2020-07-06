@@ -8,6 +8,62 @@ import helpers as hp
 import time
 
 
+def queryDailyAvg(idx, fld, dateFrom, dateTo):
+    val_fld = hp.getValueField(idx)
+    query = {
+        "size": 0,
+        "query": {
+            "bool": {
+                "must": [
+                    {
+                        "range": {
+                            "timestamp": {
+                                "gte": dateFrom,
+                                "lte": dateTo
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        "aggs": {
+            "avg_values": {
+                "terms": {
+                    "field": fld,
+                    "size": 9999
+                },
+                "aggs": {
+                    "period": {
+                        "date_histogram": {
+                            "field": "timestamp",
+                            "calendar_interval": "day"
+                        },
+                        "aggs": {
+                            val_fld: {
+                                "avg": {
+                                    "field": val_fld
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    data = hp.es.search(index=idx, body=query)
+
+    result = {}
+    i = 0
+    for ip in data['aggregations']['avg_values']['buckets']:
+        temp = {}
+        for period in ip['period']['buckets']:
+            temp[period['key']] = period[val_fld]['value']
+        result[ip['key']] = temp
+
+    return result
+
+
 def get_ip_host(idx, dateFrom, dateTo):
     def q_ip_host (fld):
         return {

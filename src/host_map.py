@@ -7,15 +7,13 @@ import pandas as pd
 
 import templates as tmpl
 import queries as qrs
-import HostsMetaData as hmd
-import DatasetBuilder as dsb
+from DataLoader import GeneralDataLoader
 
-latency_df = pd.merge(dsb.pls, dsb.owd, how='outer')
-throughput_df = pd.merge(dsb.thp, dsb.rtt, how='outer')
+gobj = GeneralDataLoader()
 
-all_df = pd.merge(latency_df, throughput_df, how='outer')
-all_df = all_df[['ip', 'is_ipv6', 'host', 'site', 'admin_email', 'admin_name', 'ip_in_ps_meta',
+all_df = gobj.all_df[['ip', 'is_ipv6', 'host', 'site', 'admin_email', 'admin_name', 'ip_in_ps_meta',
                  'host_in_ps_meta', 'host_index', 'site_index', 'host_meta', 'site_meta']].sort_values(by=['ip_in_ps_meta', 'host_in_ps_meta', 'ip'], ascending=False)
+
 
 
 fig = go.Figure()
@@ -54,14 +52,14 @@ layout_all = html.Div([
             ),
             dbc.Row(
                 dbc.Col(
-                    html.Div(id='datatable-interactivity-container1', children=dcc.Graph(figure=fig))
+                    html.Div(id='datatable-interactivity-container1', children=dcc.Graph(figure=fig1))
                 )
             ),
             dbc.Row(
                 dbc.Col(
-                    html.H5(className="gi-title", children="The following dataset provides information for all hosts in the main indices: ps_packetloss, ps_owd, ps_retransmits, and ps_throughput. "
+                    html.H3(className="gi-title", children="The following dataset provides information for all hosts in the main indices: ps_packetloss, ps_owd, ps_retransmits, and ps_throughput. "
                            )
-                , width=11), justify="around",
+                , width=12), justify="around",
             ),
             dbc.Row(
                 dbc.Col(
@@ -74,7 +72,7 @@ layout_all = html.Div([
                         style_cell_conditional=tmpl.gen_info_table_cell,
                         style_table={'overflowX': 'scroll'},
                     )
-                , width=11), justify="around",
+                , width=12), justify="around",
             )
         ])
 

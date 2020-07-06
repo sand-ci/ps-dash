@@ -138,3 +138,105 @@
 .gi-title {
     margin-top: 30px;
 }
+
+/**********   Sites   **********/
+
+
+.tab--selected.jsx-3468109796, .tab.jsx-3468109796 {
+    font-size: 20px;
+}
+
+.tab-element {
+    padding: 20px;
+}
+
+th:not(.CalendarDay), td:not(.CalendarDay) {
+    padding: 0;
+}
+
+.site-title {
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+table.ip-table, table.packetloss, table.owd, table.throughput, table.retransmits {
+    width: inherit;
+}
+
+th.latency-head, th.throughput-head {
+    text-align: center;
+    font-size: 15px;
+    color: #fff;
+}
+
+th.latency-head {
+    background-color: #1F3864;
+}
+
+th.throughput-head {
+    background-color: #004242;
+}
+
+td.ipv-type, td.ipv-count, td.inout-type, td.inout-value {
+    border-left: 1px solid #E1E1E1;
+    border-right: 1px solid #E1E1E1;
+    padding: 5px;
+    text-align: center;
+    font-size: 13px;
+}
+
+td.ipv-type, td.ipv-count {
+    padding: 0px;
+    font-size: 16px;
+}
+
+td.ipv-type, td.inout-type {
+    border-bottom: white;
+}
+
+th.packetloss-tests, th.owd-tests, th.throughput-tests, th.retransmits-tests {
+    text-align: center;
+    font-weight: bold;
+    font-size: 15px;
+    padding-top: 10px;
+}
+
+table.packetloss td.inout-type, table.packetloss td.inout-value, table.packetloss tr.change-values {
+    background-color: #2F5597;
+}
+
+table.owd td.inout-type, table.owd td.inout-value, table.owd tr.change-values {
+    background-color: #497EB0;
+}
+
+table.throughput td.inout-type, table.throughput td.inout-value, table.throughput tr.change-values {
+    background-color: #337678;
+}
+
+table.retransmits td.inout-type, table.retransmits td.inout-value, table.retransmits tr.change-values {
+    background-color: #5DA6A9;
+}
+
+table.packetloss td.inout-type, table.packetloss td.inout-value, table.packetloss tr.change-values,
+table.owd td.inout-type, table.owd td.inout-value, table.owd tr.change-values,
+table.throughput td.inout-type, table.throughput td.inout-value, table.throughput tr.change-values,
+table.retransmits td.inout-type, table.retransmits td.inout-value, table.retransmits tr.change-values {
+    color: #fff;
+}
+
+table.packetloss tr.change-values td, table.owd tr.change-values td,
+table.throughput tr.change-values td, table.retransmits tr.change-values td {
+    padding-left: 5px;
+}
+
+table.packetloss, table.owd, table.throughput, table.retransmits {
+    font-size: 13px;
+}
+
+td.change-title {
+    text-align: center;
+}
+
+.site-card {
+    padding-bottom: 10px;
+}
