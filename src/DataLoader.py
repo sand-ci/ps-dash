@@ -25,13 +25,19 @@ class GeneralDataLoader():
         self.owd = HostsMetaData('ps_owd').df
         self.thp = HostsMetaData('ps_throughput').df
         self.rtm = HostsMetaData('ps_retransmits').df
+        self.latency_df = pd.merge(self.pls, self.owd, how='outer')
+        self.throughput_df = pd.merge(self.thp, self.rtm, how='outer')
+        self.all_df = pd.merge(self.latency_df, self.throughput_df, how='outer')
+
         self.pls_related_only = self.pls[self.pls['host_in_ps_meta'] == True]
         self.owd_related_only = self.owd[self.owd['host_in_ps_meta'] == True]
         self.thp_related_only = self.thp[self.thp['host_in_ps_meta'] == True]
         self.rtm_related_only = self.rtm[self.rtm['host_in_ps_meta'] == True]
-        self.latency_df = pd.merge(self.pls, self.owd, how='outer')
-        self.throughput_df = pd.merge(self.thp, self.rtm, how='outer')
-        self.all_df = pd.merge(self.latency_df, self.throughput_df, how='outer')
+
+        self.latency_df_related_only = self.latency_df[self.latency_df['host_in_ps_meta'] == True]
+        self.throughput_df_related_only = self.throughput_df[self.throughput_df['host_in_ps_meta'] == True]
+        self.all_df_related_only = self.all_df[self.all_df['host_in_ps_meta'] == True]
+
         self.lastUpdated = datetime.now()
 
 
@@ -117,6 +123,6 @@ class SiteDataLoader(GeneralDataLoader):
         problematic.extend(self.pls_data.nlargest(20, ['day-3_val', 'day-2_val', 'day-1_val', 'day_val'])['site'].values)
         problematic.extend(self.owd_data.nlargest(20, ['day-3_val', 'day-2_val', 'day-1_val', 'day_val'])['site'].values)
         problematic = list(set(problematic))
-        self.all_df['has_problems'] = self.all_df['site'].apply(lambda x: True if x in problematic else False)
-        sites = self.all_df.sort_values(by='has_problems', ascending=False).drop_duplicates(['site'])['site'].values
+        self.all_df_related_only['has_problems'] = self.all_df_related_only['site'].apply(lambda x: True if x in problematic else False)
+        sites = self.all_df_related_only.sort_values(by='has_problems', ascending=False).drop_duplicates(['site'])['site'].values
         return sites
