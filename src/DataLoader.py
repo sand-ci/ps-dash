@@ -42,7 +42,7 @@ class GeneralDataLoader():
         self.UpdateGeneralInfo()
 
     def UpdateGeneralInfo(self):
-        print('Update')
+        print('UpdateGeneralInfo...')
         self.pls = HostsMetaData('ps_packetloss', self.dateFrom, self.dateTo).df
         self.owd = HostsMetaData('ps_owd', self.dateFrom, self.dateTo).df
         self.thp = HostsMetaData('ps_throughput', self.dateFrom, self.dateTo).df
@@ -61,6 +61,12 @@ class GeneralDataLoader():
         self.all_df_related_only = self.all_df[self.all_df['host_in_ps_meta'] == True]
 
         self.lastUpdated = datetime.now()
+        self.StartGenInfoThread()
+
+    def StartGenInfoThread(self):
+        self.thread = threading.Timer(24*60*60, self.UpdateGeneralInfo)
+        self.thread.daemon = True
+        self.thread.start()
 
 
 
@@ -100,10 +106,9 @@ class SiteDataLoader(GeneralDataLoader):
         for t in ['dest_host', 'src_host']:
             meta_df = idx_df.copy()
 
-            start = time.time()
+#             start = time.time()
             df = pd.DataFrame(qrs.queryDailyAvg(idx, t, self.dateFrom, self.dateTo)).reset_index()
-            print("Query took %ss" % (int(time.time() - start)))
-
+#             print("Query took %ss" % (int(time.time() - start)))
 
             df['index'] = pd.to_datetime(df['index'], unit='ms').dt.strftime('%d/%m')
             df = df.transpose()
