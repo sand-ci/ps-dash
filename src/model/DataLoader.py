@@ -6,8 +6,8 @@ import time
 from functools import reduce
 from datetime import datetime, timedelta
 
-import queries as qrs
-from HostsMetaData import HostsMetaData
+import model.queries as qrs
+from model.HostsMetaData import HostsMetaData
 
 
 class GeneralDataLoader():

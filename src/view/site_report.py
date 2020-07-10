@@ -14,10 +14,8 @@ import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, State
 import dash_html_components as html
 
-import queries as qrs
-import helpers as hp
-
-from DataLoader import SiteDataLoader 
+import model.queries as qrs
+from model.DataLoader import SiteDataLoader
 
 
 sobj = SiteDataLoader()
@@ -117,16 +115,16 @@ def createCard(site):
                     [
                         dbc.Row([
                                 dbc.Col([
-                                        html.H1(site, id=f"{site}-title", className='site-title')
+                                        html.H4(site, id=f"{site}-title", className='site-title')
                                 ], width=12)
-                        ], justify="center"),
+                        ], justify="left"),
                         dbc.Row([
                             dbc.Col([
-                                     generateIPTable(site, 'latency', sobj.latency_df[sobj.latency_df['site']==site]),
+                                     generateIPTable(site, 'latency', sobj.latency_df_related_only[sobj.latency_df_related_only['site']==site]),
                                      generateTable(site, 'packetloss', sobj.pls_data[sobj.pls_data['site']==site], sobj.pls_dates),
                             ], width=6),
                             dbc.Col([
-                                     generateIPTable(site, 'throughput', sobj.throughput_df[sobj.throughput_df['site']==site]),
+                                     generateIPTable(site, 'throughput', sobj.throughput_df_related_only[sobj.throughput_df_related_only['site']==site]),
                                      generateTable(site, 'throughput', sobj.thp_data[sobj.thp_data['site']==site], sobj.thp_dates)
                             ], width=6),
                        ]),

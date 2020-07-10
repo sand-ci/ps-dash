@@ -9,7 +9,7 @@ import re
 from ipwhois import IPWhois
 import difflib
 
-import queries as qrs
+import model.queries as qrs
 
 
 class HostsMetaData:
