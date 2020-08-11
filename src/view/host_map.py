@@ -8,12 +8,15 @@ import pandas as pd
 import view.templates as tmpl
 import model.queries as qrs
 from model.DataLoader import GeneralDataLoader
+from model.DataLoader import HostsDataLoader
 
-gobj = GeneralDataLoader()
+gobj = GeneralDataLoader.Instance()
+
 
 all_df = gobj.all_df_related_only[['ip', 'is_ipv6', 'host', 'site', 'admin_email', 'admin_name', 'ip_in_ps_meta',
                  'host_in_ps_meta', 'host_index', 'site_index', 'host_meta', 'site_meta']].sort_values(by=['ip_in_ps_meta', 'host_in_ps_meta', 'ip'], ascending=False)
-
+test = HostsDataLoader()
+test.func()
 
 
 fig = go.Figure()

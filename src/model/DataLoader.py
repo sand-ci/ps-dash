@@ -9,8 +9,26 @@ from datetime import datetime, timedelta
 import model.queries as qrs
 from model.HostsMetaData import HostsMetaData
 
+class Singleton:
 
-class GeneralDataLoader():
+    def __init__(self, cls):
+        self._cls = cls
+
+    def Instance(self):
+        try:
+            return self._instance
+        except AttributeError:
+            self._instance = self._cls()
+            return self._instance
+
+    def __call__(self):
+        raise TypeError('Singletons must be accessed through `Instance()`.')
+
+    def __instancecheck__(self, inst):
+        return isinstance(inst, self._cls)
+
+@Singleton
+class GeneralDataLoader(object):
 
     defaultEnd = datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M')
     defaultStart = datetime.strftime(datetime.now() - timedelta(days = 3), '%Y-%m-%d %H:%M')
@@ -70,26 +88,31 @@ class GeneralDataLoader():
 
 
 
-class SiteDataLoader(GeneralDataLoader):
+class SiteDataLoader():
+
+    genData = GeneralDataLoader.Instance()
     
     def __init__(self):
-        GeneralDataLoader.__init__(self)
         self.UpdateSiteData()
 
     def UpdateSiteData(self):
         print('UpdateSiteData')
-        pls_site_in_out = self.InOutDf("ps_packetloss", self.pls_related_only)
+        pls_site_in_out = self.InOutDf("ps_packetloss", self.genData.pls_related_only)
         self.pls_data = pls_site_in_out['data']
         self.pls_dates = pls_site_in_out['dates']
-        owd_site_in_out = self.InOutDf("ps_owd", self.owd_related_only)
+        owd_site_in_out = self.InOutDf("ps_owd", self.genData.owd_related_only)
         self.owd_data = owd_site_in_out['data']
         self.owd_dates = owd_site_in_out['dates']
-        thp_site_in_out = self.InOutDf("ps_throughput", self.thp_related_only)
+        thp_site_in_out = self.InOutDf("ps_throughput", self.genData.thp_related_only)
         self.thp_data = thp_site_in_out['data']
         self.thp_dates = thp_site_in_out['dates']
-        rtm_site_in_out = self.InOutDf("ps_retransmits", self.rtm_related_only)
+        rtm_site_in_out = self.InOutDf("ps_retransmits", self.genData.rtm_related_only)
         self.rtm_data = rtm_site_in_out['data']
         self.rtm_dates = rtm_site_in_out['dates']
+
+        self.latency_df_related_only = self.genData.latency_df_related_only
+        self.throughput_df_related_only = self.genData.throughput_df_related_only
+
         self.sites = self.orderSites()
         self.StartThread()
 
@@ -107,7 +130,7 @@ class SiteDataLoader(GeneralDataLoader):
             meta_df = idx_df.copy()
 
 #             start = time.time()
-            df = pd.DataFrame(qrs.queryDailyAvg(idx, t, self.dateFrom, self.dateTo)).reset_index()
+            df = pd.DataFrame(qrs.queryDailyAvg(idx, t, self.genData.dateFrom, self.genData.dateTo)).reset_index()
 #             print("Query took %ss" % (int(time.time() - start)))
 
             df['index'] = pd.to_datetime(df['index'], unit='ms').dt.strftime('%d/%m')
@@ -145,6 +168,7 @@ class SiteDataLoader(GeneralDataLoader):
         problematic.extend(self.pls_data.nlargest(20, ['day-3_val', 'day-2_val', 'day-1_val', 'day_val'])['site'].values)
         problematic.extend(self.owd_data.nlargest(20, ['day-3_val', 'day-2_val', 'day-1_val', 'day_val'])['site'].values)
         problematic = list(set(problematic))
-        self.all_df_related_only['has_problems'] = self.all_df_related_only['site'].apply(lambda x: True if x in problematic else False)
-        sites = self.all_df_related_only.sort_values(by='has_problems', ascending=False).drop_duplicates(['site'])['site'].values
+        all_df = self.genData.all_df_related_only.copy()
+        all_df['has_problems'] = all_df['site'].apply(lambda x: True if x in problematic else False)
+        sites = all_df.sort_values(by='has_problems', ascending=False).drop_duplicates(['site'])['site'].values
         return sites
