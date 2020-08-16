@@ -5,12 +5,11 @@ import csv
 import multiprocessing as mp
 from functools import partial
 from contextlib import contextmanager
-import datetime
+from datetime import datetime
+import dateutil.relativedelta
 import time
 import requests 
 import os
-from datetime import datetime
-import time
 import pandas as pd
 
 from elasticsearch import Elasticsearch
@@ -34,25 +33,37 @@ def ConnectES():
     else: print("Connection Unsuccessful")
 
 
-def GetTimeRanges(start, end, intv=1):
+# Expected values: time in miliseconds or string (%Y-%m-%d %H:%M')
+def FindPeriodDiff(dateFrom, dateTo):
+    if (isinstance(dateFrom, int) and isinstance(dateTo, int)):
+        d1 = datetime.fromtimestamp(dateTo/1000)
+        d2 = datetime.fromtimestamp(dateFrom/1000)
+        time_delta = dateutil.relativedelta.relativedelta (d1, d2)
+    else:
+        fmt = '%Y-%m-%d %H:%M'
+        d1 = datetime.strptime(dateFrom, fmt)
+        d2 = datetime.strptime(dateTo, fmt)
+        time_delta = d2-d1
+    return time_delta
+
+
+def GetTimeRanges(dateFrom, dateTo, intv=1):
+    diff = FindPeriodDiff(dateFrom, dateTo) / intv
     t_format = "%Y-%m-%d %H:%M"
-    start = datetime.strptime(start,t_format)
-    end = datetime.strptime(end, t_format)
-    diff = (end - start ) / intv
+    tl = []
+    for i in range(intv+1):
+        if (isinstance(dateFrom, int)):
+            t = (datetime.fromtimestamp(dateFrom/1000) + diff * i)
+            tl.append(int(time.mktime(t.timetuple())*1000))
+        else:
+            t = (datetime.strptime(dateFrom,t_format) + diff * i).strftime(t_format)
+            tl.append(int(time.mktime(datetime.strptime(t, t_format).timetuple())*1000))
 
-    for i in range(intv):
-        t = (start + diff * i).strftime(t_format)
-        yield int(time.mktime(datetime.strptime(t, t_format).timetuple())*1000)
-
-    yield int(time.mktime(end.timetuple())*1000)
+    return tl
 
 
 def CalcMinutes4Period(dateFrom, dateTo):
-    fmt = '%Y-%m-%d %H:%M'
-    d1 = datetime.strptime(dateFrom, fmt)
-    d2 = datetime.strptime(dateTo, fmt)
-    time_delta = d2-d1
-
+    time_delta = FindPeriodDiff(dateFrom, dateTo)
     return (time_delta.days*24*60 + time_delta.seconds//60)
 
 
