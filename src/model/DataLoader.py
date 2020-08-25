@@ -3,32 +3,37 @@ import time
 import datetime
 import pandas as pd
 import time
-from functools import reduce
+from functools import reduce, wraps
 from datetime import datetime, timedelta
 
 import model.queries as qrs
 from model.HostsMetaData import HostsMetaData
+import utils.helpers as hp
+from utils.helpers import timer
 
-class Singleton:
 
-    def __init__(self, cls):
-        self._cls = cls
+class Singleton(type):
 
-    def Instance(self):
-        try:
-            return self._instance
-        except AttributeError:
-            self._instance = self._cls()
-            return self._instance
+    defaultDT = hp.defaultTimeRange()
 
-    def __call__(self):
-        raise TypeError('Singletons must be accessed through `Instance()`.')
+    def __init__(cls, name, bases, attibutes):
+        cls._dict = {}
 
-    def __instancecheck__(self, inst):
-        return isinstance(inst, self._cls)
+    def __call__(cls, dateFrom=None, dateTo=None):
+        print(cls, dateFrom, dateTo)
+        if (dateFrom is None):
+            dateFrom = Singleton.defaultDT[0]
+        if (dateTo is None):
+            dateTo = Singleton.defaultDT[1]
 
-@Singleton
-class GeneralDataLoader(object):
+        if (dateFrom, dateTo) in cls._dict:
+#             print('EXISTS')
+            instance = cls._dict[(dateFrom, dateTo)]
+        else:
+#             print('NEW', (dateFrom, dateTo))
+            instance = super().__call__(dateFrom, dateTo)
+            cls._dict[(dateFrom, dateTo)] = instance
+        return instance
 
     defaultEnd = datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M')
     defaultStart = datetime.strftime(datetime.now() - timedelta(days = 3), '%Y-%m-%d %H:%M')
