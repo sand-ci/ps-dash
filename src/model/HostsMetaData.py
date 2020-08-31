@@ -49,7 +49,7 @@ class HostsMetaData:
                 if self.isHost(host_from_meta):
                     return host_from_meta
             # it is possible that for that IP has another record with the valid hostname
-            elif (df[df['ip'] == host_from_index]['host_index'].values[0]):
+            elif len(df[df['ip'] == host_from_index]['host_index'].values) > 0:
                 return df[df['ip'] == host_from_index]['host_index'].values[0]
             # otherwise we try to resolve the IP from socket.gethostbyaddr(host)
             else: 
