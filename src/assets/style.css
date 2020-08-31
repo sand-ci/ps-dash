@@ -241,3 +241,45 @@ td.change-title {
 .site-card {
     padding-bottom: 10px;
 }
+
+
+
+
+
+
+.tab-parent--vert {
+    width: 100%;
+    padding-top: 20px;
+}
+
+.indeces-types {
+    width: 100%;
+    font-size: 18px;
+}
+
+.problem-table {
+    width: 100%;
+    margin: 20px 0
+}
+
+.problem-table td {
+    font-size: 14px;
+    border-bottom: none;
+}
+
+.problem-table th {
+    font-size: 16px;
+}
+
+.last-update {
+    text-align: center;
+    padding: 10px 0;
+}
+
+.index-title {
+    padding: 20px 0 0 10px;
+}
+
+.prob-types {
+    font-size: 14px;
+}

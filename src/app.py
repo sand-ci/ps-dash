@@ -6,8 +6,9 @@ import dash_html_components as html
 import plotly.express as px
 import pandas as pd
 
-import view.host_map as host_map
+# import view.host_map as host_map
 import view.site_report as site_report
+import view.problematic_hosts as problems
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP]
 
@@ -15,7 +16,7 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 
 app.layout = html.Div([
                 dcc.Tabs([
-                    dcc.Tab(label='Sites', children=[
+                    dcc.Tab(label='Sites', id='sites-tab', children=[
                         html.Div([
                             dcc.Location(id='url', refresh=False),
                             dcc.Store(id='memory-output'),
@@ -26,14 +27,17 @@ app.layout = html.Div([
                                     max_intervals=len(site_report.sites),
                                 ),
                             html.Div(id='cards')
-                        ], className='tab-element')
+                        ], className='tab-element', id='main-tabs')
                     ]),
-                    dcc.Tab(label='Hosts', children=[
-                                                html.Div(
-                                                    host_map.layout_all, className='tab-element'
-                                                    )
-                                                ]
-                           )
+                    dcc.Tab(label='Hosts', id='hosts-tab', children=[
+                            html.Div(
+                                problems.problems_layout, className='tab-element'
+                                )
+#                             html.Div(
+#                                 host_map.layout_all, className='tab-element'
+#                                 )
+                            ]
+                    )
                 ])
             ])
 
@@ -53,5 +57,24 @@ def siteTables(interval):
                                  id=f"card-{interval}", className='site-card'))
 
     return elem_list
+
+
+
+@app.callback(Output('tabs-content', 'children'),
+              [Input('tabs-indeces', 'value'),
+               Input('tabs-prob-types', 'value')])
+def render_problems(idx, problem):
+    if (problem == 'high_sigma'):
+        df = problems.high_sigma
+    elif (problem == 'has_bursts'):
+        df = problems.has_bursts
+    elif (problem == 'all_packets_lost'):
+        df = problems.all_packets_lost
+
+    if idx == 'all':
+        return problems.showAll(df)
+    else:
+        return problems.showIndex(idx, df)
+
 
 app.run_server(debug=False, port=8050, host='0.0.0.0')
