@@ -235,10 +235,10 @@ def get_ip_host(idx, dateFrom, dateTo):
                   }
                 }
 
-
+    res_ip_host = {}
     for field in ['src', 'dest']:
         results = hp.es.search(index=idx, body=q_ip_host(field))
-        res_ip_host = {}
+
         for item in results["aggregations"]["groupby"]["buckets"]:
             ip = item['key'][field]
             host = item['key'][str(field+'_host')]
@@ -305,10 +305,10 @@ def get_ip_site(idx, dateFrom, dateTo):
                   }
                 }
 
-
+    res_ip_site = {}
     for field in ['src', 'dest']:
         results = hp.es.search(index=idx, body=q_ip_site(field))
-        res_ip_site = {}
+
         for item in results["aggregations"]["groupby"]["buckets"]:
             ip = item['key'][field]
             site = item['key'][str(field+'_site')]
@@ -367,9 +367,10 @@ def get_host_site(idx, dateFrom, dateTo):
           }
         }
 
+    res_host_site = {}
     for field in ['src', 'dest']:
         results = hp.es.search(index=idx, body=q_host_site(field))
-        res_host_site = {}
+
         for item in results["aggregations"]["groupby"]["buckets"]:
             site = item['key'][str(field+"_site")]
             host = item['key'][str(field+'_host')]
