@@ -35,8 +35,18 @@ class Singleton(type):
             cls._dict[(dateFrom, dateTo)] = instance
         return instance
 
-    defaultEnd = datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M')
-    defaultStart = datetime.strftime(datetime.now() - timedelta(days = 3), '%Y-%m-%d %H:%M')
+
+class GeneralDataLoader(object, metaclass=Singleton):
+
+    def __init__(self, dateFrom,  dateTo):
+        self.dateFrom = dateFrom
+        self.dateTo = dateTo
+        self.lastUpdated = None
+        self.pls = pd.DataFrame()
+        self.owd = pd.DataFrame()
+        self.thp = pd.DataFrame()
+        self.rtm = pd.DataFrame()
+        self.UpdateGeneralInfo()
 
     @property
     def dateFrom(self):
@@ -54,25 +64,26 @@ class Singleton(type):
     def dateTo(self, value):
         self._dateTo = int(time.mktime(datetime.strptime(value, "%Y-%m-%d %H:%M").timetuple())*1000)
 
-    def __init__(self, dateFrom = defaultStart,  dateTo = defaultEnd):
-        self.dateFrom = dateFrom
-        self.dateTo = dateTo
-        self.pls = pd.DataFrame()
-        self.owd = pd.DataFrame()
-        self.thp = pd.DataFrame()
-        self.rtm = pd.DataFrame()
-        self.lastUpdated = datetime.now()
-        self.UpdateGeneralInfo()
+    @property
+    def lastUpdated(self):
+        return self._lastUpdated
 
+    @lastUpdated.setter
+    def lastUpdated(self, value):
+        self._lastUpdated = value
+
+    @timer
     def UpdateGeneralInfo(self):
-        print('UpdateGeneralInfo...')
+        print("last updated: {0}, new start: {1} new end: {2} ".format(self.lastUpdated, self.dateFrom, self.dateTo))
+
         self.pls = HostsMetaData('ps_packetloss', self.dateFrom, self.dateTo).df
         self.owd = HostsMetaData('ps_owd', self.dateFrom, self.dateTo).df
         self.thp = HostsMetaData('ps_throughput', self.dateFrom, self.dateTo).df
         self.rtm = HostsMetaData('ps_retransmits', self.dateFrom, self.dateTo).df
         self.latency_df = pd.merge(self.pls, self.owd, how='outer')
         self.throughput_df = pd.merge(self.thp, self.rtm, how='outer')
-        self.all_df = pd.merge(self.latency_df, self.throughput_df, how='outer')
+        all_df = pd.merge(self.latency_df, self.throughput_df, how='outer')
+        self.all_df = all_df.drop_duplicates()
 
         self.pls_related_only = self.pls[self.pls['host_in_ps_meta'] == True]
         self.owd_related_only = self.owd[self.owd['host_in_ps_meta'] == True]
@@ -87,7 +98,14 @@ class Singleton(type):
         self.StartGenInfoThread()
 
     def StartGenInfoThread(self):
+        self.lastUpdated = datetime.now().strftime("%d-%m-%Y, %H:%M")
+        # Update dates
+        defaultDT = hp.defaultTimeRange()
+        if (self.lastUpdated != defaultDT[1]):
+            self.dateFrom = defaultDT[0]
+            self.dateTo = defaultDT[1]
         self.thread = threading.Timer(24*60*60, self.UpdateGeneralInfo)
+
         self.thread.daemon = True
         self.thread.start()
 
@@ -95,13 +113,13 @@ class Singleton(type):
 
 class SiteDataLoader():
 
-    genData = GeneralDataLoader.Instance()
-    
+    genData = GeneralDataLoader()
+
     def __init__(self):
         self.UpdateSiteData()
 
     def UpdateSiteData(self):
-        print('UpdateSiteData')
+        print('UpdateSiteData >>> ', self.genData.dateFrom, self.genData.dateTo)
         pls_site_in_out = self.InOutDf("ps_packetloss", self.genData.pls_related_only)
         self.pls_data = pls_site_in_out['data']
         self.pls_dates = pls_site_in_out['dates']
@@ -127,16 +145,14 @@ class SiteDataLoader():
         self.thread.daemon = True
         self.thread.start()
 
+    @timer
     def InOutDf(self, idx, idx_df):
         in_out_values = []
-        sstart = time.time()
 
         for t in ['dest_host', 'src_host']:
             meta_df = idx_df.copy()
 
-#             start = time.time()
             df = pd.DataFrame(qrs.queryDailyAvg(idx, t, self.genData.dateFrom, self.genData.dateTo)).reset_index()
-#             print("Query took %ss" % (int(time.time() - start)))
 
             df['index'] = pd.to_datetime(df['index'], unit='ms').dt.strftime('%d/%m')
             df = df.transpose()
@@ -162,7 +178,6 @@ class SiteDataLoader():
         site_df = pd.concat(in_out_values).reset_index()
         site_df = site_df.round(2)
 
-        print(idx, "Processing took %ss" % (int(time.time() - sstart)))
         return {"data": site_df,
                 "dates": header}
 

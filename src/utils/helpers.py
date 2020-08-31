@@ -5,12 +5,13 @@ import csv
 import multiprocessing as mp
 from functools import partial
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 import dateutil.relativedelta
 import time
 import requests 
 import os
 import pandas as pd
+import functools
 
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import scan
@@ -33,12 +34,30 @@ def ConnectES():
     else: print("Connection Unsuccessful")
 
 
+def timer(func):
+    @functools.wraps(func)
+    def wrapper_timer(*args, **kwargs):
+        start_time = time.perf_counter()    # 1
+        value = func(*args, **kwargs)
+        end_time = time.perf_counter()      # 2
+        run_time = end_time - start_time    # 3
+        print(f"Finished {func.__name__!r} in {run_time:.4f} secs")
+        return value
+    return wrapper_timer
+
+
+def defaultTimeRange():
+    defaultEnd = datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M')
+    defaultStart = datetime.strftime(datetime.now() - timedelta(days = 3), '%Y-%m-%d %H:%M')
+    return [defaultStart, defaultEnd]
+
+
 # Expected values: time in miliseconds or string (%Y-%m-%d %H:%M')
 def FindPeriodDiff(dateFrom, dateTo):
     if (isinstance(dateFrom, int) and isinstance(dateTo, int)):
         d1 = datetime.fromtimestamp(dateTo/1000)
         d2 = datetime.fromtimestamp(dateFrom/1000)
-        time_delta = dateutil.relativedelta.relativedelta (d1, d2)
+        time_delta = (d1 - d2)
     else:
         fmt = '%Y-%m-%d %H:%M'
         d1 = datetime.strptime(dateFrom, fmt)
