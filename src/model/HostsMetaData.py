@@ -14,33 +14,7 @@ import model.queries as qrs
 
 class HostsMetaData:
 
-    defaultEnd = datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M')
-    defaultStart = datetime.strftime(datetime.now() - timedelta(days = 3), '%Y-%m-%d %H:%M')
-
-    @property
-    def dateFrom(self):
-        return self._dateFrom
-
-    @dateFrom.setter
-    def dateFrom(self, value):
-        if (type(value) == int):
-            self._dateFrom = value
-        else:
-            self._dateFrom = int(time.mktime(datetime.strptime(value, "%Y-%m-%d %H:%M").timetuple())*1000)
-
-    @property
-    def dateTo(self):
-        return self._dateTo
-
-    @dateTo.setter
-    def dateTo(self, value):
-        if (type(value) == int):
-            self._dateTo = value
-        else:
-            self._dateTo = int(time.mktime(datetime.strptime(value, "%Y-%m-%d %H:%M").timetuple())*1000)
-
-
-    def __init__(self, index, dateFrom = defaultStart,  dateTo = defaultEnd):
+    def __init__(self, index, dateFrom,  dateTo):
         self.idx = index
         self.dateFrom = dateFrom
         self.dateTo = dateTo
