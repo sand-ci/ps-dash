@@ -5,6 +5,8 @@ import pandas as pd
 import time
 from functools import reduce, wraps
 from datetime import datetime, timedelta
+import numpy as np
+from  scipy.stats import zscore
 
 import model.queries as qrs
 from model.HostsMetaData import HostsMetaData
@@ -192,3 +194,129 @@ class SiteDataLoader():
         all_df['has_problems'] = all_df['site'].apply(lambda x: True if x in problematic else False)
         sites = all_df.sort_values(by='has_problems', ascending=False).drop_duplicates(['site'])['site'].values
         return sites
+
+
+class HostDataLoader():
+
+    gobj = GeneralDataLoader()
+    time_range = [gobj.dateFrom, gobj.dateTo]
+    LIST_IDXS = ['ps_packetloss', 'ps_owd', 'ps_retransmits', 'ps_throughput']
+
+    def __init__(self):
+        self.df = self.markNodes()
+        self.StartThread()
+
+
+    @timer
+    def buildProblems(self, idx):
+        print(idx)
+        data = []
+        intv = int(hp.CalcMinutes4Period(self.time_range[0], self.time_range[1])/60)
+        time_list = hp.GetTimeRanges(self.time_range[0], self.time_range[1], intv)
+        for i in range(len(time_list)-1):
+            data.extend(qrs.query4Avg(idx, time_list[i], time_list[i+1]))
+
+        return data
+
+
+    @timer
+    def getPercentageMeasuresDone(self, grouped, tempdf):
+        measures_done = tempdf.groupby('hash').agg({'doc_count':'sum'})
+        def findRatio(row, total_minutes):
+            if pd.isna(row['doc_count']):
+                count = '0'
+            else: count = str(round((row['doc_count']/total_minutes)*100))+'%'
+            return count
+
+        one_test_per_min = hp.CalcMinutes4Period(self.time_range[0], self.time_range[1])
+        measures_done['tests_done'] = measures_done.apply(lambda x: findRatio(x, one_test_per_min), axis=1)
+        grouped = pd.merge(grouped, measures_done, on='hash', how='left')
+
+        return grouped
+
+
+    @timer
+    def markNodes(self):
+        print(f'time range is: {self.time_range}')
+        df = pd.DataFrame()
+        for idx in self.LIST_IDXS:
+            tempdf = pd.DataFrame(self.buildProblems(idx))
+            grouped = tempdf.groupby(['src', 'dest', 'hash']).agg({'value': lambda x: x.mean(skipna=False)}, axis=1).reset_index()
+
+            grouped = self.getRelHosts(grouped)
+            # zscore based on a each pair value
+            tempdf['zscore'] = tempdf.groupby('hash')['value'].apply(lambda x: (x - x.mean())/x.std())
+            # add max zscore so that it is possible to order by worst
+            max_z = tempdf.groupby('hash').agg({'zscore':'max'}).rename(columns={'zscore':'max_hash_zscore'})
+            grouped = pd.merge(grouped, max_z, on='hash', how='left')
+
+            # zscore based on the whole dataset
+            grouped['zscore'] = grouped[['value']].apply(lambda x: (x - x.mean())/x.std())
+            grouped['idx'] = idx
+
+            # calculate the percentage of measures based on the assumption that ideally measures are done once every minute
+            grouped = self.getPercentageMeasuresDone(grouped, tempdf)
+
+            # this is not accurate since we have some cases with 4-5 times more tests than expected
+            avg_numtests = tempdf.groupby('hash').agg({'doc_count':'mean'}).values[0][0]
+
+            # Add flags for some general problems
+            if (idx == 'ps_packetloss'):
+                grouped['all_packets_lost'] = grouped['hash'].apply(lambda x: 1 if x in grouped[grouped['value']==1]['hash'].values else 0)
+            else: grouped['all_packets_lost'] = -1
+
+            grouped['high_sigma'] = grouped['hash'].apply(lambda x: 1
+                                                          if x in grouped[grouped['zscore'] > 3].drop_duplicates()['hash'].values
+                                                          else 0)
+            grouped['has_bursts'] = grouped['hash'].apply(lambda x: 1
+                                                           if x in tempdf[tempdf['zscore']>5]['hash'].values
+                                                           else 0)
+            grouped['src_not_in'] = grouped['hash'].apply(lambda x: 1
+                                                          if x in grouped[grouped['src'].isin(self.gobj.all_df_related_only['ip']) == False]['hash'].values
+                                                          else 0)
+            grouped['dest_not_in'] = grouped['hash'].apply(lambda x: 1
+                                                           if x in grouped[grouped['dest'].isin(self.gobj.all_df_related_only['ip']) == False]['hash'].values
+                                                           else 0)
+
+            grouped['measures'] = grouped['doc_count'].astype(str)+'('+grouped['tests_done'].astype(str)+')'
+
+            df = df.append(grouped, ignore_index=True)
+        print(f'Total number of hashes: {len(df)}')
+
+        return df
+
+    @timer
+    def getValues(self, probdf):
+    #     probdf = markNodes()
+    #     time_list = hp.GetTimeRanges(time_range[0], time_range[1], 1)
+        df = pd.DataFrame(columns=['timestamp', 'value', 'idx', 'hash'])
+        for item in probdf[['src', 'dest', 'idx']].values:
+            print(item)
+            tempdf = pd.DataFrame(qrs.queryAllValues(item[2], item, self.time_range))
+            tempdf['idx'] = item[2]
+            tempdf['hash'] = item[0]+"-"+item[1]
+            tempdf['src'] = item[0]
+            tempdf['dest'] = item[1]
+            tempdf.rename(columns={hp.getValueField(item[2]): 'value'}, inplace=True)
+            df = df.append(tempdf, ignore_index=True)
+
+        return df
+
+    @timer
+    def getRelHosts(self, probdf):
+        df1 = pd.merge(self.gobj.all_df_related_only[['host', 'ip', 'site']], probdf[['src', 'hash']], left_on='ip', right_on='src', how='right')
+        df2 = pd.merge(self.gobj.all_df_related_only[['host', 'ip', 'site']], probdf[['dest', 'hash']], left_on='ip', right_on='dest', how='right')
+        df = pd.merge(df1, df2, on=['hash'], suffixes=('_src', '_dest'), how='inner')
+    #     df = df[df.duplicated(subset=['hash'])==False]
+
+        df = df.drop(columns=['ip_src', 'ip_dest'])
+        df = pd.merge(probdf, df, on=['hash', 'src', 'dest'], how='left')
+
+        return df
+
+
+    def StartThread(self):
+        print('**** Range:',self.time_range, self.gobj.lastUpdated)
+        self.thread = threading.Timer(3600.0, self.markNodes)
+        self.thread.daemon = True
+        self.thread.start()
