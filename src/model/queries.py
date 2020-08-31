@@ -8,6 +8,128 @@ from elasticsearch.helpers import scan
 import utils.helpers as hp
 
 
+def queryAllValues(idx, fld_type, time_range):
+    val_fld = hp.getValueField(idx)
+    query = {
+            "size": 0,
+            "_source": ["timestamp", val_fld],
+            "sort": [
+                {
+                  "timestamp": {
+                    "order": "asc"
+                  }
+                }
+            ],
+            "query": {
+                "bool": {
+                    "must": [
+                        {
+                            "range": {
+                                "timestamp": {
+                                    "gte": time_range[0],
+                                    "lte": time_range[1]
+                                }
+                            }
+                        },
+                        {
+                          "term" : {
+                            "src" : {
+                              "value" : fld_type[0]
+                            }
+                          }
+                        },
+                        {
+                          "term" : {
+                            "dest" : {
+                              "value" : fld_type[1]
+                            }
+                          }
+                        }
+                    ]
+                }
+            }
+            }
+
+    data = scan(client=hp.es, index=idx, query=query)
+#     print(idx, str(query).replace("\'", "\""))
+    count = 0
+    allData=[]
+    for res in data:
+        if not count%100000: print(count)
+        allData.append(res['_source'])
+        count=count+1
+
+    return allData
+
+
+def query4Avg(idx, dateFrom, dateTo):
+    val_fld = hp.getValueField(idx)
+    query = {
+              "size" : 0,
+              "query" : {
+                "bool" : {
+                  "must" : [
+                    {
+                      "range" : {
+                        "timestamp" : {
+                          "gt" : dateFrom,
+                          "lte": dateTo
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "aggregations" : {
+                "groupby" : {
+                  "composite" : {
+                    "size" : 9999,
+                    "sources" : [
+                      {
+                        "src" : {
+                          "terms" : {
+                            "field" : "src"
+                          }
+                        }
+                      },
+                      {
+                        "dest" : {
+                          "terms" : {
+                            "field" : "dest"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "aggs": {
+                    val_fld: {
+                      "avg": {
+                        "field": val_fld
+                      }
+                    }
+                  }
+                }
+              }
+            }
+
+
+#     print(idx, str(query).replace("\'", "\""))
+    aggrs = []
+
+    aggdata = hp.es.search(index=idx, body=query)
+    for item in aggdata['aggregations']['groupby']['buckets']:
+        aggrs.append({'hash': str(item['key']['src']+'-'+item['key']['dest']),
+                      'src': item['key']['src'], 'dest': item['key']['dest'],
+                      'value': item[val_fld]['value'],
+                      'from': dateFrom,
+                      'to': dateTo,
+                      'doc_count': item['doc_count']
+                     })
+
+    return aggrs
+
+
+
 def queryDailyAvg(idx, fld, dateFrom, dateTo):
     val_fld = hp.getValueField(idx)
     query = {
