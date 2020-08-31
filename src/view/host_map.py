@@ -8,15 +8,14 @@ import pandas as pd
 import view.templates as tmpl
 import model.queries as qrs
 from model.DataLoader import GeneralDataLoader
-from model.DataLoader import HostsDataLoader
+from model.DataLoader import HostDataLoader
 
-gobj = GeneralDataLoader.Instance()
+gobj = GeneralDataLoader()
 
 
 all_df = gobj.all_df_related_only[['ip', 'is_ipv6', 'host', 'site', 'admin_email', 'admin_name', 'ip_in_ps_meta',
                  'host_in_ps_meta', 'host_index', 'site_index', 'host_meta', 'site_meta']].sort_values(by=['ip_in_ps_meta', 'host_in_ps_meta', 'ip'], ascending=False)
-test = HostsDataLoader()
-test.func()
+# test = HostDataLoader()
 
 
 fig = go.Figure()
@@ -59,7 +58,7 @@ layout_all = html.Div([
             ]),
             dbc.Row(
                 dbc.Col(
-                    html.H4(className="gi-title", children="The following dataset provides information for all hosts in the main indices: ps_packetloss, ps_owd, ps_retransmits, and ps_throughput. "
+                    html.H3(className="gi-title", children="The following dataset provides information for all hosts in the main indices: ps_packetloss, ps_owd, ps_retransmits, and ps_throughput. "
                            )
                 , width=12), justify="around",
             ),

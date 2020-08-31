@@ -17,6 +17,8 @@ from elasticsearch import Elasticsearch
 from elasticsearch.helpers import scan
 import getpass
 
+INDECES = ['ps_packetloss', 'ps_owd', 'ps_retransmits', 'ps_throughput']
+
 def ConnectES():
     user = None
     passwd = None
