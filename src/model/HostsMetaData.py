@@ -10,6 +10,7 @@ from ipwhois import IPWhois
 import difflib
 
 import model.queries as qrs
+from utils.helpers import timer
 
 
 class HostsMetaData:
@@ -107,11 +108,9 @@ class HostsMetaData:
             else: val = inst.args
         return val
 
-
+    @timer
     def BuildDataFrame(self):
-        print()
         print('Query ', self.idx, ' for the period', self.dateFrom, '-', self.dateTo)
-        start = time.time()
         
         # get metadata
         meta_df = pd.DataFrame.from_dict(qrs.get_metadata(self.dateFrom, self.dateTo), orient='index',
@@ -158,7 +157,6 @@ class HostsMetaData:
         df['site'] = df.apply(lambda row: self.findSite(row, df, hosts), axis=1)
         df.rename(columns={'site_x': 'site_index', 'site_y': 'site_meta'}, inplace=True)
 
-        print("BuildDataFrame took %ss" % (int(time.time() - start)))
         return df
 
 
