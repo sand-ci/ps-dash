@@ -78,10 +78,10 @@ class GeneralDataLoader(object, metaclass=Singleton):
     def UpdateGeneralInfo(self):
         print("last updated: {0}, new start: {1} new end: {2} ".format(self.lastUpdated, self.dateFrom, self.dateTo))
 
-        self.pls = HostsMetaData('ps_packetloss', self.dateFrom, self.dateTo).df
-        self.owd = HostsMetaData('ps_owd', self.dateFrom, self.dateTo).df
-        self.thp = HostsMetaData('ps_throughput', self.dateFrom, self.dateTo).df
-        self.rtm = HostsMetaData('ps_retransmits', self.dateFrom, self.dateTo).df
+        self.pls = NodesMetaData('ps_packetloss', self.dateFrom, self.dateTo).df
+        self.owd = NodesMetaData('ps_owd', self.dateFrom, self.dateTo).df
+        self.thp = NodesMetaData('ps_throughput', self.dateFrom, self.dateTo).df
+        self.rtm = NodesMetaData('ps_retransmits', self.dateFrom, self.dateTo).df
         self.latency_df = pd.merge(self.pls, self.owd, how='outer')
         self.throughput_df = pd.merge(self.thp, self.rtm, how='outer')
         all_df = pd.merge(self.latency_df, self.throughput_df, how='outer')

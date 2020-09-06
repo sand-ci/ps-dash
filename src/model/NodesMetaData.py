@@ -13,7 +13,7 @@ import model.queries as qrs
 from utils.helpers import timer
 
 
-class HostsMetaData:
+class NodesMetaData:
 
     def __init__(self, index, dateFrom,  dateTo):
         self.idx = index

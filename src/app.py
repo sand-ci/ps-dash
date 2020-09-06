@@ -8,7 +8,7 @@ import pandas as pd
 
 # import view.host_map as host_map
 import view.site_report as site_report
-import view.problematic_hosts as problems
+import view.problematic_pairs as problems
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP]
 
@@ -29,7 +29,7 @@ app.layout = html.Div([
                             html.Div(id='cards')
                         ], className='tab-element', id='main-tabs')
                     ]),
-                    dcc.Tab(label='Hosts', id='hosts-tab', children=[
+                    dcc.Tab(label='Nodes', id='nodes-tab', children=[
                             html.Div(
                                 problems.problems_layout, className='tab-element'
                                 )
