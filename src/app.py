@@ -8,7 +8,10 @@ import pandas as pd
 
 # import view.host_map as host_map
 import view.site_report as site_report
-import view.problematic_pairs as problems
+from view.problematic_pairs import ProblematicPairsPage
+
+
+ppage = ProblematicPairsPage()
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP]
 
@@ -29,9 +32,9 @@ app.layout = html.Div([
                             html.Div(id='cards')
                         ], className='tab-element', id='main-tabs')
                     ]),
-                    dcc.Tab(label='Nodes', id='nodes-tab', children=[
+                    dcc.Tab(label='Nodes', id='hosts-tab', children=[
                             html.Div(
-                                problems.problems_layout, className='tab-element'
+                                ppage.createLayout(), className='tab-element'
                                 )
 #                             html.Div(
 #                                 host_map.layout_all, className='tab-element'
@@ -58,23 +61,24 @@ def siteTables(interval):
 
     return elem_list
 
-
-
-@app.callback(Output('tabs-content', 'children'),
+@app.callback([Output('tabs-content', 'children'),
+               Output('last-updated', 'children')],
               [Input('tabs-indeces', 'value'),
-               Input('tabs-prob-types', 'value')])
-def render_problems(idx, problem):
+               Input('tabs-prob-types', 'value'),
+               Input('update-interval-component', 'n_intervals')])
+def render_problems(idx, problem, intv):
+    print('*** Reload content ***')
+    ppage = ProblematicPairsPage()
     if (problem == 'high_sigma'):
-        df = problems.high_sigma
+        df = ppage.high_sigma
     elif (problem == 'has_bursts'):
-        df = problems.has_bursts
+        df = ppage.has_bursts
     elif (problem == 'all_packets_lost'):
-        df = problems.all_packets_lost
+        df = ppage.all_packets_lost
 
-    if idx == 'all':
-        return problems.showAll(df)
-    else:
-        return problems.showIndex(idx, df)
+    return [ppage.showProblems(idx, df), dbc.Col([html.Div(f'{ppage.obj.dateFrom} - {ppage.obj.dateTo}', className='period-times'),
+                     html.Div('(Queried period in UTC time)', className='period-times')], className='period-element')]
+
 
 
 app.run_server(debug=False, port=8050, host='0.0.0.0')
