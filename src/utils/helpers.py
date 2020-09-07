@@ -39,19 +39,26 @@ def ConnectES():
 def timer(func):
     @functools.wraps(func)
     def wrapper_timer(*args, **kwargs):
-        start_time = time.perf_counter()    # 1
+        start_time = time.perf_counter()
         value = func(*args, **kwargs)
-        end_time = time.perf_counter()      # 2
-        run_time = end_time - start_time    # 3
+        end_time = time.perf_counter()
+        run_time = end_time - start_time
         print(f"Finished {func.__name__!r} in {run_time:.4f} secs")
         return value
     return wrapper_timer
 
 
 def defaultTimeRange():
-    defaultEnd = datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M')
-    defaultStart = datetime.strftime(datetime.now() - timedelta(days = 3), '%Y-%m-%d %H:%M')
+    now = hourRounder(datetime.utcnow())
+    defaultEnd = datetime.strftime(now, '%Y-%m-%d %H:%M')
+    defaultStart = datetime.strftime(now - timedelta(days = 3), '%Y-%m-%d %H:%M')
     return [defaultStart, defaultEnd]
+
+
+def hourRounder(t):
+    # Rounds to nearest hour by adding a timedelta hour if minute >= 30
+    return (t.replace(second=0, microsecond=0, minute=0, hour=t.hour)
+               +timedelta(hours=t.minute//30))
 
 
 # Expected values: time in miliseconds or string (%Y-%m-%d %H:%M')
