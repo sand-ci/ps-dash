@@ -28,7 +28,10 @@ def ConnectES():
             passwd = f.readline().strip()
     credentials = (user, passwd)
 
-    es = Elasticsearch([{'host': 'atlas-kibana.mwt2.org', 'port': 9200, 'scheme': 'https'}],
+    if getpass.getuser() == 'petya':
+        es = Elasticsearch('https://localhost:9200', verify_certs=False, timeout=240, http_auth=credentials)
+    else:
+        es = Elasticsearch([{'host': 'atlas-kibana.mwt2.org', 'port': 9200, 'scheme': 'https'}],
                        timeout=240, http_auth=credentials)
 
     if es.ping() == True:
