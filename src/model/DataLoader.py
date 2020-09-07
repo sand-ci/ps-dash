@@ -16,24 +16,22 @@ from utils.helpers import timer
 
 class Singleton(type):
 
-    defaultDT = hp.defaultTimeRange()
-
     def __init__(cls, name, bases, attibutes):
         cls._dict = {}
 
-    def __call__(cls, dateFrom=None, dateTo=None):
-        print(cls, dateFrom, dateTo)
-        if (dateFrom is None):
-            dateFrom = Singleton.defaultDT[0]
-        if (dateTo is None):
-            dateTo = Singleton.defaultDT[1]
+    def __call__(cls, dateFrom=None, dateTo=None, *args):
+        defaultDT = hp.defaultTimeRange()
+        if (dateFrom is None) or (dateTo is None):
+            dateFrom = defaultDT[0]
+            dateTo = defaultDT[1]
 
+        print('****', cls, dateFrom, dateTo, *args)
         if (dateFrom, dateTo) in cls._dict:
 #             print('EXISTS')
             instance = cls._dict[(dateFrom, dateTo)]
         else:
-#             print('NEW', (dateFrom, dateTo))
-            instance = super().__call__(dateFrom, dateTo)
+#             print('NEW', dateFrom, dateTo)
+            instance = super().__call__(dateFrom, dateTo, *args)
             cls._dict[(dateFrom, dateTo)] = instance
         return instance
 
