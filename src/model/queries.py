@@ -8,7 +8,7 @@ from elasticsearch.helpers import scan
 import utils.helpers as hp
 
 
-def queryAllValues(idx, fld_type, time_range):
+def queryAllValues(idx, fld_type, dateFrom, dateTo):
     val_fld = hp.getValueField(idx)
     query = {
             "size": 0,
@@ -26,8 +26,8 @@ def queryAllValues(idx, fld_type, time_range):
                         {
                             "range": {
                                 "timestamp": {
-                                    "gte": time_range[0],
-                                    "lte": time_range[1]
+                                    "gte": dateFrom,
+                                    "lte": dateTo
                                 }
                             }
                         },

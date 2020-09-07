@@ -111,15 +111,17 @@ class GeneralDataLoader(object, metaclass=Singleton):
 
 
 
-class SiteDataLoader():
+class SiteDataLoader(object, metaclass=Singleton):
 
     genData = GeneralDataLoader()
 
-    def __init__(self):
+    def __init__(self, dateFrom, dateTo):
+        self.dateFrom = dateFrom
+        self.dateTo = dateTo
         self.UpdateSiteData()
 
     def UpdateSiteData(self):
-        print('UpdateSiteData >>> ', self.genData.dateFrom, self.genData.dateTo)
+        print('UpdateSiteData >>> ', self.dateFrom, self.dateTo)
         pls_site_in_out = self.InOutDf("ps_packetloss", self.genData.pls_related_only)
         self.pls_data = pls_site_in_out['data']
         self.pls_dates = pls_site_in_out['dates']
@@ -137,22 +139,17 @@ class SiteDataLoader():
         self.throughput_df_related_only = self.genData.throughput_df_related_only
 
         self.sites = self.orderSites()
-        self.StartThread()
 
-    def StartThread(self):
-        print('Active threads:',threading.active_count())
-        self.thread = threading.Timer(3600.0, self.UpdateSiteData)
-        self.thread.daemon = True
-        self.thread.start()
 
     @timer
     def InOutDf(self, idx, idx_df):
+        print(idx)
         in_out_values = []
-
+        time_list = hp.GetTimeRanges(self.dateFrom, self.dateTo)
         for t in ['dest_host', 'src_host']:
             meta_df = idx_df.copy()
 
-            df = pd.DataFrame(qrs.queryDailyAvg(idx, t, self.genData.dateFrom, self.genData.dateTo)).reset_index()
+            df = pd.DataFrame(qrs.queryDailyAvg(idx, t, time_list[0], time_list[1])).reset_index()
 
             df['index'] = pd.to_datetime(df['index'], unit='ms').dt.strftime('%d/%m')
             df = df.transpose()
@@ -194,23 +191,25 @@ class SiteDataLoader():
         return sites
 
 
-class HostDataLoader():
+class PrtoblematicPairsDataLoader(object, metaclass=Singleton):
 
     gobj = GeneralDataLoader()
-    time_range = [gobj.dateFrom, gobj.dateTo]
     LIST_IDXS = ['ps_packetloss', 'ps_owd', 'ps_retransmits', 'ps_throughput']
 
-    def __init__(self):
+    def __init__(self, dateFrom, dateTo):
+        self.dateFrom = dateFrom
+        self.dateTo = dateTo
+        self.all_df = self.gobj.all_df_related_only[['ip', 'is_ipv6', 'host', 'site', 'admin_email', 'admin_name', 'ip_in_ps_meta',
+                 'host_in_ps_meta', 'host_index', 'site_index', 'host_meta', 'site_meta']].sort_values(by=['ip_in_ps_meta', 'host_in_ps_meta', 'ip'], ascending=False)
         self.df = self.markNodes()
-        self.StartThread()
 
 
     @timer
     def buildProblems(self, idx):
-        print(idx)
+        print('buildProblems...',idx)
         data = []
-        intv = int(hp.CalcMinutes4Period(self.time_range[0], self.time_range[1])/60)
-        time_list = hp.GetTimeRanges(self.time_range[0], self.time_range[1], intv)
+        intv = int(hp.CalcMinutes4Period(self.dateFrom, self.dateTo)/60)
+        time_list = hp.GetTimeRanges(self.dateFrom, self.dateTo, intv)
         for i in range(len(time_list)-1):
             data.extend(qrs.query4Avg(idx, time_list[i], time_list[i+1]))
 
@@ -226,7 +225,7 @@ class HostDataLoader():
             else: count = str(round((row['doc_count']/total_minutes)*100))+'%'
             return count
 
-        one_test_per_min = hp.CalcMinutes4Period(self.time_range[0], self.time_range[1])
+        one_test_per_min = hp.CalcMinutes4Period(self.dateFrom, self.dateTo)
         measures_done['tests_done'] = measures_done.apply(lambda x: findRatio(x, one_test_per_min), axis=1)
         grouped = pd.merge(grouped, measures_done, on='hash', how='left')
 
@@ -235,7 +234,6 @@ class HostDataLoader():
 
     @timer
     def markNodes(self):
-        print(f'time range is: {self.time_range}')
         df = pd.DataFrame()
         for idx in self.LIST_IDXS:
             tempdf = pd.DataFrame(self.buildProblems(idx))
@@ -270,10 +268,10 @@ class HostDataLoader():
                                                            if x in tempdf[tempdf['zscore']>5]['hash'].values
                                                            else 0)
             grouped['src_not_in'] = grouped['hash'].apply(lambda x: 1
-                                                          if x in grouped[grouped['src'].isin(self.gobj.all_df_related_only['ip']) == False]['hash'].values
+                                                          if x in grouped[grouped['src'].isin(self.all_df['ip']) == False]['hash'].values
                                                           else 0)
             grouped['dest_not_in'] = grouped['hash'].apply(lambda x: 1
-                                                           if x in grouped[grouped['dest'].isin(self.gobj.all_df_related_only['ip']) == False]['hash'].values
+                                                           if x in grouped[grouped['dest'].isin(self.all_df['ip']) == False]['hash'].values
                                                            else 0)
 
             grouped['measures'] = grouped['doc_count'].astype(str)+'('+grouped['tests_done'].astype(str)+')'
@@ -286,11 +284,11 @@ class HostDataLoader():
     @timer
     def getValues(self, probdf):
     #     probdf = markNodes()
-    #     time_list = hp.GetTimeRanges(time_range[0], time_range[1], 1)
         df = pd.DataFrame(columns=['timestamp', 'value', 'idx', 'hash'])
+        time_list = hp.GetTimeRanges(self.dateFrom, self.dateTo)
         for item in probdf[['src', 'dest', 'idx']].values:
             print(item)
-            tempdf = pd.DataFrame(qrs.queryAllValues(item[2], item, self.time_range))
+            tempdf = pd.DataFrame(qrs.queryAllValues(item[2], item, time_list[0], time_list[1]))
             tempdf['idx'] = item[2]
             tempdf['hash'] = item[0]+"-"+item[1]
             tempdf['src'] = item[0]
@@ -302,8 +300,8 @@ class HostDataLoader():
 
     @timer
     def getRelHosts(self, probdf):
-        df1 = pd.merge(self.gobj.all_df_related_only[['host', 'ip', 'site']], probdf[['src', 'hash']], left_on='ip', right_on='src', how='right')
-        df2 = pd.merge(self.gobj.all_df_related_only[['host', 'ip', 'site']], probdf[['dest', 'hash']], left_on='ip', right_on='dest', how='right')
+        df1 = pd.merge(self.all_df[['host', 'ip', 'site']], probdf[['src', 'hash']], left_on='ip', right_on='src', how='right')
+        df2 = pd.merge(self.all_df[['host', 'ip', 'site']], probdf[['dest', 'hash']], left_on='ip', right_on='dest', how='right')
         df = pd.merge(df1, df2, on=['hash'], suffixes=('_src', '_dest'), how='inner')
     #     df = df[df.duplicated(subset=['hash'])==False]
 
