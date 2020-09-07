@@ -9,7 +9,7 @@ import numpy as np
 from  scipy.stats import zscore
 
 import model.queries as qrs
-from model.HostsMetaData import HostsMetaData
+from model.NodesMetaData import NodesMetaData
 import utils.helpers as hp
 from utils.helpers import timer
 
