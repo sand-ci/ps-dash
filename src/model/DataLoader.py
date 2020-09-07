@@ -36,6 +36,27 @@ class Singleton(type):
         return instance
 
 
+class Updater(object):
+
+    def __init__(self):
+        self.StartThread()
+
+    @timer
+    def UpdateAllData(self):
+        print()
+        print('New data is on its way...')
+        print('Active threads:',threading.active_count())
+        GeneralDataLoader()
+        SiteDataLoader()
+        PrtoblematicPairsDataLoader()
+
+    def StartThread(self):
+        self.lastUpdated = datetime.utcnow().strftime("%d-%m-%Y, %H:%M")
+        self.thread = threading.Timer(3600, self.UpdateAllData) # 1hour
+        self.thread.daemon = True
+        self.thread.start()
+
+
 class GeneralDataLoader(object, metaclass=Singleton):
 
     def __init__(self, dateFrom,  dateTo):
@@ -95,20 +116,6 @@ class GeneralDataLoader(object, metaclass=Singleton):
         self.all_df_related_only = self.all_df[self.all_df['host_in_ps_meta'] == True]
 
         self.lastUpdated = datetime.now()
-        self.StartGenInfoThread()
-
-    def StartGenInfoThread(self):
-        self.lastUpdated = datetime.now().strftime("%d-%m-%Y, %H:%M")
-        # Update dates
-        defaultDT = hp.defaultTimeRange()
-        if (self.lastUpdated != defaultDT[1]):
-            self.dateFrom = defaultDT[0]
-            self.dateTo = defaultDT[1]
-        self.thread = threading.Timer(24*60*60, self.UpdateGeneralInfo)
-
-        self.thread.daemon = True
-        self.thread.start()
-
 
 
 class SiteDataLoader(object, metaclass=Singleton):
@@ -309,10 +316,3 @@ class PrtoblematicPairsDataLoader(object, metaclass=Singleton):
         df = pd.merge(probdf, df, on=['hash', 'src', 'dest'], how='left')
 
         return df
-
-
-    def StartThread(self):
-        print('**** Range:',self.time_range, self.gobj.lastUpdated)
-        self.thread = threading.Timer(3600.0, self.markNodes)
-        self.thread.daemon = True
-        self.thread.start()

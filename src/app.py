@@ -9,8 +9,11 @@ import pandas as pd
 # import view.host_map as host_map
 import view.site_report as site_report
 from view.problematic_pairs import ProblematicPairsPage
+from model.DataLoader import Updater
 
 
+# Start a thread which will update the data every hour
+Updater()
 ppage = ProblematicPairsPage()
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP]
