@@ -18,27 +18,40 @@ class Singleton(type):
 
     def __init__(cls, name, bases, attibutes):
         cls._dict = {}
+        cls._registered = []
 
     def __call__(cls, dateFrom=None, dateTo=None, *args):
-        defaultDT = hp.defaultTimeRange()
         if (dateFrom is None) or (dateTo is None):
+            defaultDT = hp.defaultTimeRange()
             dateFrom = defaultDT[0]
             dateTo = defaultDT[1]
 
-        print('****', cls, dateFrom, dateTo, *args)
         if (dateFrom, dateTo) in cls._dict:
-#             print('EXISTS')
+            print('OBJECT EXISTS')
             instance = cls._dict[(dateFrom, dateTo)]
         else:
-#             print('NEW', dateFrom, dateTo)
-            instance = super().__call__(dateFrom, dateTo, *args)
-            cls._dict[(dateFrom, dateTo)] = instance
+            print('OBJECT DOES NOT EXIST', dateFrom, dateTo)
+            if ([dateFrom, dateTo] != cls._registered) :
+                print(' >>> CREATING NEW INSTANCE', dateFrom, dateTo)
+                cls._registered = [dateFrom, dateTo]
+                instance = super().__call__(dateFrom, dateTo, *args)
+                cls._dict[(dateFrom, dateTo)] = instance
+            elif [dateFrom, dateTo] == cls._registered:
+                print(' >>> CREATION IS IN PROGRESS FOR', dateFrom, dateTo)
+                print(' >>> GET LAST INSTANCE INSTEAD', list(cls._dict.keys())[-1])
+                instance = cls._dict[list(cls._dict.keys())[-1]]
+
+                # keep only a few objects in memory
+                if len(cls._dict) >= 3:
+                    cls._dict.pop(list(cls._dict.keys())[0])
+
         return instance
 
 
 class Updater(object):
 
     def __init__(self):
+        self.lastUpdated = hp.hourRounder(datetime.utcnow())
         self.StartThread()
 
     @timer
