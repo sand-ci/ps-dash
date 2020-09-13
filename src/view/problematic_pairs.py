@@ -105,7 +105,12 @@ class ProblematicPairsPage(object):
                         ], align="center"),
                     ], width={"size": 2}),
                     dbc.Col([
-                        html.Div(id='tabs-content')
+                        dcc.Loading(
+                            id="loading-problems",
+                            type="default",
+                            className="loading-problems",
+                            children=html.Div("Loading may take a few minutes. Refresh the page to get the data from an hour ago.", id="tabs-content", className="problems-tabs-content")
+                        ),
                     ], width=9)
                 ])
             ])
