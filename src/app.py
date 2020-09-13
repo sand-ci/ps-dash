@@ -49,19 +49,18 @@ app.layout = html.Div([
 
 
 
-elem_list = []
 @app.callback(Output('cards', 'children'),
-              [Input('interval-component', 'n_intervals')])
-def siteTables(interval):
-    global elem_list
-    if (interval == 0):
-        elem_list = []
+              [Input('interval-component', 'n_intervals')],
+              [State('cards', 'children')])
+def siteTables(interval, current_elements):
+    elem_list = []
 
     if (interval%3 == 0):
         elem_list.append(dbc.Row([dbc.Col(site_report.createCard(val))
                                   for val in site_report.sites[interval:interval+3]],
                                  id=f"card-{interval}", className='site-card'))
-
+    if current_elements is not None:
+        return current_elements + elem_list
     return elem_list
 
 @app.callback([Output('tabs-content', 'children'),
