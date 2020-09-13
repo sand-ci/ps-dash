@@ -46,9 +46,11 @@ class ProblematicPairsPage(object):
 
     def generateTable(self, item, df):
         df = df[df['idx']==item][['host_src', 'src', 'site_src', 'host_dest', 'dest', 'site_dest', 'measures', 'value']]
+        display_columns = {'host_src': 'host_src', 'src': 'src', 'site_src': 'site_src', 'host_dest': 'host_dest',
+                           'dest': 'dest', 'site_dest': 'site_dest', 'measures': 'measures', 'value': hp.getValueUnit(item)}
         return  dash_table.DataTable(
                     id=str(item+'prob'),
-                    columns=[{"name": i, "id": i} for i in df.columns],
+                    columns=[{"name": v, "id": k} for k,v in display_columns.items()],
                     data=df.to_dict("rows"),
                     style_header=tmpl.host_table_header,
                     style_cell={'font-family':'sans-serif', 'font-size': '11px'},
