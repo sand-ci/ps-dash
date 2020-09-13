@@ -243,9 +243,7 @@ td.change-title {
 }
 
 
-
-
-
+/**********   Pairs   **********/
 
 .tab-parent--vert {
     width: 100%;
@@ -290,4 +288,8 @@ td.change-title {
 
 .period-times {
     text-align: center;
+}
+
+.loading-problems .dash-spinner {
+    margin-top: 40em;
 }
