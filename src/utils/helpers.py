@@ -51,17 +51,30 @@ def timer(func):
     return wrapper_timer
 
 
+def getValueUnit(test_type):
+    if (test_type == 'ps_packetloss'):
+        return 'avg % lost packets'
+    if (test_type == 'ps_retransmits'):
+        return 'avg rtm packets'
+    elif (test_type == 'ps_throughput'):
+        return 'avg MBps'
+    elif (test_type == 'ps_owd'):
+        return 'avg ms'
+
+
 def defaultTimeRange():
-    now = hourRounder(datetime.utcnow())
+    now = roundTime(datetime.utcnow()) # 1 hour
     defaultEnd = datetime.strftime(now, '%Y-%m-%d %H:%M')
     defaultStart = datetime.strftime(now - timedelta(days = 3), '%Y-%m-%d %H:%M')
     return [defaultStart, defaultEnd]
 
 
-def hourRounder(t):
-    # Rounds to nearest hour by adding a timedelta hour if minute >= 30
-    return (t.replace(second=0, microsecond=0, minute=0, hour=t.hour)
-               +timedelta(hours=t.minute//30))
+def roundTime(dt=None, round_to=60*60):
+    if dt == None:
+        dt = datetime.utcnow()
+    seconds = (dt - dt.min).seconds
+    rounding = (seconds+round_to/2) // round_to * round_to
+    return dt + timedelta(0,rounding-seconds,-dt.microsecond)
 
 
 # Expected values: time in miliseconds or string (%Y-%m-%d %H:%M')
