@@ -6,10 +6,10 @@ import dash_html_components as html
 import plotly.express as px
 import pandas as pd
 
+from model.DataLoader import Updater
 # import view.host_map as host_map
 import view.site_report as site_report
 from view.problematic_pairs import ProblematicPairsPage
-from model.DataLoader import Updater
 
 
 # Start a thread which will update the data every hour
