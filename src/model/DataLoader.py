@@ -51,20 +51,21 @@ class Singleton(type):
 class Updater(object):
 
     def __init__(self):
-        self.lastUpdated = hp.hourRounder(datetime.utcnow())
         self.StartThread()
 
     @timer
     def UpdateAllData(self):
         print()
-        print('New data is on its way...')
+        print(f'{datetime.utcnow()}: New data is on its way...')
         print('Active threads:',threading.active_count())
-        GeneralDataLoader()
-        SiteDataLoader()
-        PrtoblematicPairsDataLoader()
+        # query period must be the same for all data loaders
+        defaultDT = hp.defaultTimeRange()
+        GeneralDataLoader(defaultDT[0], defaultDT[1])
+        SiteDataLoader(defaultDT[0], defaultDT[1])
+        PrtoblematicPairsDataLoader(defaultDT[0], defaultDT[1])
+        self.lastUpdated = hp.roundTime(datetime.utcnow())
 
     def StartThread(self):
-        self.lastUpdated = datetime.utcnow().strftime("%d-%m-%Y, %H:%M")
         self.thread = threading.Timer(3600, self.UpdateAllData) # 1hour
         self.thread.daemon = True
         self.thread.start()
