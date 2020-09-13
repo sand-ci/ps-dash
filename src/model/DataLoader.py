@@ -27,12 +27,12 @@ class Singleton(type):
             dateTo = defaultDT[1]
 
         if (dateFrom, dateTo) in cls._dict:
-            print('OBJECT EXISTS')
+            print('OBJECT EXISTS', cls, dateFrom, dateTo)
             instance = cls._dict[(dateFrom, dateTo)]
         else:
-            print('OBJECT DOES NOT EXIST', dateFrom, dateTo)
+            print('OBJECT DOES NOT EXIST', cls, dateFrom, dateTo)
             if ([dateFrom, dateTo] != cls._registered) :
-                print(' >>> CREATING NEW INSTANCE', dateFrom, dateTo)
+                print(' >>> CREATING NEW INSTANCE')
                 cls._registered = [dateFrom, dateTo]
                 instance = super().__call__(dateFrom, dateTo, *args)
                 cls._dict[(dateFrom, dateTo)] = instance

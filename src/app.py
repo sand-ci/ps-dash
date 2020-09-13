@@ -78,8 +78,10 @@ def render_problems(idx, problem, intv):
     elif (problem == 'all_packets_lost'):
         df = ppage.all_packets_lost
 
-    return [ppage.showProblems(idx, df), dbc.Col([html.Div(f'{ppage.obj.dateFrom} - {ppage.obj.dateTo}', className='period-times'),
-                     html.Div('(Queried period in UTC time)', className='period-times')], className='period-element')]
+    return [ppage.showProblems(idx, df), dbc.Col([
+                                            html.Div(f'{ppage.obj.dateFrom} - {ppage.obj.dateTo}', className='period-times'),
+                                            html.Div('(Queried period in UTC time)', className='period-times')], className='period-element'
+                                         )]
 
 
 
