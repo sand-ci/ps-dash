@@ -70,6 +70,50 @@ class ProblematicPairsPage(object):
                 )
 
 
+    def addSectionHeader(self, item):
+        return dbc.Row([
+                    html.Div(id={
+                                'type': 'memory-output',
+                                'index': item
+                            }),
+                    dbc.Col([
+                        html.H2(self.indx_dict[item], className="index-title"),
+                    ], width=3),
+                    dbc.Col([
+                        dbc.Row([
+                        html.H2('Source: ', className='input-type'),
+                        dcc.Input(
+#                                     id=f"{item}-input-src",
+                            id={
+                                'type': 'input-src',
+                                'index': item
+                            },
+                            type="text",
+                            className='input-value',
+                            placeholder="Click on a row to select values",
+                            style={'font-size':'14px'},
+                        ),
+                        html.H2('Destination: ', className='input-type'),
+                        dcc.Input(
+                            id={
+                                'type': 'input-dest',
+                                'index': item
+                            },
+                            type="text",
+                            className='input-value',
+                            placeholder="Click on a row to select values",
+                            style={'font-size':'14px'},
+                        ),
+                        html.Button('Plot'.upper(),
+                                    id={
+                                        'type': 'plot',
+                                        'index': item
+                                    }, className='plot-input-button', n_clicks=0)
+                            ], align="center", justify="end",)
+                     ], width=9)
+                ], align="center", justify="between", className='problems-tab-header')
+
+
     def showProblems(self, idx, df):
         if idx == 'all':
             return dbc.Row([
