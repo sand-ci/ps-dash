@@ -66,21 +66,23 @@ class ProblematicPairsPage(object):
                     style_cell_conditional=tmpl.gen_info_table_cell,
                     sort_action='native',
                     filter_action='native',
-                    page_size=10
+                    page_size=num_rows
                 )
 
 
     def showProblems(self, idx, df):
         if idx == 'all':
             return dbc.Row([
-                        dbc.Col([
-                            html.H2(self.indx_dict[item], className="index-title"),
-                            self.generateTable(item, df)
-                        ], width=12) for item in hp.INDECES
+                        dbc.Col(
+                            html.Div([
+                                self.addSectionHeader(item),
+                                self.generateTable(item, df, 10)
+                            ], className='idx-tab'), width=12) for item in hp.INDECES
                    ], justify="center")
         else:
             return dbc.Row([
-                        dbc.Col(self.generateTable(idx, df))
+                        dbc.Col([self.addSectionHeader(idx),
+                                 self.generateTable(idx, df, 9999)])
                    ], justify="center")
 
 
