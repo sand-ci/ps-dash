@@ -214,15 +214,15 @@ table.packetloss td.inout-type, table.packetloss td.inout-value, table.packetlos
 }
 
 table.owd td.inout-type, table.owd td.inout-value, table.owd tr.change-values {
-    background-color: #F03A47;
+    background-color: #243660;
 }
 
 table.throughput td.inout-type, table.throughput td.inout-value, table.throughput tr.change-values {
-    background-color: #ffc107;
+    background-color: #3b1c6c;
 }
 
 table.retransmits td.inout-type, table.retransmits td.inout-value, table.retransmits tr.change-values {
-    background-color: #00BCD4;
+    background-color: #242424;
 }
 
 table.packetloss tr.change-values td, table.owd tr.change-values td,
@@ -247,7 +247,7 @@ td.change-title {
 
 
 .tab-container .tab {
-    background-color: #03256C !important;
+    background-color: #00245a !important;
     color: white !important;
 }
 
@@ -363,6 +363,11 @@ td.change-title {
     font-size: 14px;
     color: #fff;
     background-color: #03266c;
+}
+
+.plot-input-button:hover, .plot-input-button:active {
+  color: white;
+  background-color: #1868ac;
 }
 
 .input-value {
