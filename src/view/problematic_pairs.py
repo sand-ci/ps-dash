@@ -4,6 +4,7 @@ import dash_html_components as html
 import dash_table
 import plotly.graph_objects as go
 import pandas as pd
+import numpy as np
 
 import view.templates as tmpl
 import model.queries as qrs
@@ -18,15 +19,23 @@ class ProblematicPairsPage(object):
     problem_types = {'high_sigma':'The most problematic pairs', 'has_bursts':'Pairs showing bursts',
             'all_packets_lost': 'Pairs with 100% packets lost'}
 
+
     def __init__(self):
         self.obj = PrtoblematicPairsDataLoader()
-        self.problems = self.obj.df.copy()
-        # problems = pd.read_csv('df.csv')
-        self.problems = self.problems.round(3)
-
+        self.problems = self.getDf()
         self.high_sigma = self.problems[(self.problems['high_sigma'] == 1) & (self.problems['all_packets_lost'] != 1) & ((self.problems['src_not_in'] == 0) | (self.problems['dest_not_in'] == 0))].sort_values(by=['zscore', 'doc_count'], ascending=False)
         self.has_bursts = self.problems[(self.problems['has_bursts'] == 1) & ((self.problems['src_not_in'] == 0) | (self.problems['dest_not_in'] == 0))].sort_values(by=['max_hash_zscore', 'doc_count'], ascending=False)
         self.all_packets_lost = self.problems[(self.problems['all_packets_lost'] == 1) & ((self.problems['src_not_in'] == 0) | (self.problems['dest_not_in'] == 0))].sort_values(by=['all_packets_lost', 'doc_count'], ascending=False)
+
+
+    def getDf(self):
+        obj = PrtoblematicPairsDataLoader()
+        df = obj.df.copy()
+        df.fillna('N/A', inplace=True)
+        df['value'] = np.where(df['idx']=='ps_packetloss', df['value']*100, df['value'])
+        df['value'] = np.where(df['idx']=='ps_throughput', round(df['value']/1e+6, 2), df['value'])
+        df = df.round(3)
+        return df
 
 
     def getPairs(self, pair_type, row):

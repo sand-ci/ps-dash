@@ -299,6 +299,7 @@ class PrtoblematicPairsDataLoader(object, metaclass=Singleton):
             grouped['measures'] = grouped['doc_count'].astype(str)+'('+grouped['tests_done'].astype(str)+')'
 
             df = df.append(grouped, ignore_index=True)
+            df.fillna('N/A', inplace=True)
         print(f'Total number of hashes: {len(df)}')
 
         return df
