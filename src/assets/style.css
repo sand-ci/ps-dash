@@ -147,7 +147,7 @@
 }
 
 .tab-element {
-    padding: 20px;
+    padding: 10px;
 }
 
 th:not(.CalendarDay), td:not(.CalendarDay) {
@@ -170,11 +170,11 @@ th.latency-head, th.throughput-head {
 }
 
 th.latency-head {
-    background-color: #1F3864;
+    background-color: #2f2f2f;
 }
 
 th.throughput-head {
-    background-color: #004242;
+    background-color: #2f2f2f;
 }
 
 td.ipv-type, td.ipv-count, td.inout-type, td.inout-value {
@@ -202,27 +202,27 @@ th.packetloss-tests, th.owd-tests, th.throughput-tests, th.retransmits-tests {
     padding-top: 10px;
 }
 
-table.packetloss td.inout-type, table.packetloss td.inout-value, table.packetloss tr.change-values {
-    background-color: #2F5597;
-}
-
-table.owd td.inout-type, table.owd td.inout-value, table.owd tr.change-values {
-    background-color: #497EB0;
-}
-
-table.throughput td.inout-type, table.throughput td.inout-value, table.throughput tr.change-values {
-    background-color: #337678;
-}
-
-table.retransmits td.inout-type, table.retransmits td.inout-value, table.retransmits tr.change-values {
-    background-color: #5DA6A9;
-}
-
 table.packetloss td.inout-type, table.packetloss td.inout-value, table.packetloss tr.change-values,
 table.owd td.inout-type, table.owd td.inout-value, table.owd tr.change-values,
 table.throughput td.inout-type, table.throughput td.inout-value, table.throughput tr.change-values,
 table.retransmits td.inout-type, table.retransmits td.inout-value, table.retransmits tr.change-values {
     color: #fff;
+}
+
+table.packetloss td.inout-type, table.packetloss td.inout-value, table.packetloss tr.change-values {
+    background-color: #1768AC;
+}
+
+table.owd td.inout-type, table.owd td.inout-value, table.owd tr.change-values {
+    background-color: #F03A47;
+}
+
+table.throughput td.inout-type, table.throughput td.inout-value, table.throughput tr.change-values {
+    background-color: #ffc107;
+}
+
+table.retransmits td.inout-type, table.retransmits td.inout-value, table.retransmits tr.change-values {
+    background-color: #00BCD4;
 }
 
 table.packetloss tr.change-values td, table.owd tr.change-values td,
@@ -245,9 +245,65 @@ td.change-title {
 
 /**********   Pairs   **********/
 
+
+.tab-container .tab {
+    background-color: #03256C !important;
+    color: white !important;
+}
+
+.tab-container .tab--selected {
+    background-color: #fff !important;
+    color: black !important;
+    border-top: 1px solid #03266c !important;
+}
+
+.indeces-types .tab--selected {
+    border-top: 1px solid #d6d6d6 !important;
+    border-left: 1px solid #03266c !important;
+}
+
+.dash-spreadsheet-menu {
+    margin-top: 0 !important;
+}
+
+.dash-table-container table td {
+    border: 0px !important;
+}
+
+.dash-table-container th {
+    border-left: 0px !important;
+    border-right: 0px !important;
+    border-top-color: white !important;
+    border-bottom-color: white !important;
+    background-color: #ffc107 !important;
+}
+
+.column-header--sort {
+    color: white !important;
+    font-size: 16px !important;
+}
+
+.dash-table-container th.dash-filter {
+    background-color: #e7f8fa !important;
+}
+
+.problems-tab-header {
+    background-color: #1768AC;
+    color: white;
+}
+
 .tab-parent--vert {
     width: 100%;
     padding-top: 20px;
+}
+
+.problems-tabs-content {
+    margin-top: 20px;
+    margin-left: 20px;
+}
+
+.plot-input-button {
+    background-color: white;
 }
 
 .indeces-types {
@@ -275,11 +331,15 @@ td.change-title {
 }
 
 .index-title {
-    padding: 20px 0 0 10px;
+    padding: 20 0 0 10px;
 }
 
 .prob-types {
     font-size: 14px;
+}
+
+.idx-tab {
+    margin-bottom: 70px;
 }
 
 .period-element {
@@ -292,4 +352,60 @@ td.change-title {
 
 .loading-problems .dash-spinner {
     margin-top: 40em;
+}
+
+.input-type {
+    padding: 10px;
+}
+
+.plot-input-button {
+    margin: 10px;
+    font-size: 14px;
+    color: #fff;
+    background-color: #03266c;
+}
+
+.input-value {
+    width: 280px;
+}
+
+.ppage-header {
+    color: #EEF0F2;
+    font-size: 1.6em;
+    padding: 5%;
+    height: 100%;
+}
+
+.ppage-header h1 {
+    color: white;
+}
+
+.issue-header {
+    height: 150px;
+}
+
+.issue-wrapper {
+    height: 100%;
+}
+
+.issue {
+    background-color: #03256C;
+}
+
+.src-issue {
+    background-color: #e4ac05;
+    color: white;
+}
+
+.dest-issue {
+    background-color: #00bcd4;
+    color: white;
+}
+
+.other-issue {
+    background-color: #1768AC;
+}
+
+.arrow-right {
+    font-size: 6em;
 }
