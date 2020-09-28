@@ -72,7 +72,7 @@ class PairPlotsPage(ProblematicPairsPage):
             fig.add_trace(go.Scatter(x=df['dt'], y=df['sqrt'],
                                 mode='markers',
                                 marker=dict(
-                                    color='darkviolet'),
+                                    color='#F03A47'),
                                 name='sqrt',
                                 yaxis="y2",
                                 visible='legendonly'),
@@ -81,7 +81,7 @@ class PairPlotsPage(ProblematicPairsPage):
             fig.add_trace(go.Scatter(x=df['dt'], y=df['log_value'],
                                 mode='markers',
                                 marker=dict(
-                                    color='turquoise'),
+                                    color='#00BCD4'),
                                 name='log',
                                 yaxis="y3",
                                 visible='legendonly'),
@@ -184,7 +184,7 @@ class PairPlotsPage(ProblematicPairsPage):
             other_issues = html.Div([
                             html.Div([
                                 html.Div(ddict[item]['text'], className="card-text"),
-                                html.H1(f"{int(round(ddict[item]['avg'], 0))} {hp.getValueUnit(item)}", className="card-text")
+                                html.H2(f"{int(round(ddict[item]['avg'], 0))} {hp.getValueUnit(item)}", className="card-text")
                             ]) for item in other_indeces
                         ])
         else: other_issues = html.Div('None', className="card-text")
@@ -193,7 +193,7 @@ class PairPlotsPage(ProblematicPairsPage):
                     html.Div([
                         html.H2('ISSUE', className="card-title"),
                         html.Div(ddict[self._idx]['text'], className="card-text"),
-                        html.H1(f"{int(round(ddict[self._idx]['avg'], 0))} {hp.getValueUnit(self._idx)}", className="card-text")
+                        html.H2(f"{int(round(ddict[self._idx]['avg'], 0))} {hp.getValueUnit(self._idx)}", className="card-text")
                 ], className='issue ppage-header'), width=3), dbc.Col(
                 dbc.Row([
                     dbc.Col(
