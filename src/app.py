@@ -27,37 +27,45 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets, suppress_ca
 
 app.layout = html.Div([
                 dcc.Location(id='change-url', refresh=False),
-                html.Div(id='page-content'),
-                dcc.Loading(id="loader", type="default", fullscreen=True,
-                    children=[
-                        html.Div(id='page-content1')
-                    ]
+                dcc.Store(id='store-dropdown'),
+                dbc.Nav(
+                    [
+                        dbc.NavItem(dbc.NavLink("Sites", href="/sites", id='sites-tab')),
+                        dbc.NavItem(dbc.NavLink("Nodes", href="/nodes", id='nodes-tab')),
+                        dbc.NavItem(dbc.NavLink("Pairs", href="/pairs", id='pairs-tab')),
+                    ], fill=True, justified=True, id='navbar'
                 ),
+                html.Div(id='page-content'),
+                html.Div(id='page-content1')
             ])
 
 
-layout_tabs =  dcc.Tabs([
-                    dcc.Tab(label='Sites', id='sites-tab', children=[
-                        html.Div([
-                            dcc.Interval(
-                                    id='interval-component',
-                                    interval=1*450, # in milliseconds
-                                    n_intervals=0,
-                                    max_intervals=len(site_report.sites),
-                                ),
-                            html.Div(id='cards')
-                        ], className='tab-element', id='main-tabs')
-                    ]),
-                    dcc.Tab(label='Nodes', id='hosts-tab', children=[
-                            html.Div(
-                                ppage.createLayout(), className='tab-element'
-                                )
-#                             html.Div(
-#                                 host_map.layout_all, className='tab-element'
-#                                 )
-                            ]
+layout_nodes =  html.Div(
+                    ppage.createLayout(), className='tab-element'
                     )
-                ])
+
+
+layout_sites =  html.Div([
+                    dcc.Interval(
+                            id='interval-component',
+                            interval=1*1000, # in milliseconds
+                            n_intervals=0,
+                            max_intervals=len(site_report.sites)/27
+                    ),
+                    html.Div(id='cards')
+                ], className='tab-element', id='main-tabs')
+
+layout_notfound = dbc.Jumbotron(
+                    [
+                        dbc.Row([
+                            dbc.Col([
+                                html.H1("404: Not found", className="text-danger"),
+                                html.Hr(),
+                                html.P("Try another path...")
+                            ], width=8)
+                        ], justify='center')
+                    ]
+                )
 
 
 '''Build the site summaries as a set of smaller elements wrapped up in a bigger one'''
@@ -124,19 +132,31 @@ def fillInput(active_cell, data, page, page_size, elem_id):
 
 
 '''Simulate opening of a new page to show the relevant plots'''
-@app.callback([Output('change-url', 'pathname')],
+@app.callback([Output('change-url', 'href')],
               [Input({'type': 'plot', 'index': ALL}, 'n_clicks'),
-               Input({'type': 'memory-output','index': ALL}, 'value')])
-def changePath(clicked, stored):
-    idx = None
-    # get the index of the button click and use it to get the data from the corresponding table
-    for i in range(len(clicked)):
-        if clicked[i] > 0:
-            idx = hp.INDECES[i]
-            data = stored[i]
-    if idx is not None:
+               Input({'type': 'memory-output','index': ALL}, 'value'),
+               Input("store-dropdown", "data")
+              ])
+def changePath(clicked, stored, dddata):
+    idx, data = None, None
+
+    # If there is only 1 value for the plot button, that means a user is on page Pairs
+    # and the data comes from the dropdown fields
+    if (len(clicked) == 1):
+        if (clicked[0] == 1) and not any(v is None for v in dddata.values()):
+            data = dddata
+    else:
+        # If there is > 1 value for the plot button, that means a user is on page Nodes
+        # and the data comes from the datatables
+        # get the index of the button click and use it to get the data from the corresponding table
+        for i in range(len(clicked)):
+            if clicked[i] > 0:
+                idx = hp.INDECES[i]
+                data = stored[i]
+
+    if data is not None:
         return [f'/plot?idx={data["idx"]}&src_host={data["host_src"]}&src={data["src"]}&dest_host={data["host_dest"]}&dest={data["dest"]}']
-    else: raise PreventUpdate
+    raise PreventUpdate
 
 
 @app.callback([Output("src-dropdown", "options"),
@@ -209,14 +229,25 @@ def update_dropdowns_from_url(url_data):
 
 # TODO: remove the long sites page and replace it woth a geo map. Then the container without the loader can be removed as well
 '''Show different layouts depending on the URL'''
-@app.callback([Output('page-content', 'children'), Output('page-content1', 'children'),],[Input('change-url', 'pathname'), Input('change-url', 'href')])
+@app.callback([Output('page-content', 'children'),
+               Output('page-content1', 'children'),
+               Output('sites-tab', 'active'),
+               Output('nodes-tab', 'active'),
+               Output('pairs-tab', 'active')],
+              [Input('change-url', 'pathname'),
+               Input('change-url', 'href')])
 def displayPage(pathname, url):
-    if pathname == '/':
-        return [layout_tabs, None]
-    elif pathname.startswith('/plot'):
-        path = pathname if len(pathname) > 5 else url
-        o = PairPlotsPage(path)
-        return [None, o.createLayout()]
+    o = PairPlotsPage()
+    if pathname == '/' or pathname == '/sites':
+        return [layout_sites, None, True, False, False]
+    elif url.endswith('/nodes'):
+        return [layout_nodes, None, False, True, False]
+    elif url.endswith('/pairs') :
+        return [o.defaultLayout(), None, False, False, True]
+    elif url.startswith('/plot') or pathname.startswith('/plot'):
+        return [o.defaultLayout(), o.specificPairLayout(url), False, False, True]
+    else: return [layout_notfound, None, False, False, False]
+
 
 
 app.run_server(debug=False, port=8050, host='0.0.0.0')
