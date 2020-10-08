@@ -104,12 +104,12 @@ class ProblematicPairsPage(object):
                             placeholder="Click on a row to select values",
                             style={'font-size':'14px'},
                         ),
-                        html.Button('Plot'.upper(),
+                        dbc.Button('Plot'.upper(),
                                     id={
                                         'type': 'plot',
                                         'index': item
                                     }, className='plot-input-button', n_clicks=0)
-                            ], align="center", justify="end",)
+                            ], align="center", justify="end", )
                      ], width=9)
                 ], align="center", justify="between", className='problems-tab-header')
 
