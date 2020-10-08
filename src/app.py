@@ -4,10 +4,12 @@ import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, State, MATCH, ALL
 from dash.exceptions import PreventUpdate
 import dash_html_components as html
-import plotly.express as px
 import pandas as pd
+import urllib.parse as urlparse
+from urllib.parse import parse_qs
 
 from model.DataLoader import Updater
+from model.DataLoader import GeneralDataLoader
 # import view.host_map as host_map
 import view.site_report as site_report
 from view.problematic_pairs import ProblematicPairsPage
@@ -17,6 +19,7 @@ import utils.helpers as hp
 # Start a thread which will update the data every hour
 Updater()
 ppage = ProblematicPairsPage()
+gdl = GeneralDataLoader()
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP]
 
