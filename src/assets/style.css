@@ -1,142 +1,22 @@
 /**********   Header   **********/
 
-.header {
-    margin: 10px;
+.nav {
+    line-height: 2.8em;
+    font-size: 2em;
 }
 
-.header h4 {
-    padding-left: 20px;
+.nav .nav-link.active {
+    color: #000;
+    background-color: #ffffff;
 }
 
-/**********   Switch button   **********/
-
-.read-db-switch {
-    margin: 0 15px;
-}
-
-.sc-bdVaJa.epRheK, .sc-bdVaJa.ljjuxx {
-    width: 10px;
-    height: 10px;
-    margin: 0 5px;
-}
-
-.epRheK.daq-toggleswitch--light__indicator--on {
-    background-color: gray;
-}
-
-/**********   Period buttons   **********/
-
-.period-btns {
-    float: right;
+.nav-item {
+    background-color: #00245a;
     margin-bottom: 0;
 }
 
-/**********   Data table   **********/
-
-.base {
-    margin: 0 30px 30px 30px;
-}
-
-.data-table tbody tr.selected td {
-    background: none repeat scroll 0 0 #FFCF8B;
-    color: #FFFFFF !important;
-}
-
-.selected-text, .desc-text, #as_src_txt, #as_dest_txt {
-    display: none;
-}
-
-/**********   Loaders   **********/
-
-.loading-component1 {
-    margin: 50px 0 0 0;
-}
-
-.loading-component1 .dash-spinner.dash-default-spinner {
-    margin-bottom: 300px;
-}
-
-.loading-component {
-    margin-top: 50px;
-}
-
-/**********   Header   **********/
-
-.header {
-    margin: 10px;
-}
-
-.header h4 {
-    padding-left: 20px;
-}
-
-/**********   Switch button   **********/
-
-.read-db-switch {
-    margin: 0 15px;
-}
-
-.sc-bdVaJa.epRheK, .sc-bdVaJa.ljjuxx {
-    width: 10px;
-    height: 10px;
-    margin: 0 5px;
-}
-
-.epRheK.daq-toggleswitch--light__indicator--on {
-    background-color: gray;
-}
-
-/**********   Period buttons   **********/
-
-.period-btns {
-    float: right;
-    margin-bottom: 0;
-}
-
-/**********   Data table   **********/
-
-.data-table {
-    margin: 0 30px 30px 30px;
-}
-
-.data-table tbody tr.selected td {
-    background: none repeat scroll 0 0 #FFCF8B;
-    color: #FFFFFF !important;
-}
-
-.selected-text, .desc-text, #as_src_txt, #as_dest_txt {
-    display: none;
-}
-
-/**********   Loaders   **********/
-
-.loading-component1 {
-    margin: 50px 0 0 0;
-}
-
-.loading-component1 .dash-spinner.dash-default-spinner {
-    margin-bottom: 300px;
-}
-
-.loading-component {
-    margin-top: 50px;
-}
-
-.removed-hosts-title {
-    margin-top: 20px;
-    width: 50%;
-    float: left;
-}
-
-.dash-spreadsheet-menu {
-    float: right;
-    margin-top: 15px;
-}
-
-/**********   General Info   **********/
-
-.gi-title {
-    margin-top: 30px;
+.nav-item .nav-link {
+    color: #fff;
 }
 
 /**********   Sites   **********/
@@ -243,7 +123,7 @@ td.change-title {
 }
 
 
-/**********   Pairs   **********/
+/**********   Nodes   **********/
 
 
 .tab-container .tab {
@@ -362,10 +242,11 @@ td.change-title {
     margin: 10px;
     font-size: 14px;
     color: #fff;
-    background-color: #03266c;
+    background-color: #00255a;
+    width: 100px;
 }
 
-.plot-input-button:hover, .plot-input-button:active {
+.plot-input-button:hover, .plot-input-button:active, .plot-input-button:focus {
   color: white;
   background-color: #1868ac;
 }
@@ -385,12 +266,53 @@ td.change-title {
     color: white;
 }
 
+
+/**********   Pairs   **********/
+
+
+.fields-wrapper {
+    padding: 0.1%;
+    background-color: #fff;
+    margin: 0.5%;
+}
+
+.fields-wrapper label {
+    font-size: 1.6em;
+    color: black;
+}
+
+.fields-wrapper p {
+/*     font-size: 1.6em; */
+    color: black;
+}
+
+.fields-wrapper .dd-fields {
+    margin-left: 5px;
+}
+
+.fields-wrapper .dd-count {
+  margin-left: 5px;
+  margin-top: 5px;
+  line-height: 0em;
+}
+
+.dash-spinner-container {
+    width: 50% !important;
+    margin-top: 20% !important;
+    height: 0 !important;
+    position: relative !important;
+}
+
 .issue-header {
     height: 150px;
+    margin-bottom: 0.5%;
 }
 
 .issue-wrapper {
     height: 100%;
+    padding: 0;
+    margin-right: 0px;
+    margin-left: 0px;
 }
 
 .issue {
