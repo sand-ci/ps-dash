@@ -63,10 +63,14 @@ layout_tabs =  dcc.Tabs([
               [State('cards', 'children')])
 def showsSiteTables(interval, current_elements):
     elem_list = []
-    if (interval%3 == 0):
-        elem_list.append(dbc.Row([dbc.Col(site_report.createCard(val))
-                                  for val in site_report.sites[interval:interval+3]],
-                                 id=f"card-{interval}", className='site-card'))
+    start = interval*27
+    end = start+27
+    for i in range(start, end):
+        if (i%3 == 0):
+            elem_list.append(dbc.Row([dbc.Col(site_report.createCard(val))
+                                  for val in site_report.sites[i:i+3]],
+                                 id=f"card-{i}", className='site-card'))
+
     if current_elements is not None:
         return [current_elements + elem_list]
     return [elem_list]
