@@ -130,8 +130,28 @@ class GeneralDataLoader(object, metaclass=Singleton):
         self.latency_df_related_only = self.latency_df[self.latency_df['host_in_ps_meta'] == True]
         self.throughput_df_related_only = self.throughput_df[self.throughput_df['host_in_ps_meta'] == True]
         self.all_df_related_only = self.all_df[self.all_df['host_in_ps_meta'] == True]
+        self.all_tested_pairs = self.getAllTestedPairs()
 
         self.lastUpdated = datetime.now()
+
+    def getAllTestedPairs(self):
+        all_df = self.all_df[['host', 'ip']]
+        df = pd.DataFrame(qrs.queryAllTestedPairs([self.dateFrom, self.dateTo]))
+        df = pd.merge(all_df, df, left_on='ip', right_on='src', how='right')
+        df = pd.merge(all_df, df, left_on='ip', right_on='dest', how='right', suffixes=('_dest', '_src'))
+        df.drop_duplicates(keep='first', inplace=True)
+
+        df = df.sort_values(['host_src', 'host_dest'])
+        df['host_dest'] = df['host_dest'].fillna('N/A')
+        df['host_src'] = df['host_src'].fillna('N/A')
+
+        df['source'] = df[['host_src', 'src']].apply(lambda x: ': '.join(x), axis=1)
+        df['destination'] = df[['host_dest', 'dest']].apply(lambda x: ': '.join(x), axis=1)
+
+        # df = df.sort_values(by=['host_src', 'host_dest'], ascending=False)
+        df = df[['host_dest', 'host_src', 'idx', 'src', 'dest', 'source', 'destination']]
+
+        return df
 
 
 class SiteDataLoader(object, metaclass=Singleton):

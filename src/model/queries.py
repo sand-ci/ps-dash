@@ -8,6 +8,59 @@ from elasticsearch.helpers import scan
 import utils.helpers as hp
 
 
+def queryAllTestedPairs(period):
+    query = {
+      "size" : 0,
+      "query" : {
+        "bool" : {
+          "must" : [
+            {
+              "range" : {
+                "timestamp" : {
+                  "gt" : period[0],
+                  "lte": period[1]
+                }
+              }
+            }
+          ]
+        }
+      },
+      "aggregations" : {
+        "groupby" : {
+          "composite" : {
+            "size" : 9999,
+            "sources" : [
+              {
+                "src" : {
+                  "terms" : {
+                    "field" : "src"
+                  }
+                }
+              },
+              {
+                "dest" : {
+                  "terms" : {
+                    "field" : "dest"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+
+    aggrs = []
+    for idx in hp.INDECES:
+        aggdata = hp.es.search(index=idx, body=query)
+        for item in aggdata['aggregations']['groupby']['buckets']:
+            aggrs.append({'idx': idx,
+                          'src': item['key']['src'],
+                          'dest': item['key']['dest']
+                         })
+    return aggrs
+
+
 def queryAllValues(idx, src, dest, period):
     val_fld = hp.getValueField(idx)
     query = {
