@@ -148,6 +148,45 @@ class PairPlotsPage():
         return fig
 
 
+    def defaultLayout(self):
+        return  html.Div([
+                    dbc.Row([
+                        dbc.Col([
+                            dbc.Row([
+                                dbc.Col(html.Label('Index:'), width=3, className='dd-fields'),
+                                dbc.Col(html.Label('Source:'), width=3, className='dd-fields'),
+                                dbc.Col(html.Label('Destination:'), width=3, className='dd-fields'),
+                                dbc.Col(width=1),
+                                ], no_gutters=True, justify="center", className='dd-field-names'),
+                            dbc.Row([
+                                dbc.Col(dcc.Dropdown(
+                                    id='idx-dropdown',
+                                    options=[{'label':idx, 'value':idx} for idx in hp.INDECES],
+                                ), width=3, className='dd-fields'),
+                                dbc.Col(dcc.Dropdown(
+                                    id='src-dropdown',
+                                    placeholder="First select an index",
+                                ), width=3, className='dd-fields'),
+                                dbc.Col(dcc.Dropdown(
+                                    id='dest-dropdown',
+                                    placeholder="First select an index",
+                                ), width=3, className='dd-fields'),
+                                dbc.Col(dbc.Button('Plot'.upper(),
+                                            id={
+                                                    'type': 'plot',
+                                                    'index': 'default'
+                                                }, className='plot-input-button', n_clicks=0), width=1),
+                                ], align="center", no_gutters=True, justify="center"),
+                            dbc.Row([
+                                dbc.Col(html.P(id='total-pairs', className='dd-count'), width=3, className='dd-fields'),
+                                dbc.Col(html.P(id='total-srcs', className='dd-count'), width=3, className='dd-fields'),
+                                dbc.Col(html.P(id='total-dests', className='dd-count'), width=4, className='dd-fields'),
+                                ], no_gutters=True, justify="center"),
+                        ], width=12, className='fields-wrapper'),
+                      ], justify="center", className='dd-container'),
+                ])
+
+
     def phraseProblem(self, ptype, idx):
             if ptype == 'high_sigma' or ptype == 'all_packets_lost':
                 phrase = 'overall'
