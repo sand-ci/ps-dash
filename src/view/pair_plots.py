@@ -17,20 +17,19 @@ import dash_bootstrap_components as dbc
 import dash_html_components as html
 
 from view.problematic_pairs import ProblematicPairsPage
+from model.DataLoader import GeneralDataLoader
 
 
-class PairPlotsPage(ProblematicPairsPage):
+class PairPlotsPage():
 
-    def __init__(self, url):
+    def __init__(self):
         self.parent = ProblematicPairsPage()
-        self.forward = self.getData(url, True)
-        self.reversed = self.getData(url, False)
+        self.root_parent = GeneralDataLoader()
 
 
     def getData(self, url, forward):
-        self._time_list = hp.GetTimeRanges(self.parent.obj.dateFrom, self.parent.obj.dateTo)
+        self._time_list = hp.GetTimeRanges(self.root_parent.dateFrom, self.root_parent.dateTo)
         parsed = urlparse.urlparse(url)
-
         self._idx = parse_qs(parsed.query)['idx'][0]
 
         if forward:
@@ -48,7 +47,6 @@ class PairPlotsPage(ProblematicPairsPage):
             self._dest_ip = parse_qs(parsed.query)['src'][0]
 
         df = pd.DataFrame(qrs.queryAllValues(self._idx, self._src_ip, self._dest_ip, self._time_list))
-        print(len(df))
         df.rename(columns={hp.getValueField(self._idx): 'value'}, inplace=True)
         if len(df) > 0:
             df['log_value'] = np.log10(df['value'].replace(0, np.nan))
@@ -167,57 +165,75 @@ class PairPlotsPage(ProblematicPairsPage):
 
 
     def createCards(self):
-        data = self.parent.problems[(self.parent.problems['src']==self._src) &
+        other_issues_div = html.Div('None', className="card-text")
+        if self.parent.problems[['src', 'dest']].isin({'src': [self._src], 'dest': [self._dest]}).any().all():
+            data = self.parent.problems[(self.parent.problems['src']==self._src) &
                                  (self.parent.problems['dest']==self._dest)].set_index('idx').to_dict('index')
-        watch4 = ['high_sigma', 'all_packets_lost', 'has_bursts']
+            watch4 = ['high_sigma', 'all_packets_lost', 'has_bursts']
 
-        '''Store the sentences in a dictionary'''
-        ddict = {}
-        for idx in data:
-            for k, v in data[idx].items():
-                if k in watch4 and v == 1:
-                    ddict[idx] = {'text':self.phraseProblem(k, idx), 'avg':data[idx]['value']}
+            '''Store the sentences in a dictionary'''
+            ddict = {}
+            for idx in data:
+                for k, v in data[idx].items():
+                    if k in watch4 and v == 1:
+                        ddict[idx] = {'text':self.phraseProblem(k, idx), 'avg':data[idx]['value']}
+                if idx not in ddict:
+                    ddict[idx] = {'text':'None found', 'avg':data[idx]['value']}
 
-        '''Search for other problems for the same pair and show them. Otherwise return None'''
-        other_indeces = [item for item in ddict.keys() if item != self._idx]
-        if len(other_indeces) > 0:
-            other_issues = html.Div([
-                            html.Div([
-                                html.Div(ddict[item]['text'], className="card-text"),
-                                html.H2(f"{int(round(ddict[item]['avg'], 0))} {hp.getValueUnit(item)}", className="card-text")
-                            ]) for item in other_indeces
-                        ])
-        else: other_issues = html.Div('None', className="card-text")
+            '''Search for other problems for the same pair and show them. Otherwise return None'''
+            other_indeces = [item for item in ddict.keys() if item != self._idx]
+            if len(other_indeces) > 0:
+                other_issues_div = html.Div([
+                                html.Div([
+                                    html.Div(ddict[item]['text'], className="card-text"),
+                                    html.H2(f"{int(round(ddict[item]['avg'], 0))} {hp.getValueUnit(item)}", className="card-text")
+                                ]) for item in other_indeces
+                            ])
+
+            itext = html.Div(ddict[self._idx]['text'], className="card-text")
+            ival = html.H2(f"{int(round(ddict[self._idx]['avg'], 0))} {hp.getValueUnit(self._idx)}", className="card-text")
+        else:
+            itext = html.Div('None found', className="card-text")
+            ival = html.Div(className="card-text")
+            # TOFIX: the case when dest -> src exists in problems is not covered
+
+        src = self.root_parent.all_df[(self.root_parent.all_df['ip']==self._src)]
+        dest = self.root_parent.all_df[(self.root_parent.all_df['ip']==self._dest)]
 
         return  dbc.Col(
                     html.Div([
-                        html.H2('ISSUE', className="card-title"),
-                        html.Div(ddict[self._idx]['text'], className="card-text"),
-                        html.H2(f"{int(round(ddict[self._idx]['avg'], 0))} {hp.getValueUnit(self._idx)}", className="card-text")
+                        html.H2('Issue for this type of measure', className="card-title"),
+                        itext,
+                        ival
                 ], className='issue ppage-header'), width=3), dbc.Col(
-                dbc.Row([
-                    dbc.Col(
+                    dbc.Row([
+                        dbc.Col([
+                            html.Div([
+                                html.H2('SOURCE', className="card-title"),
+                                html.Div(src['host'].values, className="card-text"),
+                                html.Div(src['ip'].values, className="card-text"),
+                                html.Div(src['site'].values, className="card-text")
+                             ], className='src-issue ppage-header'),
+
+                            ], width=6, className='issue-wrapper src'),dbc.Col(
+                            html.Div([
+                                html.H2('DESTINATION', className="card-title"),
+                                html.Div(dest['host'].values, className="card-text"),
+                                html.Div(dest['ip'].values, className="card-text"),
+                                html.Div(dest['site'].values, className="card-text")
+                         ], className='dest-issue ppage-header'), width=6, className='issue-wrapper dest')
+                    ], justify="center", align="center", className='issue-wrapper')
+                    , width=6), dbc.Col(
                         html.Div([
-                            html.H2('SOURCE', className="card-title"),
-                            html.Div(data[self._idx]['host_src'], className="card-text"),
-                            html.Div(data[self._idx]['src'], className="card-text"),
-                            html.Div(data[self._idx]['site_src'], className="card-text")
-                     ], className='src-issue ppage-header'), width=5, className='issue-wrapper'), dbc.Col(
-                        html.P(['⇒'], className='arrow-right'), width=0.5),dbc.Col(
-                        html.Div([
-                            html.H2('DESTINATION', className="card-title"),
-                            html.Div(data[self._idx]['host_dest'], className="card-text"),
-                            html.Div(data[self._idx]['dest'], className="card-text"),
-                            html.Div(data[self._idx]['site_dest'], className="card-text")
-                     ], className='dest-issue ppage-header'), width=5, className='issue-wrapper')
-                ], justify="center", align="center", className='issue-wrapper'), width=6), dbc.Col(
-                    html.Div([
-                        html.H2('Other issues for the same pair', className="card-title"),
-                        other_issues
-                 ], className='other-issue ppage-header'), width=3)
+                            html.H2('Other issues for the same pair', className="card-title"),
+                            other_issues_div
+                         ], className='other-issue ppage-header')
+                    , width=3)
 
 
-    def createLayout(self):
+    def specificPairLayout(self, url):
+        pair = self.getData(url, True)
+        reversed_pair = self.getData(url, False)
         return html.Div([
                 dbc.Row(
                     self.createCards(), className='issue-header', no_gutters=True, justify='center'
@@ -225,12 +241,12 @@ class PairPlotsPage(ProblematicPairsPage):
                 dbc.Row([
                      dbc.Col(
                          html.Div([
-                            dcc.Graph(figure=self.buildGraph(self.forward))
+                            dcc.Graph(figure=self.buildGraph(pair))
                         ])
                      ),
                     dbc.Col(
                          html.Div([
-                            dcc.Graph(figure=self.buildGraph(self.reversed))
+                            dcc.Graph(figure=self.buildGraph(reversed_pair))
                         ])
                      )
                 ])
