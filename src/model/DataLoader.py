@@ -347,7 +347,7 @@ class PrtoblematicPairsDataLoader(object, metaclass=Singleton):
         df1 = pd.merge(self.all_df[['host', 'ip', 'site']], probdf[['src', 'hash']], left_on='ip', right_on='src', how='right')
         df2 = pd.merge(self.all_df[['host', 'ip', 'site']], probdf[['dest', 'hash']], left_on='ip', right_on='dest', how='right')
         df = pd.merge(df1, df2, on=['hash'], suffixes=('_src', '_dest'), how='inner')
-    #     df = df[df.duplicated(subset=['hash'])==False]
+        df = df[df.duplicated(subset=['hash'])==False]
 
         df = df.drop(columns=['ip_src', 'ip_dest'])
         df = pd.merge(probdf, df, on=['hash', 'src', 'dest'], how='left')
