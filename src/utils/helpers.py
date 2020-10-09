@@ -53,13 +53,13 @@ def timer(func):
 
 def getValueUnit(test_type):
     if (test_type == 'ps_packetloss'):
-        return 'avg % lost(packets)'
+        return '% lost (packets) avg'
     if (test_type == 'ps_retransmits'):
-        return 'avg retransmits(packets)'
+        return 'retransmits (packets) avg'
     elif (test_type == 'ps_throughput'):
-        return 'avg throughput(MBps)'
+        return 'throughput (MBps) avg'
     elif (test_type == 'ps_owd'):
-        return 'avg delay(ms)'
+        return 'delay (ms) avg'
 
 
 def defaultTimeRange():
