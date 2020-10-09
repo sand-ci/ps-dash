@@ -27,34 +27,18 @@ class PairPlotsPage():
         self.root_parent = GeneralDataLoader()
 
 
-    def getData(self, url, forward):
-        self._time_list = hp.GetTimeRanges(self.root_parent.dateFrom, self.root_parent.dateTo)
-        parsed = urlparse.urlparse(url)
-        self._idx = parse_qs(parsed.query)['idx'][0]
+    def getData(self, src, dest):
+        time_list = hp.GetTimeRanges(self.root_parent.dateFrom, self.root_parent.dateTo)
 
-        if forward:
-            # self._src and self._dest are the orginal values
-            self._src = parse_qs(parsed.query)['src'][0]
-            self._dest = parse_qs(parsed.query)['dest'][0]
-            self._host_src = parse_qs(parsed.query)['src_host'][0]
-            self._host_dest = parse_qs(parsed.query)['dest_host'][0]
-            self._src_ip = self._src
-            self._dest_ip = self._dest
-        else:
-            self._host_src = parse_qs(parsed.query)['dest_host'][0]
-            self._host_dest = parse_qs(parsed.query)['src_host'][0]
-            self._src_ip = parse_qs(parsed.query)['dest'][0]
-            self._dest_ip = parse_qs(parsed.query)['src'][0]
-
-        df = pd.DataFrame(qrs.queryAllValues(self._idx, self._src_ip, self._dest_ip, self._time_list))
+        df = pd.DataFrame(qrs.queryAllValues(self._idx, src, dest, time_list))
         df.rename(columns={hp.getValueField(self._idx): 'value'}, inplace=True)
         if len(df) > 0:
-            df['log_value'] = np.log10(df['value'].replace(0, np.nan))
+            df['log_value'] = np.log(df['value'].replace(0, np.nan))
             df['sqrt'] = df['value']**(1/2)
         return df
 
 
-    def buildGraph(self, df):
+    def buildGraph(self, df, host_src, host_dest):
         fig = go.Figure()
         if len(df) > 0:
             df = df.sort_values('timestamp', ascending=False)
@@ -128,11 +112,11 @@ class PairPlotsPage():
                     ),
                 )
             )
-            fig.update_layout(title=f'{self._idx}: Measures for {self._host_src} ⇒ {self._host_dest}',
+            fig.update_layout(title=f'{self._idx}: Measures for {host_src} ⇒ {host_dest}',
                               template = 'plotly_white')
 
         else:
-            fig.update_layout(title=f'{self._idx}: Measures for {self._host_src} ⇒ {self._host_dest}',
+            fig.update_layout(title=f'{self._idx}: Measures for {host_src} ⇒ {host_dest}',
                               template = 'plotly_white',
                               annotations = [
                                 {
@@ -273,8 +257,16 @@ class PairPlotsPage():
 
 
     def specificPairLayout(self, url):
-        pair = self.getData(url, True)
-        reversed_pair = self.getData(url, False)
+        data = parse_qs(urlparse.urlparse(url).query)
+        # self._src and self._dest are the orginal values
+        self._src = data['src'][0]
+        self._dest = data['dest'][0]
+        self._idx = data['idx'][0]
+        host_src = data['src_host'][0]
+        host_dest = data['dest_host'][0]
+
+        pair = self.getData(self._src, self._dest)
+        reversed_pair = self.getData(self._dest, self._src)
         return html.Div([
                 dbc.Row(
                     self.createCards(), className='issue-header', no_gutters=True, justify='center'
@@ -282,12 +274,12 @@ class PairPlotsPage():
                 dbc.Row([
                      dbc.Col(
                          html.Div([
-                            dcc.Graph(figure=self.buildGraph(pair))
+                            dcc.Graph(figure=self.buildGraph(pair, host_src, host_dest))
                         ])
                      ),
                     dbc.Col(
                          html.Div([
-                            dcc.Graph(figure=self.buildGraph(reversed_pair))
+                            dcc.Graph(figure=self.buildGraph(reversed_pair, host_dest, host_src))
                         ])
                      )
                 ])
