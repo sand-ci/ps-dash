@@ -50,7 +50,7 @@ layout_sites =  html.Div([
                             id='interval-component',
                             interval=1*1000, # in milliseconds
                             n_intervals=0,
-                            max_intervals=len(site_report.sites)/27
+                            max_intervals=len(site_report.sites)/21
                     ),
                     html.Div(id='cards')
                 ], className='tab-element', id='main-tabs')
@@ -74,17 +74,21 @@ layout_notfound = dbc.Jumbotron(
               [State('cards', 'children')])
 def showsSiteTables(interval, current_elements):
     elem_list = []
-    start = interval*27
-    end = start+27
+    start = interval*21
+    end = start+21
+    print (len(site_report.sites), (start, end))
     for i in range(start, end):
         if (i%3 == 0):
+            print(len(site_report.sites), site_report.sites[i:i+3])
             elem_list.append(dbc.Row([dbc.Col(site_report.createCard(val))
                                   for val in site_report.sites[i:i+3]],
                                  id=f"card-{i}", className='site-card'))
 
     if current_elements is not None:
+        print('Sites elements >>>> ',len(current_elements), len(elem_list))
         return [current_elements + elem_list]
-    return [elem_list]
+    else:
+        return [elem_list]
 
 
 '''Get the relevant dataframe based on the type of problem. Page loading is much faster this way'''
