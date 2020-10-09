@@ -304,7 +304,7 @@ td.change-title {
 }
 
 .issue-header {
-    height: 150px;
+    min-height: 150px;
     margin-bottom: 0.5%;
 }
 
