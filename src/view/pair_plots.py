@@ -212,20 +212,22 @@ class PairPlotsPage():
 
             '''Store the sentences in a dictionary'''
             ddict = {}
+            no_issues = []
             for idx in data:
                 for k, v in data[idx].items():
                     if k in watch4 and v == 1:
                         ddict[idx] = {'text':self.phraseProblem(k, idx), 'avg':data[idx]['value']}
                 if idx not in ddict:
-                    ddict[idx] = {'text':'None found', 'avg':data[idx]['value']}
+                    ddict[idx] = {'text':f'{self.parent.indx_dict[idx]}: None found', 'avg':data[idx]['value']}
 
             '''Search for other problems for the same pair and show them. Otherwise return None'''
             other_indeces = [item for item in ddict.keys() if item != self._idx]
+
             if len(other_indeces) > 0:
                 other_issues_div = html.Div([
                                 html.Div([
                                     html.Div(ddict[item]['text'], className="card-text"),
-                                    html.H2(f"{int(round(ddict[item]['avg'], 0))} {hp.getValueUnit(item)}", className="card-text")
+                                    html.H3(f"{int(round(ddict[item]['avg'], 0))} {hp.getValueUnit(item)}", className="card-text")
                                 ]) for item in other_indeces
                             ])
 
