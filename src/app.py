@@ -44,13 +44,12 @@ layout_nodes =  html.Div(
                     ppage.createLayout(), className='tab-element'
                     )
 
-
 layout_sites =  html.Div([
                     dcc.Interval(
                             id='interval-component',
                             interval=1*1000, # in milliseconds
                             n_intervals=0,
-                            max_intervals=len(site_report.sites)/21
+                            max_intervals=1
                     ),
                     html.Div(id='cards')
                 ], className='tab-element', id='main-tabs')
@@ -74,10 +73,9 @@ layout_notfound = dbc.Jumbotron(
               [State('cards', 'children')])
 def showsSiteTables(interval, current_elements):
     elem_list = []
-    start = interval*21
-    end = start+21
-    print (len(site_report.sites), (start, end))
-    for i in range(start, end):
+    start = interval*3
+    end = start+3
+    for i in range(0, len(site_report.sites)):
         if (i%3 == 0):
             print(len(site_report.sites), site_report.sites[i:i+3])
             elem_list.append(dbc.Row([dbc.Col(site_report.createCard(val))
@@ -85,7 +83,7 @@ def showsSiteTables(interval, current_elements):
                                  id=f"card-{i}", className='site-card'))
 
     if current_elements is not None:
-        print('Sites elements >>>> ',len(current_elements), len(elem_list))
+#         print('Sites elements >>>> ',len(current_elements), len(elem_list))
         return [current_elements + elem_list]
     else:
         return [elem_list]
