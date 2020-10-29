@@ -36,15 +36,16 @@ class Singleton(type):
                 cls._registered = [dateFrom, dateTo]
                 instance = super().__call__(dateFrom, dateTo, *args)
                 cls._dict[(dateFrom, dateTo)] = instance
+
             elif [dateFrom, dateTo] == cls._registered:
                 print(' >>> CREATION IS IN PROGRESS FOR', dateFrom, dateTo)
                 print(' >>> GET LAST INSTANCE INSTEAD', list(cls._dict.keys())[-1])
                 if cls._dict[list(cls._dict.keys())[-1]]:
                     instance = cls._dict[list(cls._dict.keys())[-1]]
 
-                # keep only a few objects in memory
-                if len(cls._dict) >= 3:
-                    cls._dict.pop(list(cls._dict.keys())[0])
+            # keep only a few objects in memory
+            if len(cls._dict) >= 3:
+                cls._dict.pop(list(cls._dict.keys())[0])
 
         return instance
 

@@ -77,7 +77,7 @@ def showsSiteTables(interval, current_elements):
     end = start+3
     for i in range(0, len(site_report.sites)):
         if (i%3 == 0):
-            print(len(site_report.sites), site_report.sites[i:i+3])
+#             print(len(site_report.sites), site_report.sites[i:i+3])
             elem_list.append(dbc.Row([dbc.Col(site_report.createCard(val))
                                   for val in site_report.sites[i:i+3]],
                                  id=f"card-{i}", className='site-card'))
