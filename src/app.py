@@ -7,23 +7,48 @@ import dash_html_components as html
 import pandas as pd
 import urllib.parse as urlparse
 from urllib.parse import parse_qs
+from flask_caching import Cache
+import os
 
 from model.DataLoader import Updater
 from model.DataLoader import GeneralDataLoader
 # import view.host_map as host_map
-import view.site_report as site_report
+from view.site_report import SiteReport
 from view.problematic_pairs import ProblematicPairsPage
 from view.pair_plots import PairPlotsPage
 import utils.helpers as hp
+
 
 # Start a thread which will update the data every hour
 Updater()
 ppage = ProblematicPairsPage()
 gdl = GeneralDataLoader()
+site_report = SiteReport()
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP]
 
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets, suppress_callback_exceptions=True)
+
+CACHE_CONFIG = {
+    'CACHE_TYPE': 'redis',
+    'CACHE_REDIS_URL': 'redis://redis-master.perfsonar-platform.svc.cluster.local'
+}
+cache = Cache()
+cache.init_app(app.server, config=CACHE_CONFIG)
+
+@cache.memoize(timeout=60*60)
+def showsSiteTables():
+    elem_list = []
+    interval = 0
+    start = interval*3
+    end = start+3
+    for i in range(0, len(site_report.sites)):
+        if (i%3 == 0):
+            print(len(site_report.sites), site_report.sites[i:i+3])
+            elem_list.append(dbc.Row([dbc.Col(site_report.createCard(val))
+                                  for val in site_report.sites[i:i+3]],
+                                 id=f"card-{i}", className='site-card'))
+    return elem_list
 
 app.layout = html.Div([
                 dcc.Location(id='change-url', refresh=False),
@@ -39,19 +64,12 @@ app.layout = html.Div([
                 html.Div(id='page-content1')
             ])
 
-
 layout_nodes =  html.Div(
                     ppage.createLayout(), className='tab-element'
                     )
 
 layout_sites =  html.Div([
-                    dcc.Interval(
-                            id='interval-component',
-                            interval=1*1000, # in milliseconds
-                            n_intervals=0,
-                            max_intervals=1
-                    ),
-                    html.Div(id='cards')
+                  html.Div(id='cards', children=showsSiteTables())
                 ], className='tab-element', id='main-tabs')
 
 layout_notfound = dbc.Jumbotron(
@@ -65,28 +83,6 @@ layout_notfound = dbc.Jumbotron(
                         ], justify='center')
                     ]
                 )
-
-
-'''Build the site summaries as a set of smaller elements wrapped up in a bigger one'''
-@app.callback([Output('cards', 'children')],
-              [Input('interval-component', 'n_intervals')],
-              [State('cards', 'children')])
-def showsSiteTables(interval, current_elements):
-    elem_list = []
-    start = interval*3
-    end = start+3
-    for i in range(0, len(site_report.sites)):
-        if (i%3 == 0):
-#             print(len(site_report.sites), site_report.sites[i:i+3])
-            elem_list.append(dbc.Row([dbc.Col(site_report.createCard(val))
-                                  for val in site_report.sites[i:i+3]],
-                                 id=f"card-{i}", className='site-card'))
-
-    if current_elements is not None:
-#         print('Sites elements >>>> ',len(current_elements), len(elem_list))
-        return [current_elements + elem_list]
-    else:
-        return [elem_list]
 
 
 '''Get the relevant dataframe based on the type of problem. Page loading is much faster this way'''
@@ -252,4 +248,4 @@ def displayPage(pathname, url):
 
 
 
-app.run_server(debug=False, port=8050, host='0.0.0.0')
+app.run_server(debug=True, port=8050, host='0.0.0.0')

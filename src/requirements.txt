@@ -13,3 +13,4 @@ plotly_express==0.4.1
 numpy==1.19.1
 pandas==1.1.1
 ipwhois==1.1.0
+redis==3.5.3
