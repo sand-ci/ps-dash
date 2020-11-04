@@ -18,98 +18,103 @@ import model.queries as qrs
 from model.DataLoader import SiteDataLoader
 
 
-sobj = SiteDataLoader()
-sites = sobj.sites
+class SiteReport(object):
 
-def generateIPTable(site, test_method, df):
-    ipv6 = len(df[(df['is_ipv6']==True)])
-    ipv4 = len(df[(df['is_ipv6']==False)])
-    return html.Table(
-                # Header
-                [html.Tr([html.Th(f"{test_method.capitalize()} hosts", colSpan='4', className=f"{test_method}-head")]) ] +
-                # Body
-                [html.Tr([
-                    html.Td([col], colSpan='2', className='ipv-type') for col in ['IPv4', 'IPv6']
-                ]) ] +
-                [html.Tr([
-                    html.Td([col], colSpan='2', className='ipv-count') for col in [ipv4, ipv6]
-                ]) ],
-                className='ip-table'
-            )
+    def __init__(self):
+        self.sobj = SiteDataLoader()
+        self.sites = self.sobj.sites
 
 
-def get2dayValue(dff, site, test_type):
-    val = dff['day_val']
-    if (len(val.values) > 0) and (val.isnull().values.any() == False):
-        if test_type == 'throughput':
-            return round(dff['day_val'].values[0]/1e+6, 2)
-        return dff['day_val'].values[0]
-    else: return 'N/A'
+    def generateIPTable(self, site, test_method, df):
+        ipv6 = len(df[(df['is_ipv6']==True)])
+        ipv4 = len(df[(df['is_ipv6']==False)])
+        return html.Table(
+                    # Header
+                    [html.Tr([html.Th(f"{test_method.capitalize()} hosts", colSpan='4', className=f"{test_method}-head")]) ] +
+                    # Body
+                    [html.Tr([
+                        html.Td([col], colSpan='2', className='ipv-type') for col in ['IPv4', 'IPv6']
+                    ]) ] +
+                    [html.Tr([
+                        html.Td([col], colSpan='2', className='ipv-count') for col in [ipv4, ipv6]
+                    ]) ],
+                    className='ip-table'
+                )
 
 
-def getChangeVals(dfm, direction, site):
-    if len(dfm[['day-2', 'day-1', 'day']].values) > 0:
-        vals = dfm[['day-2', 'day-1', 'day']].values[0]
-        data = dfm[['day-2', 'day-1', 'day']]
-        vals = list(data.applymap(lambda x: "+"+str(x) if x>0 else x).values[0])
-        vals.insert(0, direction)
-        return vals
-    else: return [direction, 'N/A', 'N/A', 'N/A'] 
+    def get2dayValue(self, dff, site, test_type):
+        val = dff['day_val']
+        if (len(val.values) > 0) and (val.isnull().values.any() == False):
+            if test_type == 'throughput':
+                return round(dff['day_val'].values[0]/1e+6, 2)
+            return dff['day_val'].values[0]
+        else: return 'N/A'
 
 
-def getUnit(test_type):
-    if (test_type in ['packetloss', 'retransmits']):
-        return 'packets'
-    elif (test_type == 'throughput'):
-        return 'MBps'
-    elif (test_type == 'owd'):
-        return 'ms'
+    def getChangeVals(self, dfm, direction, site):
+        if len(dfm[['day-2', 'day-1', 'day']].values) > 0:
+            vals = dfm[['day-2', 'day-1', 'day']].values[0]
+            data = dfm[['day-2', 'day-1', 'day']]
+            vals = list(data.applymap(lambda x: "+"+str(x) if x>0 else x).values[0])
+            vals.insert(0, direction)
+            return vals
+        else: return [direction, 'N/A', 'N/A', 'N/A']
 
 
-def generateTable(site, test_type, df, dates):
-    # there is no value for the first day of the period since
-    # there is no data for the previous day to comapre with
-    dates[0] = ''
-    meas_type = (test_type).upper()
-
-    dfin = df[df['direction']=='IN']
-    dfout = df[df['direction']=='OUT']
-
-    ch_in = getChangeVals(dfin, 'IN', site)
-    ch_out = getChangeVals(dfout, 'OUT', site)
-
-    val_in = get2dayValue(dfin, site, test_type)
-    val_out = get2dayValue(dfout, site, test_type)
-
-    unit = getUnit(test_type)
-
-    return html.Table(
-                # Header
-                [html.Tr([html.Th(f"{meas_type} ({unit})", colSpan='4', className=f"{test_type}-tests")]) ] +
-                # Body
-                [html.Tr([
-                    html.Td([col], colSpan='2', className='inout-type') for col in ['TODAY IN', 'TODAY OUT']
-                ]) ] +
-                [html.Tr([
-                    html.Td(val_in, colSpan='2', className='inout-value'),
-                    html.Td(val_out, colSpan='2', className='inout-value')
-                ]) ]+
-                [html.Tr(
-                    html.Td('Change over the past 3 days (%)', colSpan='4', className='change-title'),
-                ) ] +
-                [html.Tr([
-                    html.Td(col) for col in dates
-                    ], className='change-values') ] +
-                [html.Tr([
-                    html.Td(col) for col in ch_in
-                    ], className='change-values') ] +
-                [html.Tr([
-                    html.Td(col) for col in ch_out
-                    ], className='change-values') ], className=f'{test_type}'
-            )
+    def getUnit(self, test_type):
+        if (test_type in ['packetloss', 'retransmits']):
+            return 'packets'
+        elif (test_type == 'throughput'):
+            return 'MBps'
+        elif (test_type == 'owd'):
+            return 'ms'
 
 
-def createCard(site):
+    def generateTable(self, site, test_type, df, dates):
+        # there is no value for the first day of the period since
+        # there is no data for the previous day to comapre with
+        dates[0] = ''
+        meas_type = (test_type).upper()
+
+        dfin = df[df['direction']=='IN']
+        dfout = df[df['direction']=='OUT']
+
+        ch_in = self.getChangeVals(dfin, 'IN', site)
+        ch_out = self.getChangeVals(dfout, 'OUT', site)
+
+        val_in = self.get2dayValue(dfin, site, test_type)
+        val_out = self.get2dayValue(dfout, site, test_type)
+
+        unit = self.getUnit(test_type)
+
+        return html.Table(
+                    # Header
+                    [html.Tr([html.Th(f"{meas_type} ({unit})", colSpan='4', className=f"{test_type}-tests")]) ] +
+                    # Body
+                    [html.Tr([
+                        html.Td([col], colSpan='2', className='inout-type') for col in ['TODAY IN', 'TODAY OUT']
+                    ]) ] +
+                    [html.Tr([
+                        html.Td(val_in, colSpan='2', className='inout-value'),
+                        html.Td(val_out, colSpan='2', className='inout-value')
+                    ]) ]+
+                    [html.Tr(
+                        html.Td('Change over the past 3 days (%)', colSpan='4', className='change-title'),
+                    ) ] +
+                    [html.Tr([
+                        html.Td(col) for col in dates
+                        ], className='change-values') ] +
+                    [html.Tr([
+                        html.Td(col) for col in ch_in
+                        ], className='change-values') ] +
+                    [html.Tr([
+                        html.Td(col) for col in ch_out
+                        ], className='change-values') ], className=f'{test_type}'
+                )
+
+
+    def createCard(self, site):
+        sobj = self.sobj
         return dbc.Card(
                 dbc.CardBody(
                     [
@@ -120,20 +125,20 @@ def createCard(site):
                         ], justify="left"),
                         dbc.Row([
                             dbc.Col([
-                                     generateIPTable(site, 'latency', sobj.genData.latency_df_related_only[sobj.latency_df_related_only['site']==site]),
-                                     generateTable(site, 'packetloss', sobj.pls_data[sobj.pls_data['site']==site], sobj.pls_dates),
+                                     self.generateIPTable(site, 'latency', sobj.genData.latency_df_related_only[sobj.latency_df_related_only['site']==site]),
+                                     self.generateTable(site, 'packetloss', sobj.pls_data[sobj.pls_data['site']==site], sobj.pls_dates),
                             ], width=6),
                             dbc.Col([
-                                     generateIPTable(site, 'throughput', sobj.genData.throughput_df_related_only[sobj.throughput_df_related_only['site']==site]),
-                                     generateTable(site, 'throughput', sobj.thp_data[sobj.thp_data['site']==site], sobj.thp_dates)
+                                     self.generateIPTable(site, 'throughput', sobj.genData.throughput_df_related_only[sobj.throughput_df_related_only['site']==site]),
+                                     self.generateTable(site, 'throughput', sobj.thp_data[sobj.thp_data['site']==site], sobj.thp_dates)
                             ], width=6),
                        ]),
                         dbc.Row([
                             dbc.Col([
-                                     generateTable(site, 'owd', sobj.owd_data[sobj.owd_data['site']==site], sobj.owd_dates)
+                                     self.generateTable(site, 'owd', sobj.owd_data[sobj.owd_data['site']==site], sobj.owd_dates)
                             ], width=6),
                             dbc.Col([
-                                     generateTable(site, 'retransmits', sobj.rtm_data[sobj.rtm_data['site']==site], sobj.rtm_dates)
+                                     self.generateTable(site, 'retransmits', sobj.rtm_data[sobj.rtm_data['site']==site], sobj.rtm_dates)
                             ], width=6),
                         ])
                     ]
