@@ -12,8 +12,8 @@ import os
 
 from model.DataLoader import Updater
 from model.DataLoader import GeneralDataLoader
-# import view.host_map as host_map
 from view.site_report import SiteReport
+from view.sites_page import SitesPage
 from view.problematic_pairs import ProblematicPairsPage
 from view.pair_plots import PairPlotsPage
 import utils.helpers as hp

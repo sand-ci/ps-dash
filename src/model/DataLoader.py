@@ -243,7 +243,7 @@ class PrtoblematicPairsDataLoader(object, metaclass=Singleton):
     def __init__(self, dateFrom, dateTo):
         self.dateFrom = dateFrom
         self.dateTo = dateTo
-        self.all_df = self.gobj.all_df_related_only[['ip', 'is_ipv6', 'host', 'site', 'admin_email', 'admin_name', 'ip_in_ps_meta',
+        self.all_df = self.gobj.all_df[['ip', 'is_ipv6', 'host', 'site', 'admin_email', 'admin_name', 'ip_in_ps_meta',
                  'host_in_ps_meta', 'host_index', 'site_index', 'host_meta', 'site_meta']].sort_values(by=['ip_in_ps_meta', 'host_in_ps_meta', 'ip'], ascending=False)
         self.df = self.markNodes()
 
