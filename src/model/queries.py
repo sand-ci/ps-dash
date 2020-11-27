@@ -7,6 +7,62 @@ from elasticsearch.helpers import scan
 
 import utils.helpers as hp
 
+import urllib3
+urllib3.disable_warnings()
+
+
+def queryNodesGeoLocation():
+
+    include=["geolocation","external_address.ipv4_address", "external_address.ipv6_address", "config.site_name"]
+    period = hp.GetTimeRanges(*hp.defaultTimeRange(days=30))
+
+    query = {
+            "query": {
+                "bool": {
+                        "filter": [
+                        {
+                            "range": {
+                                "timestamp": {
+                                "gte": period[0],
+                                "lte": period[1]
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+          }
+    data = scan(client=hp.es, index='ps_meta', query=query,
+                _source=include, filter_path=['_scroll_id', '_shards', 'hits.hits._source'])
+
+    count = 0
+    neatdata = []
+    ddict = {}
+    for res in data:
+        if not count%100000: print(count)
+        data = res['_source']
+
+        if 'config' in data:
+            site = data['config']['site_name']
+        else: site = None
+
+        if 'ipv4_address' in  data['external_address']:
+            ip = data['external_address']['ipv4_address']
+        else: ip = data['external_address']['ipv6_address']
+
+        if 'geolocation' in data:
+            geoip = data['geolocation'].split(",")
+
+#         if 'speed' in  data['external_address']:
+#             speed = data['external_address']['speed']
+
+        if (ip in ddict) and (site is None):
+            continue
+        else: ddict[ip] = {'lat': geoip[0], 'lon': geoip[1], 'site': site}
+
+        count=count+1
+    return ddict
+
 
 def queryAllTestedPairs(period):
     query = {
@@ -20,6 +76,16 @@ def queryAllTestedPairs(period):
                   "gt" : period[0],
                   "lte": period[1]
                 }
+              }
+            },
+            {
+              "term" : {
+                "src_production" : True
+              }
+            },
+            {
+              "term" : {
+                "dest_production" : True
               }
             }
           ]
@@ -61,6 +127,47 @@ def queryAllTestedPairs(period):
     return aggrs
 
 
+def queryAllValuesFromList(idx, fld_type, val_list, period):
+    val_fld = hp.getValueField(idx)
+    query = {
+        "size": 0,
+        "_source": {
+            "includes": ["timestamp", "dest", "src", val_fld]
+          },
+        "query": {
+          "bool": {
+            "must": [
+              {
+                "range": {
+                  "timestamp": {
+                    "gte": period[0],
+                    "lte": period[1]
+                  }
+
+                }
+              },
+              {
+                "terms": {
+                  fld_type: val_list
+                }
+              }
+            ]
+          }
+        }
+      }
+    data = scan(client=es, index=idx, query=query, _source=["timestamp", "dest", "src", val_fld], filter_path=['_scroll_id', '_shards', 'hits.hits._source'])
+#     scan(client=hp.es, index=idx, query=query)
+#     print(idx, str(query).replace("\'", "\""))
+    count = 0
+    allData=[]
+    for res in data:
+        if not count%100000: print(count)
+        allData.append(res['_source'])
+        count=count+1
+
+    return allData
+
+
 def queryAllValues(idx, src, dest, period):
     val_fld = hp.getValueField(idx)
     query = {
@@ -97,6 +204,16 @@ def queryAllValues(idx, src, dest, period):
                               "value" : dest
                             }
                           }
+                        },
+                        {
+                          "term" : {
+                            "src_production" : True
+                          }
+                        },
+                        {
+                          "term" : {
+                            "dest_production" : True
+                          }
                         }
                     ]
                 }
@@ -128,6 +245,16 @@ def query4Avg(idx, dateFrom, dateTo):
                           "gt" : dateFrom,
                           "lte": dateTo
                         }
+                      }
+                    },
+                    {
+                      "term" : {
+                        "src_production" : True
+                      }
+                    },
+                    {
+                      "term" : {
+                        "dest_production" : True
                       }
                     }
                   ]
@@ -197,6 +324,16 @@ def queryDailyAvg(idx, fld, dateFrom, dateTo):
                                 "lte": dateTo
                             }
                         }
+                    },
+                    {
+                      "term" : {
+                        "src_production" : True
+                      }
+                    },
+                    {
+                      "term" : {
+                        "dest_production" : True
+                      }
                     }
                 ]
             }
@@ -229,7 +366,7 @@ def queryDailyAvg(idx, fld, dateFrom, dateTo):
     data = hp.es.search(index=idx, body=query)
 
     result = {}
-    i = 0
+    # i = 0
     for ip in data['aggregations']['avg_values']['buckets']:
         temp = {}
         for period in ip['period']['buckets']:
@@ -252,6 +389,16 @@ def get_ip_host(idx, dateFrom, dateTo):
                               "from" : dateFrom,
                               "to" : dateTo
                             }
+                          }
+                        },
+                        {
+                          "term" : {
+                            "src_production" : True
+                          }
+                        },
+                        {
+                          "term" : {
+                            "dest_production" : True
                           }
                         }
                       ]
@@ -313,6 +460,16 @@ def get_ip_site(idx, dateFrom, dateTo):
                               "from" : dateFrom,
                               "to" : dateTo
                             }
+                          }
+                        },
+                        {
+                          "term" : {
+                            "src_production" : True
+                          }
+                        },
+                        {
+                          "term" : {
+                            "dest_production" : True
                           }
                         }
                       ]
@@ -385,6 +542,16 @@ def get_host_site(idx, dateFrom, dateTo):
                       "to" : dateTo
                     }
                   }
+                },
+                {
+                  "term" : {
+                    "src_production" : True
+                  }
+                },
+                {
+                  "term" : {
+                    "dest_production" : True
+                  }
                 }
               ]
             }
@@ -430,6 +597,7 @@ def get_host_site(idx, dateFrom, dateTo):
             if ((host in res_host_site.keys()) and (site is not None)) or (host not in res_host_site.keys()):
                 res_host_site[host] = site
     return res_host_site
+
 
 def get_metadata(dateFrom, dateTo):
     def q_metadata():

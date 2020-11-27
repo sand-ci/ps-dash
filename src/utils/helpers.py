@@ -17,15 +17,17 @@ from elasticsearch import Elasticsearch
 from elasticsearch.helpers import scan
 import getpass
 
+
 INDECES = ['ps_packetloss', 'ps_owd', 'ps_retransmits', 'ps_throughput']
 
+user, passwd, mapboxtoken = None, None, None
+with open("/etc/ps-dash/creds.key") as f:
+    user = f.readline().strip()
+    passwd = f.readline().strip()
+    mapboxtoken = f.readline().strip()
+
 def ConnectES():
-    user = None
-    passwd = None
-    if user is None and passwd is None:
-        with open("/etc/ps-dash/creds.key") as f:
-            user = f.readline().strip()
-            passwd = f.readline().strip()
+    global user, passwd
     credentials = (user, passwd)
 
     if getpass.getuser() == 'petya':
@@ -62,10 +64,10 @@ def getValueUnit(test_type):
         return 'delay (ms) avg'
 
 
-def defaultTimeRange():
+def defaultTimeRange(days=3):
     now = roundTime(datetime.utcnow()) # 1 hour
     defaultEnd = datetime.strftime(now, '%Y-%m-%d %H:%M')
-    defaultStart = datetime.strftime(now - timedelta(days = 3), '%Y-%m-%d %H:%M')
+    defaultStart = datetime.strftime(now - timedelta(days), '%Y-%m-%d %H:%M')
     return [defaultStart, defaultEnd]
 
 

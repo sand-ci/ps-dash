@@ -22,6 +22,9 @@ from model.DataLoader import GeneralDataLoader
 
 class PairPlotsPage():
 
+    indx_dict = {'ps_packetloss': 'Packet loss', 'ps_owd': 'One-way delay',
+         'ps_retransmits': 'Retransmits', 'ps_throughput': 'Throughput'}
+
     def __init__(self):
         self.parent = ProblematicPairsPage()
         self.root_parent = GeneralDataLoader()
@@ -40,6 +43,10 @@ class PairPlotsPage():
 
     def buildGraph(self, df, host_src, host_dest):
         fig = go.Figure()
+
+        title = f'{self.indx_dict[self._idx]}: {host_src} ⇒ {host_dest}'
+        title = title if len(title)<80 else "<br>".join([f'{self.indx_dict[self._idx]}: ', f'{host_src} ⇒ {host_dest}'])
+
         if len(df) > 0:
             df = df.sort_values('timestamp', ascending=False)
             df['dt'] = pd.to_datetime(df['timestamp'], unit='ms')
@@ -112,11 +119,12 @@ class PairPlotsPage():
                     ),
                 )
             )
-            fig.update_layout(title=f'{self._idx}: Measures for {host_src} ⇒ {host_dest}',
+
+            fig.update_layout(title=title,
                               template = 'plotly_white')
 
         else:
-            fig.update_layout(title=f'{self._idx}: Measures for {host_src} ⇒ {host_dest}',
+            fig.update_layout(title=title,
                               template = 'plotly_white',
                               annotations = [
                                 {
@@ -167,7 +175,7 @@ class PairPlotsPage():
                                 dbc.Col(html.P(id='total-dests', className='dd-count'), width=4, className='dd-fields'),
                                 ], no_gutters=True, justify="center"),
                         ], width=12, className='fields-wrapper'),
-                      ], justify="center", className='dd-container'),
+                      ], justify="center", className='dd-container boxwithshadow'),
                 ])
 
 
@@ -184,7 +192,7 @@ class PairPlotsPage():
             if idx == 'ps_owd':
                 return (f'The pair shows {phrase} high latency')
             if idx == 'ps_packetloss':
-                return (f'The pair shows {phrase} high packetloss')
+                return (f'The pair shows {phrase} high packet loss')
 
 
     def createCards(self):
@@ -269,18 +277,18 @@ class PairPlotsPage():
         reversed_pair = self.getData(self._dest, self._src)
         return html.Div([
                 dbc.Row(
-                    self.createCards(), className='issue-header', no_gutters=True, justify='center'
+                    self.createCards(), className='issue-header boxwithshadow', no_gutters=True, justify='center'
                 ),
                 dbc.Row([
                      dbc.Col(
                          html.Div([
                             dcc.Graph(figure=self.buildGraph(pair, host_src, host_dest))
-                        ])
+                        ], className='pair-plot boxwithshadow')
                      ),
                     dbc.Col(
                          html.Div([
                             dcc.Graph(figure=self.buildGraph(reversed_pair, host_dest, host_src))
-                        ])
+                        ], className='pair-plot boxwithshadow')
                      )
-                ])
+                ], className='page-cont')
               ])

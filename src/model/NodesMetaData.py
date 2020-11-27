@@ -101,7 +101,6 @@ class NodesMetaData:
             obj = IPWhois(item)
             res = obj.lookup_whois()
             val = res['nets'][0]['name']
-            print('getIPWhoIs for:', item, '->', val)
         except Exception as inst:
             if self.isHost(item):
                 val = ''

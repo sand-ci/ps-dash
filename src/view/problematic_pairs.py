@@ -81,9 +81,8 @@ class ProblematicPairsPage(object):
                     ], width=3),
                     dbc.Col([
                         dbc.Row([
-                        html.H2('Source: ', className='input-type'),
+                        html.H3('Source: ', className='input-type'),
                         dcc.Input(
-#                                     id=f"{item}-input-src",
                             id={
                                 'type': 'input-src',
                                 'index': item
@@ -91,9 +90,9 @@ class ProblematicPairsPage(object):
                             type="text",
                             className='input-value',
                             placeholder="Click on a row to select values",
-                            style={'font-size':'14px'},
+                            style={'font-size':'12px'},
                         ),
-                        html.H2('Destination: ', className='input-type'),
+                        html.H3('Destination: ', className='input-type'),
                         dcc.Input(
                             id={
                                 'type': 'input-dest',
@@ -102,7 +101,7 @@ class ProblematicPairsPage(object):
                             type="text",
                             className='input-value',
                             placeholder="Click on a row to select values",
-                            style={'font-size':'14px'},
+                            style={'font-size':'12px'},
                         ),
                         dbc.Button('Plot'.upper(),
                                     id={
@@ -121,24 +120,25 @@ class ProblematicPairsPage(object):
                             html.Div([
                                 self.addSectionHeader(item),
                                 self.generateTable(item, df, 10)
-                            ], className='idx-tab'), width=12) for item in hp.INDECES
+                            ], className='idx-tab'), width=12, className='boxwithshadow') for item in hp.INDECES
                    ], justify="center")
         else:
             return dbc.Row([
                         dbc.Col([self.addSectionHeader(idx),
                                  self.generateTable(idx, df, 9999)])
-                   ], justify="center")
+                   ], justify="center", className='idx-tab boxwithshadow')
 
 
     def createLayout(self):
         return html.Div([
                 dbc.Row([
-                     dbc.Col(
+                    dbc.Col(width=2, className='blank-menu-item'),
+                    dbc.Col(
                         dcc.Tabs(id='tabs-prob-types', className='prob-types', value='high_sigma',
                                  children=[
                                     dcc.Tab(label=v.upper(), value=k) for k, v in self.problem_types.items()
                                 ])
-                     , width={"size": 8, "offset": 2})
+                    , width={"size": 9}, className='horizontal-tabs')
                 ]),
                 dbc.Row([
                     dbc.Col([
@@ -158,13 +158,14 @@ class ProblematicPairsPage(object):
                                 html.Div(id="last-updated", className='last-updated')
                             ], align="center"),
                         ], align="center"),
-                    ], width={"size": 2}),
+                    ], width={"size": 2}, className='side-menu'),
                     dbc.Col([
                         dcc.Loading(
                             id="loading-problems",
                             type="default",
                             className="loading-problems",
-                            children=html.Div("Loading may take a few minutes. Refresh the page to get the data from an hour ago.", id="tabs-content", className="problems-tabs-content")
+                            children=html.Div("Loading may take a few minutes. Refresh the page to get the data from an hour ago.",
+                                              id="tabs-content", className="problems-tabs-content")
                         ),
                     ], width=9)
                 ])

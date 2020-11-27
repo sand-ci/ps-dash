@@ -2,7 +2,6 @@ import threading
 import time
 import datetime
 import pandas as pd
-import time
 from functools import reduce, wraps
 from datetime import datetime, timedelta
 import numpy as np
@@ -58,20 +57,21 @@ class Updater(object):
     @timer
     def UpdateAllData(self):
         print()
-        print(f'{datetime.utcnow()}: New data is on its way...')
+        print(f'Last update: {self.lastUpdated}. New data is on its way at {datetime.utcnow()}')
         print('Active threads:',threading.active_count())
         # query period must be the same for all data loaders
         defaultDT = hp.defaultTimeRange()
         GeneralDataLoader(defaultDT[0], defaultDT[1])
         SiteDataLoader(defaultDT[0], defaultDT[1])
         PrtoblematicPairsDataLoader(defaultDT[0], defaultDT[1])
+        SitesRanksDataLoader(defaultDT[0], defaultDT[1])
         self.lastUpdated = hp.roundTime(datetime.utcnow())
-        self.StartThread()
+        self.StartThread(defaultDT[0], defaultDT[1])
 
     def StartThread(self):
-        self.thread = threading.Timer(3600, self.UpdateAllData) # 1hour
-        self.thread.daemon = True
-        self.thread.start()
+        thread = threading.Timer(3600, self.UpdateAllData) # 1hour
+        thread.daemon = True
+        thread.start()
 
 
 class GeneralDataLoader(object, metaclass=Singleton):
@@ -112,7 +112,7 @@ class GeneralDataLoader(object, metaclass=Singleton):
 
     @timer
     def UpdateGeneralInfo(self):
-        print("last updated: {0}, new start: {1} new end: {2} ".format(self.lastUpdated, self.dateFrom, self.dateTo))
+#         print("last updated: {0}, new start: {1} new end: {2} ".format(self.lastUpdated, self.dateFrom, self.dateTo))
 
         self.pls = NodesMetaData('ps_packetloss', self.dateFrom, self.dateTo).df
         self.owd = NodesMetaData('ps_owd', self.dateFrom, self.dateTo).df
@@ -165,7 +165,7 @@ class SiteDataLoader(object, metaclass=Singleton):
         self.UpdateSiteData()
 
     def UpdateSiteData(self):
-        print('UpdateSiteData >>> ', self.dateFrom, self.dateTo)
+        # print('UpdateSiteData >>> ', h self.dateFrom, self.dateTo)
         pls_site_in_out = self.InOutDf("ps_packetloss", self.genData.pls_related_only)
         self.pls_data = pls_site_in_out['data']
         self.pls_dates = pls_site_in_out['dates']
@@ -276,10 +276,10 @@ class PrtoblematicPairsDataLoader(object, metaclass=Singleton):
         return grouped
 
 
-    @timer
+    # @timer
     def markNodes(self):
         df = pd.DataFrame()
-        for idx in self.LIST_IDXS:
+        for idx in hp.INDECES:
             tempdf = pd.DataFrame(self.buildProblems(idx))
             grouped = tempdf.groupby(['src', 'dest', 'hash']).agg({'value': lambda x: x.mean(skipna=False)}, axis=1).reset_index()
 
@@ -298,7 +298,7 @@ class PrtoblematicPairsDataLoader(object, metaclass=Singleton):
             grouped = self.getPercentageMeasuresDone(grouped, tempdf)
 
             # this is not accurate since we have some cases with 4-5 times more tests than expected
-            avg_numtests = tempdf.groupby('hash').agg({'doc_count':'mean'}).values[0][0]
+            # avg_numtests = tempdf.groupby('hash').agg({'doc_count':'mean'}).values[0][0]
 
             # Add flags for some general problems
             if (idx == 'ps_packetloss'):
@@ -332,7 +332,6 @@ class PrtoblematicPairsDataLoader(object, metaclass=Singleton):
         df = pd.DataFrame(columns=['timestamp', 'value', 'idx', 'hash'])
         time_list = hp.GetTimeRanges(self.dateFrom, self.dateTo)
         for item in probdf[['src', 'dest', 'idx']].values:
-            print(item)
             tempdf = pd.DataFrame(qrs.queryAllValues(item[2], item, time_list[0], time_list[1]))
             tempdf['idx'] = item[2]
             tempdf['hash'] = item[0]+"-"+item[1]
@@ -354,3 +353,128 @@ class PrtoblematicPairsDataLoader(object, metaclass=Singleton):
         df = pd.merge(probdf, df, on=['hash', 'src', 'dest'], how='left')
 
         return df
+
+
+class SitesRanksDataLoader(metaclass=Singleton):
+
+    def __init__(self, dateFrom, dateTo):
+        self.dateFrom = dateFrom
+        self.dateTo = dateTo
+        self.all_df = GeneralDataLoader().all_df_related_only
+        self.locdf = pd.DataFrame.from_dict(qrs.queryNodesGeoLocation(), orient='index').reset_index().rename(columns={'index':'ip'})
+        self.measures = pd.DataFrame()
+        self.df = self.calculateRank()
+
+
+    def FixMissingLocations(self):
+        df = pd.merge(self.all_df, self.locdf, left_on=['ip'], right_on=['ip'], how='left')
+        df = df.drop(columns=['site_y']).rename(columns={'site_x': 'site'})
+
+        for i, row in df.iterrows():
+            if row['lat'] != row['lat']:
+                s = row['site']
+                lon = df[(df['site']==s)&(df['lon'].notnull())]['lon'].values
+                lat = df[(df['site']==s)&(df['lat'].notnull())]['lat'].values
+                if len(lon)>0:
+                    df.loc[i, 'lon'] = df[(df['site']==s)&(df['lon'].notnull())]['lon'].values[0]
+                    df.loc[i, 'lat'] = df[(df['site']==s)&(df['lat'].notnull())]['lat'].values[0]
+
+        return df
+
+
+    def queryData(self, idx):
+        data = []
+        intv = int(hp.CalcMinutes4Period(self.dateFrom, self.dateTo)/60)
+        time_list = hp.GetTimeRanges(self.dateFrom, self.dateTo, intv)
+        for i in range(len(time_list)-1):
+            data.extend(qrs.query4Avg(idx, time_list[i], time_list[i+1]))
+
+        return data
+
+
+    def calculateRank(self):
+        df = pd.DataFrame()
+        for idx in hp.INDECES:
+            if len(df) != 0:
+                df = pd.merge(df, self.calculateStats(idx), on=['site', 'lat', 'lon'], how='outer')
+            else: df = self.calculateStats(idx)
+
+        # sum all ranks and
+        filter_col = [col for col in df if col.endswith('rank')]
+        df['rank'] = df[filter_col].sum(axis=1)
+
+        df = df.sort_values('rank')
+        df['rank1'] = df['rank'].rank(method='max')
+        filter_col = [col for col in df if col.endswith('rank')]
+
+        df['size'] = df[filter_col].apply(lambda row: 1 if row.isnull().any() else 3, axis=1)
+
+        return df
+
+
+    def getPercentageMeasuresDone(self, grouped, tempdf):
+        measures_done = tempdf.groupby(['src', 'dest']).agg({'doc_count':'sum'})
+        def findRatio(row, total_minutes):
+            if pd.isna(row['doc_count']):
+                count = '0'
+            else: count = round((row['doc_count']/total_minutes)*100)
+            return count
+
+        one_test_per_min = hp.CalcMinutes4Period(self.dateFrom, self.dateTo)
+        measures_done['tests_done'] = measures_done.apply(lambda x: findRatio(x, one_test_per_min), axis=1)
+        grouped = pd.merge(grouped, measures_done, on=['src', 'dest'], how='left')
+
+        return grouped
+
+
+    def calculateStats(self, idx):
+        """
+        For a given index it gets the average based on a site name and then the rank of each
+        """
+        ldf = self.FixMissingLocations()
+
+        merge_on = {'in': 'dest', 'out': 'src'}
+        result = pd.DataFrame()
+
+        df = pd.DataFrame(self.queryData(idx))
+        df['idx'] = idx
+        self.measures = self.measures.append(df)
+
+        gdf = df.groupby(['src', 'dest', 'hash']).agg({'value': lambda x: x.mean(skipna=False)}, axis=1).reset_index()
+        df = self.getPercentageMeasuresDone(gdf, df)
+        df['tests_done'] = df['tests_done'].apply(lambda val: 101 if val>100 else val)
+
+        for direction in ['in', 'out']:
+            # Merge location df with all 1-hour-averages for the given direction, then get the mean for the whole period
+            tempdf = pd.merge(ldf[['ip', 'site', 'site_meta', 'lat', 'lon']], df, left_on=['ip'], right_on=merge_on[direction], how='inner')
+            grouped = tempdf.groupby(['site', 'lat', 'lon']).agg({'value': lambda x: x.mean(skipna=False),
+                                                                'tests_done': lambda x: round(x.mean(skipna=False))}, axis=1).reset_index()
+
+            # The following code checks the percentage of values > 3 sigma, which would show the site has bursts
+            tempdf['zscore'] = tempdf.groupby('site')['value'].apply(lambda x: (x - x.mean())/x.std())
+            bursts_percentage = tempdf.groupby('site')['zscore'].apply(lambda c: round(((np.abs(c)>3).sum()/len(c))*100,2))
+            grouped = pd.merge(grouped, bursts_percentage, on=['site'], how='left')
+
+            # In ps_owd there are cases of negative values.
+            asc = True
+            if idx == 'ps_owd':
+                grouped['value'] = grouped['value'].apply(lambda val: grouped['value'].max()+np.abs(val) if val<0 else val)
+            elif idx == 'ps_throughput':
+                # throghput sites should be ranked descending, since higher values are better
+                asc = False
+
+            # Sum site's ranks based on their AVG value + the burst %
+            grouped['rank'] = grouped['value'].rank(ascending=asc) + grouped['zscore'].rank(method='max')
+    #         grouped = grouped.sort_values('tests_done')
+    #         grouped['rank'] = grouped['rank'] + grouped['tests_done'].rank(ascending=False)
+
+            grouped = grouped.rename(columns={'value':f'{direction}_{idx}_avg',
+                                            'zscore':f'{direction}_{idx}_bursts_percentage',
+                                            'rank':f'{direction}_{idx}_rank',
+                                            'tests_done':f'{direction}_{idx}_tests_done_avg'})
+
+            if len(result) != 0:
+                # Merge directions IN and OUT in a single df
+                result = pd.merge(result, grouped, on=['site', 'lat', 'lon'], how='outer')
+            else: result = grouped
+        return result

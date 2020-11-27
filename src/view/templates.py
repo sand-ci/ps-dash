@@ -81,7 +81,7 @@ host_table_cond = [
 host_table_header = {
     'backgroundColor': 'rgb(230, 230, 230)',
     'fontWeight': 'bold',
-    'font-family':'sans-serif'
+    'font-family':'emoji'
 }
 
 bubble_chart_layout = {

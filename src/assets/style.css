@@ -1,4 +1,21 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;800&display=swap');
+{
+    font-family: 'Nunito', sans-serif;
+}
+
+body{
+    background-color: #efeeee;
+}
+
+.page-cont {
+    margin: 20px;
+}
+
 /**********   Header   **********/
+.logo {
+    text-align: left;
+    padding-left: 40px;
+}
 
 .nav {
     line-height: 2.8em;
@@ -7,12 +24,14 @@
 
 .nav .nav-link.active {
     color: #000;
-    background-color: #ffffff;
+    background-color:  #efeeee;
 }
 
 .nav-item {
     background-color: #00245a;
     margin-bottom: 0;
+    font-size: 22px;
+    font-weight: 700;
 }
 
 .nav-item .nav-link {
@@ -21,13 +40,63 @@
 
 /**********   Sites   **********/
 
+.boxwithshadow {
+    border: 1px solid rgba(0,0,0,.125);
+    border-radius: 1rem;
+    box-shadow: 4px 4px 7px -1px #b4b2b2;
+    margin-bottom: 20px;
+    background-color: #fff;
+}
+
+.site-inner-cont {
+    padding: 0 0 5px 0;
+}
+
+.sites-header {
+/*     border-radius: 1rem; */
+    background-color: rgb(239 239 239);
+    border-bottom-width: 0;
+}
+
+.sites-title-left, .sites-title-right {
+    padding: 20px 0px;
+    color: #000;
+    font-size: 20px;
+    font-weight: 500;
+}
+
+.sites-title-left p, .sites-title-right p {
+    margin-bottom: 0;
+}
+
+.sites-title-left{
+    padding-left: 30px;
+}
+
+.sites-title-right {
+    text-align: right;
+    padding-right: 30px;
+}
+
+.card-body .left {
+    padding-right: 5px
+}
+
+.card-body .right {
+    padding-left: 5px
+}
 
 .tab--selected.jsx-3468109796, .tab.jsx-3468109796 {
     font-size: 20px;
 }
 
-.tab-element {
-    padding: 10px;
+.site-details {
+    padding: 5px;
+}
+
+.site-report {
+    padding-left: 15px;
+    padding-right: 0;
 }
 
 th:not(.CalendarDay), td:not(.CalendarDay) {
@@ -37,6 +106,7 @@ th:not(.CalendarDay), td:not(.CalendarDay) {
 .site-title {
     text-align: center;
     margin-bottom: 15px;
+    font-size: 2em;
 }
 
 table.ip-table, table.packetloss, table.owd, table.throughput, table.retransmits {
@@ -63,12 +133,13 @@ td.ipv-type, td.ipv-count, td.inout-type, td.inout-value {
     border-bottom: 1px solid #E1E1E1;
     padding: 5px;
     text-align: center;
-    font-size: 13px;
+    font-size: 11px;
 }
 
 td.ipv-type, td.ipv-count {
     padding: 0px;
     font-size: 16px;
+    background-color: white;
 }
 
 td.ipv-type, td.inout-type {
@@ -78,31 +149,31 @@ td.ipv-type, td.inout-type {
 th.packetloss-tests, th.owd-tests, th.throughput-tests, th.retransmits-tests {
     text-align: center;
     font-weight: bold;
-    font-size: 15px;
+    font-size: 13px;
     padding-top: 10px;
 }
 
-table.packetloss td.inout-type, table.packetloss td.inout-value, table.packetloss tr.change-values,
-table.owd td.inout-type, table.owd td.inout-value, table.owd tr.change-values,
-table.throughput td.inout-type, table.throughput td.inout-value, table.throughput tr.change-values,
-table.retransmits td.inout-type, table.retransmits td.inout-value, table.retransmits tr.change-values {
+table.packetloss td.inout-value,
+table.owd td.inout-value,
+table.throughput td.inout-value,
+table.retransmits td.inout-value {
+    background-color: #fff;
+    color: #000;
+}
+
+table.packetloss tr.change-values, table.owd tr.change-values,
+table.throughput tr.change-values, table.retransmits tr.change-values {
+    background-color: #00245a;
+    color: white;
+}
+
+
+table.packetloss td.inout-type,
+table.owd td.inout-type,
+table.throughput td.inout-type,
+table.retransmits td.inout-type {
+    background-color: #2f2f2f;
     color: #fff;
-}
-
-table.packetloss td.inout-type, table.packetloss td.inout-value, table.packetloss tr.change-values {
-    background-color: #1768AC;
-}
-
-table.owd td.inout-type, table.owd td.inout-value, table.owd tr.change-values {
-    background-color: #243660;
-}
-
-table.throughput td.inout-type, table.throughput td.inout-value, table.throughput tr.change-values {
-    background-color: #3b1c6c;
-}
-
-table.retransmits td.inout-type, table.retransmits td.inout-value, table.retransmits tr.change-values {
-    background-color: #242424;
 }
 
 table.packetloss tr.change-values td, table.owd tr.change-values td,
@@ -111,20 +182,39 @@ table.throughput tr.change-values td, table.retransmits tr.change-values td {
 }
 
 table.packetloss, table.owd, table.throughput, table.retransmits {
-    font-size: 13px;
+    font-size: 12px;
 }
 
 td.change-title {
     text-align: center;
 }
 
+.site {
+    padding: 1%;
+}
+
 .site-card {
     padding-bottom: 10px;
 }
 
+.site-inner-cont {
+    padding: 10px 0;
+}
 
 /**********   Nodes   **********/
 
+.side-menu {
+    background-color: #00245a;
+    padding: 0;
+}
+
+.blank-menu-item {
+    background-color: #00245a;
+}
+
+.horizontal-tabs {
+    padding: 32px 0px 0px 20px;
+}
 
 .tab-container .tab {
     background-color: #00245a !important;
@@ -132,7 +222,7 @@ td.change-title {
 }
 
 .tab-container .tab--selected {
-    background-color: #fff !important;
+    background-color: #efeeee !important;
     color: black !important;
     border-top: 1px solid #03266c !important;
 }
@@ -140,6 +230,10 @@ td.change-title {
 .indeces-types .tab--selected {
     border-top: 1px solid #d6d6d6 !important;
     border-left: 1px solid #03266c !important;
+}
+
+.dash-fixed-content {
+    width: 100%;
 }
 
 .dash-spreadsheet-menu {
@@ -180,6 +274,10 @@ td.change-title {
 .problems-tabs-content {
     margin-top: 20px;
     margin-left: 20px;
+}
+
+.problems-tabs-content .card {
+    margin-bottom: 20px;
 }
 
 .plot-input-button {
@@ -223,7 +321,7 @@ td.change-title {
 }
 
 .idx-tab {
-    margin-bottom: 70px;
+    padding: 10px;
 }
 
 .period-element {
@@ -273,10 +371,14 @@ td.change-title {
 
 /**********   Pairs   **********/
 
+.dd-container {
+    margin-top: 1%;
+    padding-bottom: 1%;
+}
 
 .fields-wrapper {
     padding: 0.1%;
-    background-color: #fff;
+/*     background-color: #fff; */
     margin: 0.5%;
 }
 
@@ -337,58 +439,18 @@ td.change-title {
     background-color: #1768AC;
 }
 
+.pair-plot {
+    padding: 5px;
+}
 
 /**********   Loading   **********/
 
-._dash-loading-callback {
-  font-family: sans-serif;
-  padding-top: 50px;
-  color: rgb(90, 90, 90);
-
-  -webkit-animation: fadein 0.5s ease-in 7s forwards; /* Safari, Chrome and Opera > 12.1 */
-     -moz-animation: fadein 0.5s; /* Firefox < 16 */
-      -ms-animation: fadein 0.5s; /* Internet Explorer */
-       -o-animation: fadein 0.5s; /* Opera < 12.1 */
-          animation: fadein 0.5s ease-in 7s forwards;
-
-
-  /* The banner */
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(255, 255, 255, 0.5);
-  text-align: center;
-  cursor: progress;
+.loader-cont {
+    margin-top: 10em;
 }
 
-
-@keyframes fadein {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-}
-
-/* Firefox < 16 */
-@-moz-keyframes fadein {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-}
-
-/* Safari, Chrome and Opera > 12.1 */
-@-webkit-keyframes fadein {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-}
-
-/* Internet Explorer */
-@-ms-keyframes fadein {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-}
-
-/* Opera < 12.1 */
-@-o-keyframes fadein {
-    from { opacity: 0; }
-    to   { opacity: 1; }
+/* The following style is neccessary because otherwise no loading spinner is shown on click of
+   a button and it looks like the page is not loading at all. */
+*[data-dash-is-loading="true"]{
+    visibility: hidden;
 }

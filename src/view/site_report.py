@@ -120,26 +120,26 @@ class SiteReport(object):
                     [
                         dbc.Row([
                                 dbc.Col([
-                                        html.H2(site, id=f"{site}-title", className='site-title')
+                                        html.H4(site, id=f"{site}-title", className='site-title')
                                 ], width=12)
                         ], justify="left"),
                         dbc.Row([
                             dbc.Col([
                                      self.generateIPTable(site, 'latency', sobj.genData.latency_df_related_only[sobj.latency_df_related_only['site']==site]),
                                      self.generateTable(site, 'packetloss', sobj.pls_data[sobj.pls_data['site']==site], sobj.pls_dates),
-                            ], width=6),
+                            ], width=6, className='left'),
                             dbc.Col([
                                      self.generateIPTable(site, 'throughput', sobj.genData.throughput_df_related_only[sobj.throughput_df_related_only['site']==site]),
                                      self.generateTable(site, 'throughput', sobj.thp_data[sobj.thp_data['site']==site], sobj.thp_dates)
-                            ], width=6),
+                            ], width=6, className='right'),
                        ]),
                         dbc.Row([
                             dbc.Col([
                                      self.generateTable(site, 'owd', sobj.owd_data[sobj.owd_data['site']==site], sobj.owd_dates)
-                            ], width=6),
+                            ], width=6, className='left'),
                             dbc.Col([
                                      self.generateTable(site, 'retransmits', sobj.rtm_data[sobj.rtm_data['site']==site], sobj.rtm_dates)
-                            ], width=6),
+                            ], width=6, className='right'),
                         ])
                     ]
                 ), id=str(site+'-card')
