@@ -767,7 +767,6 @@ def GetPairsForAHost(idx, time_from, time_to, args):
           }
         }
 
-#         print(str(query).replace("\'", "\""))
         results = hp.es.search(index=idx, body=query)
         res = []
         for item in results["aggregations"]["groupby"]["buckets"]:
@@ -963,103 +962,6 @@ def GetNTP(date_from, date_to, args):
 
 
 
-def AggBySrcDestIPv6QueryHostV1(idx, time_from, time_to, args):
-    host = args[0]
-    es_field = args[1]
-    intv = args[2]
-    field = hp.getValueField(idx)
-    res = []
-    query = {
-              "size" : 0,
-              "query" : {
-                "bool" : {
-                  "must" : [
-                    {
-                      "term" : {
-                        es_field : {
-                          "value" : host
-                        }
-                      }
-                    },
-                    {
-                      "range" : {
-                        "timestamp" : {
-                          "from" : time_from,
-                          "to" : time_to
-                        }
-                      }
-                    }
-                  ],
-                  "adjust_pure_negative" : True
-                }
-              },
-              "_source" : False,
-              "aggregations" : {
-                "groupby" : {
-                  "composite" : {
-                    "size" : 10000,
-                    "sources" : [
-                      {
-                        "src_host" : {
-                          "terms" : {
-                            "field" : "src_host",
-                            "missing_bucket" : True,
-                            "order" : "asc"
-                          }
-                        }
-                      },
-                      {
-                        "dest_host" : {
-                          "terms" : {
-                            "field" : "dest_host",
-                            "missing_bucket" : True,
-                            "order" : "asc"
-                          }
-                        }
-                      },
-                      {
-                        "ipv6" : {
-                          "terms" : {
-                            "field" : "ipv6",
-                            "missing_bucket" : True,
-                            "order" : "asc"
-                          }
-                        }
-                      }
-                    ]
-                  },
-                  "aggregations" : {
-                    "ts": {
-                      "date_histogram": {
-                          "field": "timestamp",
-                          "fixed_interval": intv
-                      },
-                      "aggs": {
-                          field: {
-                              "avg": {
-                                  "field": field
-                              }
-                          }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-
-    results = hp.es.search(index=idx, body=query)
-    temp = []
-    for item in results["aggregations"]["groupby"]["buckets"]:
-        for p in item['ts']['buckets']:
-            temp.append({'dest_host':item['key']['dest_host'], 'src_host':item['key']['src_host'],
-                         'ipv6':item['key']['ipv6'], 'ts': p['key'],field: p[field]['value'],
-                         'doc_count': p['doc_count']})
-    res.extend(temp)
-
-    return res
-
-
-
 def PairAverageValuesQuery(idx, time_from, time_to, args):
     src = args[0]
     dest = args[1]
@@ -1179,174 +1081,6 @@ def PairAverageValuesQuery(idx, time_from, time_to, args):
 
     return data
 
-
-
-def PairSymmetryQuery(idx, date_from, date_to, args):
-    src = args[0]
-    dest = args[1]
-    ipv6 = args[2]
-    field = hp.getValueField(idx)
-
-    def runQuery(src, dest):
-        query = {
-              "size" : 1,
-              "_source": "ipv6",
-              "query" : {
-                "bool" : {
-                  "must" : [
-                    {
-                      "term" : {
-                        "src_host" : {
-                          "value" : src
-                        }
-                      }
-                    },
-                    {
-                      "term" : {
-                        "dest_host" : {
-                          "value" : dest
-                        }
-                      }
-                    },
-                    {
-                      "term" : {
-                        "ipv6" : {
-                          "value" : ipv6
-                        }
-                      }
-                    },
-                    {
-                      "range" : {
-                        "timestamp" : {
-                          "from" : date_from,
-                          "to": date_to
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-
-        results = hp.es.search(index=idx, body=query)
-
-        if results["hits"]["total"]["value"] > 0:
-            return True
-        return False
-
-    data = {}
-    src_items, dest_items = [], []
-    for k,v in hp.hosts.items():
-        if src == v:
-            src_items.append(k)
-        if dest == v:
-            dest_items.append(k)
-
-    combinations = list(itertools.product(src_items, dest_items))
-    for c in combinations:
-        output = runQuery(c[0], c[1])
-        data[(c[0], c[1])] = output
-
-    return data
-
-
-
-def AggBySrcDestIPv6QueryHost(idx, time_from, time_to, args):
-    host = args[0]
-    field = hp.getValueField(idx)
-
-    hfields = list(hp.es.indices.get_mapping(str(idx+'*')).values())[0]['mappings']['properties'].keys()
-    res = []
-    for es_field in hfields:
-         if 'host' in es_field:
-            query = {
-                      "size" : 0,
-                      "query" : {
-                        "bool" : {
-                          "must" : [
-                            {
-                              "term" : {
-                                es_field : {
-                                  "value" : host
-                                }
-                              }
-                            },
-                            {
-                              "range" : {
-                                "timestamp" : {
-                                  "from" : time_from,
-                                  "to" : time_to
-                                }
-                              }
-                            }
-                          ],
-                          "adjust_pure_negative" : True
-                        }
-                      },
-                      "_source" : False,
-                      "aggregations" : {
-                        "groupby" : {
-                          "composite" : {
-                            "size" : 10000,
-                            "sources" : [
-                              {
-                                "src_host" : {
-                                  "terms" : {
-                                    "field" : "src_host",
-                                    "missing_bucket" : True,
-                                    "order" : "asc"
-                                  }
-                                }
-                              },
-                              {
-                                "dest_host" : {
-                                  "terms" : {
-                                    "field" : "dest_host",
-                                    "missing_bucket" : True,
-                                    "order" : "asc"
-                                  }
-                                }
-                              },
-                              {
-                                "ipv6" : {
-                                  "terms" : {
-                                    "field" : "ipv6",
-                                    "missing_bucket" : True,
-                                    "order" : "asc"
-                                  }
-                                }
-                              }
-                            ]
-                          },
-                          "aggregations" : {
-                            "ts": {
-                              "date_histogram": {
-                                  "field": "timestamp",
-                                  "fixed_interval": "30m"
-                              },
-                              "aggs": {
-                                  field: {
-                                      "avg": {
-                                          "field": field
-                                      }
-                                  }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-
-            results = hp.es.search(index=idx, body=query)
-            temp = []
-            for item in results["aggregations"]["groupby"]["buckets"]:
-                for p in item['ts']['buckets']:
-                    temp.append({'dest_host':item['key']['dest_host'], 'src_host':item['key']['src_host'],
-                                 'ipv6':item['key']['ipv6'], 'ts': p['key'],field: p[field]['value'],
-                                 'doc_count': p['doc_count']})
-            res.extend(temp)
-
-    return res
 
 
 
@@ -1471,7 +1205,6 @@ def queryAvgValuebyHost(idx, fromDate, toDate):
 
 def AggBySrcDestIP(idx, time_from, time_to):
     val_fld = hp.getValueField(idx)
-
     query = {
               "size" : 0,
               "_source" : False,
@@ -1528,12 +1261,10 @@ def AggBySrcDestIP(idx, time_from, time_to):
               }
             }
 
-    results = hp.es.search( index=idx, body=query)
+    results = hp.es.search(index=idx, body=query)
 
     data = []
-    data1 = []
     for item in results["aggregations"]["groupby"]["buckets"]:
-        data1.append(item)
         data.append({'dest_host':item['key']['dest_host'], 'src_host':item['key']['src_host'], 'ipv6':item['key']['ipv6'],
                      val_fld: item['mean_field']['value'], 'num_tests': item['doc_count']})
 
