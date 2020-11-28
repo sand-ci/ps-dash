@@ -199,8 +199,7 @@ class SiteDataLoader(object, metaclass=Singleton):
             df = df.transpose()
             header = df.iloc[0]
             df = df[1:]
-            print('df',df.info(), self.dateFrom, self.dateTo, idx)
-            print('idx_df',idx_df.info())
+
             df.columns = ['day-3', 'day-2', 'day-1', 'day']
 
             meta_df = pd.merge(meta_df, df, left_on="host", right_index=True)

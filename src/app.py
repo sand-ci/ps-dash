@@ -38,19 +38,6 @@ app.css.append_css({"external_url": "https://codepen.io/chriddyp/pen/brPBPO.css"
 # cache = Cache()
 # cache.init_app(app.server, config=CACHE_CONFIG)
 
-# @cache.memoize(timeout=60*60)
-# def showsSiteTables():
-#     elem_list = []
-#     interval = 0
-#     start = interval*3
-#     end = start+3
-#     for i in range(0, len(site_report.sites)):
-#         if (i%3 == 0):
-#             print(len(site_report.sites), site_report.sites[i:i+3])
-#             elem_list.append(dbc.Row([dbc.Col(site_report.createCard(val))
-#                                   for val in site_report.sites[i:i+3]],
-#                                  id=f"card-{i}", className='site-card'))
-#     return elem_list
 
 spage = SitesPage()
 sreport = SiteReport()
