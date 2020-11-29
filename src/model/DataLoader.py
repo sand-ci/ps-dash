@@ -42,9 +42,9 @@ class Singleton(type):
                 if cls._dict[list(cls._dict.keys())[-1]]:
                     instance = cls._dict[list(cls._dict.keys())[-1]]
 
-            # keep only a few objects in memory
-            if len(cls._dict) >= 3:
-                cls._dict.pop(list(cls._dict.keys())[0])
+        # keep only a few objects in memory
+        if len(cls._dict) >= 2:
+            cls._dict.pop(list(cls._dict.keys())[0])
 
         return instance
 
