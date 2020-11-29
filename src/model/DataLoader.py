@@ -66,7 +66,7 @@ class Updater(object):
         PrtoblematicPairsDataLoader(defaultDT[0], defaultDT[1])
         SitesRanksDataLoader(defaultDT[0], defaultDT[1])
         self.lastUpdated = hp.roundTime(datetime.utcnow())
-        self.StartThread(defaultDT[0], defaultDT[1])
+        self.StartThread()
 
     def StartThread(self):
         thread = threading.Timer(3600, self.UpdateAllData) # 1hour
