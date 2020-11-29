@@ -57,7 +57,7 @@ class Updater(object):
     @timer
     def UpdateAllData(self):
         print()
-        print(f'Last update: {self.lastUpdated}. New data is on its way at {datetime.utcnow()}')
+        print(f'{datetime.now()} New data is on its way at {datetime.utcnow()}')
         print('Active threads:',threading.active_count())
         # query period must be the same for all data loaders
         defaultDT = hp.defaultTimeRange()
