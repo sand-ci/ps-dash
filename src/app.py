@@ -18,13 +18,23 @@ from view.problematic_pairs import ProblematicPairsPage
 from view.pair_plots import PairPlotsPage
 import utils.helpers as hp
 
+import threading
+import time
+import datetime
+import pandas as pd
+from functools import reduce, wraps
+from datetime import datetime, timedelta
+import numpy as np
+from  scipy.stats import zscore
+
+import model.queries as qrs
+from model.NodesMetaData import NodesMetaData
+import utils.helpers as hp
+from utils.helpers import timer
+
 
 # Start a thread which will update the data every hour
 Updater()
-ppage = ProblematicPairsPage()
-gdl = GeneralDataLoader()
-site_report = SiteReport()
-
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP]
 
 
@@ -38,13 +48,23 @@ app.css.append_css({"external_url": "https://codepen.io/chriddyp/pen/brPBPO.css"
 # cache = Cache()
 # cache.init_app(app.server, config=CACHE_CONFIG)
 
-
+# On start of application create the neccessary objects
+gdl = GeneralDataLoader()
 spage = SitesPage()
 sreport = SiteReport()
 ppage = ProblematicPairsPage()
 pplotpage = PairPlotsPage()
 
-app.layout = html.Div([
+def serve_layout():
+    # on reload get the latest data
+    global gdl, spage, sreport, ppage, pplotpage
+    gdl = GeneralDataLoader()
+    spage = SitesPage()
+    sreport = SiteReport()
+    ppage = ProblematicPairsPage()
+    pplotpage = PairPlotsPage()
+
+    return html.Div([
                 dcc.Location(id='change-url', refresh=False),
                 dcc.Store(id='store-dropdown'),
                 dbc.Nav(
@@ -60,6 +80,9 @@ app.layout = html.Div([
                 dcc.Loading(html.Div(id='page-content'), className='loader-cont', color='#00245A'),
                 html.Div(id='page-content-noloading'),
             ], className='main-cont')
+
+
+app.layout = serve_layout
 
 
 layout_nodes = html.Div(
