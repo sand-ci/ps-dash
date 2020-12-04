@@ -30,15 +30,17 @@ def ConnectES():
     global user, passwd
     credentials = (user, passwd)
 
-    if getpass.getuser() == 'petya':
-        es = Elasticsearch('https://localhost:9200', verify_certs=False, timeout=240, http_auth=credentials)
-    else:
-        es = Elasticsearch([{'host': 'atlas-kibana.mwt2.org', 'port': 9200, 'scheme': 'https'}],
-                       timeout=240, http_auth=credentials)
-
-    if es.ping() == True:
+    try:
+        if getpass.getuser() == 'petya':
+            es = Elasticsearch('https://localhost:9200', verify_certs=False, timeout=200, http_auth=credentials, max_retries=20)
+        else:
+            es = Elasticsearch([{'host': 'atlas-kibana.mwt2.org', 'port': 9200, 'scheme': 'https'}],
+                                timeout=240, http_auth=credentials, max_retries=10)
+        print('Success' if es.ping()==True else 'Fail')
         return es
-    else: print("Connection Unsuccessful")
+    except Exception as error:
+        print (">>>>>> Elasticsearch Client Error:", error)
+
 
 
 def timer(func):
