@@ -75,8 +75,9 @@ class SitesPage():
             'ps_owd': 'ms',
             'ps_retransmits': 'packets'}
 
-        colors = ['#720026', '#e4ac05', '#00bcd4', '#1768AC', '#ffa822', '#134e6f', '#ff6150', '#1ac0c6', '#492b7c', '#1f77b4', '#ff7f0e', '#2ca02c', '#9467bd',
-                 '#00224e', '#123570', '#3b496c', '#575d6d', '#707173', '#8a8678', '#a59c74', '#c3b369', '#e1cc55', '#fee838']
+        colors = ['#720026', '#e4ac05', '#00bcd4', '#1768AC', '#ffa822', '#134e6f', '#ff6150', '#1ac0c6', '#492b7c', '#9467bd',
+                  '#1f77b4', '#ff7f0e', '#2ca02c','#00224e', '#123570', '#3b496c', '#575d6d', '#707173', '#8a8678', '#a59c74',
+                  '#c3b369', '#e1cc55', '#fee838']
 
         # extract the data relevant for the given site name
         ips = self.all_df[self.all_df['site']==site_name]['ip'].values
