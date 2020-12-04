@@ -20,33 +20,43 @@ class Singleton(type):
         cls._registered = []
 
     def __call__(cls, dateFrom=None, dateTo=None, *args):
+        print('* OBJECT DICT ', len(cls._dict), cls._dict)
         if (dateFrom is None) or (dateTo is None):
             defaultDT = hp.defaultTimeRange()
             dateFrom = defaultDT[0]
             dateTo = defaultDT[1]
 
         if (dateFrom, dateTo) in cls._dict:
-            print('OBJECT EXISTS', cls, dateFrom, dateTo)
+            print('** OBJECT EXISTS', cls, dateFrom, dateTo)
             instance = cls._dict[(dateFrom, dateTo)]
         else:
-            print('OBJECT DOES NOT EXIST', cls, dateFrom, dateTo)
-            if ([dateFrom, dateTo] != cls._registered) :
-                print(' >>> CREATING NEW INSTANCE')
-                cls._registered = [dateFrom, dateTo]
-                instance = super().__call__(dateFrom, dateTo, *args)
-                cls._dict[(dateFrom, dateTo)] = instance
-
-            elif [dateFrom, dateTo] == cls._registered:
-                print(' >>> CREATION IS IN PROGRESS FOR', dateFrom, dateTo)
-                print(' >>> GET LAST INSTANCE INSTEAD', list(cls._dict.keys())[-1])
-                if cls._dict[list(cls._dict.keys())[-1]]:
-                    instance = cls._dict[list(cls._dict.keys())[-1]]
+            print('** OBJECT DOES NOT EXIST', cls, dateFrom, dateTo)
+            if (len(cls._dict) > 0) and ([dateFrom, dateTo] != cls._registered):
+                print('*** provide the latest and start thread', cls, dateFrom, dateTo)
+                instance = cls._dict[list(cls._dict.keys())[-1]]
+                refresh = threading.Thread(target=cls.nextPeriodData, args=(dateFrom, dateTo, *args))
+                refresh.start()
+            elif ([dateFrom, dateTo] == cls._registered):
+                print('*** provide the latest', cls, dateFrom, dateTo)
+                instance = cls._dict[list(cls._dict.keys())[-1]]
+            elif (len(cls._dict) == 0):
+                print('*** no data yet, refresh and wait', cls, dateFrom, dateTo)
+                cls.nextPeriodData(dateFrom, dateTo, *args)
+                instance = cls._dict[(dateFrom, dateTo)]
 
         # keep only a few objects in memory
         if len(cls._dict) >= 2:
             cls._dict.pop(list(cls._dict.keys())[0])
 
         return instance
+
+
+    def nextPeriodData(cls, dateFrom, dateTo, *args):
+        print(f'**** thread started for {cls}')
+        cls._registered = [dateFrom, dateTo]
+        instance = super().__call__(dateFrom, dateTo, *args)
+        cls._dict[(dateFrom, dateTo)] = instance
+        print(f'**** thread finished for {cls}')
 
 
 class Updater(object):
