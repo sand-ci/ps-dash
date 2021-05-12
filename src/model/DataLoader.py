@@ -377,19 +377,26 @@ class SitesRanksDataLoader(metaclass=Singleton):
         self.df = self.calculateRank()
 
 
-    def FixMissingLocations(self):
-        df = pd.merge(self.all_df, self.locdf, left_on=['ip'], right_on=['ip'], how='left')
-        df = df.drop(columns=['site_y']).rename(columns={'site_x': 'site'})
+    def FixMissingLocations():
+        df = pd.merge(all_df, locdf, left_on=['ip'], right_on=['ip'], how='left')
+        df = df.drop(columns=['site_y', 'host_y']).rename(columns={'site_x': 'site', 'host_x': 'host'})
+        df["lat"] = pd.to_numeric(df["lat"])
+        df["lon"] = pd.to_numeric(df["lon"])
 
         for i, row in df.iterrows():
-            if row['lat'] != row['lat']:
-                s = row['site']
-                lon = df[(df['site']==s)&(df['lon'].notnull())]['lon'].values
-                lat = df[(df['site']==s)&(df['lat'].notnull())]['lat'].values
-                if len(lon)>0:
-                    df.loc[i, 'lon'] = df[(df['site']==s)&(df['lon'].notnull())]['lon'].values[0]
-                    df.loc[i, 'lat'] = df[(df['site']==s)&(df['lat'].notnull())]['lat'].values[0]
+            if row['lat'] != row['lat'] or row['lat'] is None:
+                site = row['site']
+                host = row['host']
 
+                lon = df[(df['site']==site)&(df['lon'].notnull())].agg({'lon':'mean'})['lon']
+                lat = df[(df['site']==site)&(df['lat'].notnull())].agg({'lat':'mean'})['lat']
+
+                if lat!=lat or lon!=lon:
+                    lon = df[(df['host']==host)&(df['lon'].notnull())].agg({'lon':'mean'})['lon']
+                    lat = df[(df['host']==host)&(df['lat'].notnull())].agg({'lat':'mean'})['lat']
+
+                df.loc[i, 'lon'] = lon
+                df.loc[i, 'lat'] = lat
         return df
 
 

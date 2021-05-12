@@ -13,7 +13,7 @@ urllib3.disable_warnings()
 
 def queryNodesGeoLocation():
 
-    include=["geolocation","external_address.ipv4_address", "external_address.ipv6_address", "config.site_name"]
+    include=["geolocation","external_address.ipv4_address", "external_address.ipv6_address", "config.site_name", "host"]
     period = hp.GetTimeRanges(*hp.defaultTimeRange(days=30))
 
     query = {
@@ -50,15 +50,16 @@ def queryNodesGeoLocation():
             ip = data['external_address']['ipv4_address']
         else: ip = data['external_address']['ipv6_address']
 
+        geoip = [None, None]
         if 'geolocation' in data:
             geoip = data['geolocation'].split(",")
 
 #         if 'speed' in  data['external_address']:
 #             speed = data['external_address']['speed']
 
-        if (ip in ddict) and (site is None):
-            continue
-        else: ddict[ip] = {'lat': geoip[0], 'lon': geoip[1], 'site': site}
+        if (ip in ddict) and (site is not None):
+            ddict[ip]['site'] = site
+        else: ddict[ip] = {'lat': geoip[0], 'lon': geoip[1], 'site': site, 'host':data['host']}
 
         count=count+1
     return ddict
