@@ -377,8 +377,8 @@ class SitesRanksDataLoader(metaclass=Singleton):
         self.df = self.calculateRank()
 
 
-    def FixMissingLocations():
-        df = pd.merge(all_df, locdf, left_on=['ip'], right_on=['ip'], how='left')
+    def FixMissingLocations(self):
+        df = pd.merge(self.all_df, self.locdf, left_on=['ip'], right_on=['ip'], how='left')
         df = df.drop(columns=['site_y', 'host_y']).rename(columns={'site_x': 'site', 'host_x': 'host'})
         df["lat"] = pd.to_numeric(df["lat"])
         df["lon"] = pd.to_numeric(df["lon"])
