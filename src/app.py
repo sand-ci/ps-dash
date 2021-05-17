@@ -146,9 +146,8 @@ def update_site_elements(value):
               [Input('tabs-indeces', 'value'),
                Input('tabs-prob-types', 'value')])
 def renderProblems(idx, problem):
-
-    if (problem == 'high_sigma'):
-        df = ppage.high_sigma
+    if (problem == 'threshold_reached'):
+        df = ppage.threshold_reached
     elif (problem == 'has_bursts'):
         df = ppage.has_bursts
     elif (problem == 'all_packets_lost'):
