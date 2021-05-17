@@ -67,17 +67,7 @@ def serve_layout():
     return html.Div([
                 dcc.Location(id='change-url', refresh=False),
                 dcc.Store(id='store-dropdown'),
-                dbc.Nav(
-                    [
-                        dbc.NavItem(dbc.NavLink(
-                            html.Img(src=app.get_asset_url('ps-dash.png'), height="35px"
-                                    ), disabled=True, href="/sites", className="logo")),
-                        dbc.NavItem(dbc.NavLink("SITES", href="/sites", id='sites-tab')),
-                        dbc.NavItem(dbc.NavLink("NODES", href="/nodes", id='nodes-tab')),
-                        dbc.NavItem(dbc.NavLink("PAIRS", href="/pairs", id='pairs-tab')),
-                    ], fill=True, justified=True, id='navbar'
-                ),
-                 dbc.Row([
+                dbc.Row([
                      dbc.Col(dbc.Button(
                         "perfSONAR Toolkit Information",
                         className="external-button",
@@ -99,6 +89,16 @@ def serve_layout():
                         href='https://perfsonar.uc.ssl-hep.org'
                     ))
                 ], className="external-links", justify='center', align="center", no_gutters=True),
+                dbc.Nav(
+                    [
+                        dbc.NavItem(dbc.NavLink(
+                            html.Img(src=app.get_asset_url('ps-dash.png'), height="35px"
+                                    ), disabled=True, href="/sites", className="logo")),
+                        dbc.NavItem(dbc.NavLink("SITES", href="/sites", id='sites-tab')),
+                        dbc.NavItem(dbc.NavLink("NODES", href="/nodes", id='nodes-tab')),
+                        dbc.NavItem(dbc.NavLink("PAIRS", href="/pairs", id='pairs-tab')),
+                    ], fill=True, justified=True, id='navbar'
+                ),
                 dcc.Loading(html.Div(id='page-content'), className='loader-cont', color='#00245A'),
                 html.Div(id='page-content-noloading'),
             ], className='main-cont')
