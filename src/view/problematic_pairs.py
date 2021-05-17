@@ -16,14 +16,14 @@ class ProblematicPairsPage(object):
     indx_dict = {'all': 'All', 'ps_packetloss': 'Packet loss', 'ps_owd': 'One-way delay',
              'ps_retransmits': 'Retransmits', 'ps_throughput': 'Throughput'}
 
-    problem_types = {'high_sigma':'The most problematic pairs', 'has_bursts':'Pairs showing bursts',
+    problem_types = {'threshold_reached':'The most problematic pairs', 'has_bursts':'Pairs showing bursts',
             'all_packets_lost': 'Pairs with 100% packets lost'}
 
 
     def __init__(self):
         self.obj = PrtoblematicPairsDataLoader()
         self.problems = self.getDf()
-        self.high_sigma = self.problems[(self.problems['high_sigma'] == 1) & (self.problems['all_packets_lost'] != 1) & ((self.problems['src_not_in'] == 0) | (self.problems['dest_not_in'] == 0))].sort_values(by=['zscore', 'doc_count'], ascending=False)
+        self.threshold_reached = self.problems[(self.problems['threshold_reached'] == 1) & (self.problems['all_packets_lost'] != 1) & ((self.problems['src_not_in'] == 0) | (self.problems['dest_not_in'] == 0))].sort_values(by=['zscore', 'doc_count'], ascending=False)
         self.has_bursts = self.problems[(self.problems['has_bursts'] == 1) & ((self.problems['src_not_in'] == 0) | (self.problems['dest_not_in'] == 0))].sort_values(by=['max_hash_zscore', 'doc_count'], ascending=False)
         self.all_packets_lost = self.problems[(self.problems['all_packets_lost'] == 1) & ((self.problems['src_not_in'] == 0) | (self.problems['dest_not_in'] == 0))].sort_values(by=['all_packets_lost', 'doc_count'], ascending=False)
 
@@ -53,12 +53,16 @@ class ProblematicPairsPage(object):
             return src_site +' --> '+ dest_site
 
 
-    def generateTable(self, item, df, num_rows):
-        df = df[df['idx']==item][['host_src', 'src', 'site_src', 'host_dest', 'dest', 'site_dest', 'measures', 'value']]
+    def generateTable(self, idx, df, num_rows):
+        asc = False
+        if idx == 'ps_throughput':
+            asc = True
+
+        df = df[df['idx']==idx][['host_src', 'src', 'site_src', 'host_dest', 'dest', 'site_dest', 'measures', 'value']].sort_values('value', ascending=asc)
         display_columns = {'host_src': 'host_src', 'src': 'src', 'site_src': 'site_src', 'host_dest': 'host_dest',
-                           'dest': 'dest', 'site_dest': 'site_dest', 'measures': 'measures', 'value': hp.getValueUnit(item)}
+                           'dest': 'dest', 'site_dest': 'site_dest', 'measures': 'measures', 'value': hp.getValueUnit(idx)}
         return  dash_table.DataTable(
-                    id={'type': 'problem-table','index': item},
+                    id={'type': 'problem-table','index': idx},
                     columns=[{"name": v, "id": k} for k,v in display_columns.items()],
                     data=df.to_dict("rows"),
                     style_header=tmpl.host_table_header,

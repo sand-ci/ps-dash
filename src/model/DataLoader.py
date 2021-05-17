@@ -316,9 +316,26 @@ class PrtoblematicPairsDataLoader(object, metaclass=Singleton):
                 grouped['all_packets_lost'] = grouped['hash'].apply(lambda x: 1 if x in grouped[grouped['value']==1]['hash'].values else 0)
             else: grouped['all_packets_lost'] = -1
 
-            grouped['high_sigma'] = grouped['hash'].apply(lambda x: 1
-                                                          if x in grouped[grouped['zscore'] > 3].drop_duplicates()['hash'].values
-                                                          else 0)
+            def checkThreshold(value):
+                if (idx == 'ps_packetloss'):
+                    if value > 0.1:
+                        return 1
+                    return 0
+                elif (idx == 'ps_owd'):
+                    if value > 1000 or value < 0:
+                        return 1
+                    return 0
+                elif (idx == 'ps_throughput'):
+                    if round(value/1e+6, 2) < 25:
+                        return 1
+                    return 0
+                elif (idx == 'ps_retransmits'):
+                    if value > 100000:
+                        return 1
+                    return 0
+
+            grouped['threshold_reached'] = grouped['value'].apply(lambda row: checkThreshold(row))
+
             grouped['has_bursts'] = grouped['hash'].apply(lambda x: 1
                                                            if x in tempdf[tempdf['zscore']>5]['hash'].values
                                                            else 0)
