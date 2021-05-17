@@ -138,11 +138,11 @@ class ProblematicPairsPage(object):
                 dbc.Row([
                     dbc.Col(width=2, className='blank-menu-item'),
                     dbc.Col(
-                        dcc.Tabs(id='tabs-prob-types', className='prob-types', value='high_sigma',
+                        dcc.Tabs(id='tabs-prob-types', className='prob-types', value='threshold_reached',
                                  children=[
                                     dcc.Tab(label=v.upper(), value=k) for k, v in self.problem_types.items()
                                 ])
-                    , width={"size": 9}, className='horizontal-tabs')
+                    , width={"size": 10}, className='horizontal-tabs')
                 ]),
                 dbc.Row([
                     dbc.Col([
@@ -171,6 +171,6 @@ class ProblematicPairsPage(object):
                             children=html.Div("Loading may take a few minutes. Refresh the page to get the data from an hour ago.",
                                               id="tabs-content", className="problems-tabs-content")
                         ),
-                    ], width=9)
+                    ], width=10)
                 ])
             ])

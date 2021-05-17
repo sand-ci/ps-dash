@@ -8,7 +8,7 @@ body{
 }
 
 .page-cont {
-    margin: 20px;
+    margin: 0 20px;
 }
 
 /**********   Header   **********/
@@ -36,6 +36,24 @@ body{
 
 .nav-item .nav-link {
     color: #fff;
+}
+
+.external-links {
+    margin: 0 0 10px 0;
+}
+
+.external-links a {
+    font-size: 11pt;
+    width: 100%;
+    line-height: 3em;
+}
+
+.external-button {
+  font-size: 14px;
+  color: #101010;
+  background-color: #fff;
+  width: 100px;
+  border-color: #dfdfdf;
 }
 
 /**********   Sites   **********/
@@ -204,16 +222,16 @@ td.change-title {
 /**********   Nodes   **********/
 
 .side-menu {
-    background-color: #00245a;
+/*     background-color: #00245a; */
     padding: 0;
 }
 
 .blank-menu-item {
-    background-color: #00245a;
+/*     background-color: #00245a; */
 }
 
-.horizontal-tabs {
-    padding: 32px 0px 0px 20px;
+.tabs-prob-types-parent {
+    padding-right: 20px;
 }
 
 .tab-container .tab {
@@ -271,9 +289,9 @@ td.change-title {
     padding-top: 20px;
 }
 
-.problems-tabs-content {
-    margin-top: 20px;
-    margin-left: 20px;
+.problems-tabs-content, .tabs-prob-types {
+    padding: 20px;
+    margin-right: 10px;
 }
 
 .problems-tabs-content .card {
@@ -340,7 +358,7 @@ td.change-title {
     padding: 10px;
 }
 
-.plot-input-button {
+.plot-input, .plot-input-button {
     margin: 10px;
     font-size: 14px;
     color: #fff;

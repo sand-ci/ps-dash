@@ -77,6 +77,28 @@ def serve_layout():
                         dbc.NavItem(dbc.NavLink("PAIRS", href="/pairs", id='pairs-tab')),
                     ], fill=True, justified=True, id='navbar'
                 ),
+                 dbc.Row([
+                     dbc.Col(dbc.Button(
+                        "perfSONAR Toolkit Information",
+                        className="external-button",
+                        href='https://toolkitinfo.opensciencegrid.org/toolkitinfo/'
+                    )),
+                    dbc.Col(dbc.Button(
+                        "Kibana: Packet Loss in OSG/WLCG",
+                        className="external-button",
+                        href='https://atlas-kibana.mwt2.org/s/networking/app/kibana#/dashboard/07a03a80-beda-11e9-96c8-d543436ab024?_g=(filters%3A!()%2CrefreshInterval%3A(pause%3A!t%2Cvalue%3A0)%2Ctime%3A(from%3Anow-3d%2Cto%3Anow))'
+                    )),
+                    dbc.Col(dbc.Button(
+                        "Kibana: Packet Loss Tracking",
+                        className="external-button",
+                        href='https://atlas-kibana.mwt2.org/s/networking/app/dashboards#/view/ab7c4950-5cfa-11ea-bad0-ff3d06e7229e?_g=(filters:!(),refreshInterval:(pause:!t,value:0),time:(from:now-3d,to:now))'
+                    )),
+                    dbc.Col(dbc.Button(
+                        "MEPHi Tracer: Traceroute explorer",
+                        className="external-button",
+                        href='https://perfsonar.uc.ssl-hep.org'
+                    ))
+                ], className="external-links", justify='center', align="center", no_gutters=True),
                 dcc.Loading(html.Div(id='page-content'), className='loader-cont', color='#00245A'),
                 html.Div(id='page-content-noloading'),
             ], className='main-cont')
