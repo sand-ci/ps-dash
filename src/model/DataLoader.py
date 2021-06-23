@@ -318,7 +318,7 @@ class PrtoblematicPairsDataLoader(object, metaclass=Singleton):
 
             def checkThreshold(value):
                 if (idx == 'ps_packetloss'):
-                    if value > 0.1:
+                    if value > 0.05:
                         return 1
                     return 0
                 elif (idx == 'ps_owd'):
