@@ -95,8 +95,8 @@ def serve_layout():
                             html.Img(src=app.get_asset_url('ps-dash.png'), height="35px"
                                     ), disabled=True, href="/sites", className="logo")),
                         dbc.NavItem(dbc.NavLink("SITES", href="/sites", id='sites-tab')),
-                        dbc.NavItem(dbc.NavLink("NODES", href="/nodes", id='nodes-tab')),
-                        dbc.NavItem(dbc.NavLink("PAIRS", href="/pairs", id='pairs-tab')),
+                        dbc.NavItem(dbc.NavLink("LINKS", href="/nodes", id='nodes-tab')),
+                        dbc.NavItem(dbc.NavLink("PLOTS", href="/pairs", id='pairs-tab')),
                     ], fill=True, justified=True, id='navbar'
                 ),
                 dcc.Loading(html.Div(id='page-content'), className='loader-cont', color='#00245A'),
