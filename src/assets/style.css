@@ -466,6 +466,13 @@ td.change-title {
 
 /* The following style is neccessary because otherwise no loading spinner is shown on click of
    a button and it looks like the page is not loading at all. */
-*[data-dash-is-loading="true"]{
+
+/* *[data-dash-is-loading="true"]{
     visibility: hidden;
 }
+*[data-dash-is-loading="true"]::before{
+    content: "Loading...";
+    display: inline-block;
+    color: magenta;
+    visibility: visible;
+} */
