@@ -1,3 +1,4 @@
+print('starting')
 import dash
 import dash_core_components as dcc
 import dash_bootstrap_components as dbc
@@ -31,6 +32,8 @@ import model.queries as qrs
 from model.NodesMetaData import NodesMetaData
 import utils.helpers as hp
 from utils.helpers import timer
+
+
 
 
 # Start a thread which will update the data every hour
@@ -100,6 +103,7 @@ def serve_layout():
                     ], fill=True, justified=True, id='navbar'
                 ),
                 dcc.Loading(html.Div(id='page-content'), className='loader-cont', color='#00245A'),
+
                 html.Div(id='page-content-noloading'),
             ], className='main-cont')
 
@@ -300,5 +304,14 @@ def displayPage(pathname, url):
         return [dcc.Loading([pplotpage.defaultLayout(), pplotpage.specificPairLayout(url)]), None, False, False, True]
     else: return [None, layout_notfound, False, False, False]
 
+@app.callback([Output('tabs-content', 'style')],
+              [Input('tabs-indeces', 'value'),
+               Input('tabs-prob-types', 'value')])
+def triggerspinner(value):
+    if value:
+        timer.sleep(1)
+        return [{'display':'inline'}]
+
 
 app.run_server(debug=False, port=8050, host='0.0.0.0')
+print("Done")
