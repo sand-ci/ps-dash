@@ -10,14 +10,21 @@ import urllib.parse as urlparse
 from urllib.parse import parse_qs
 from flask_caching import Cache
 import os
+print('finish 1st section')
 
 from model.DataLoader import Updater
+print('updater')
 from model.DataLoader import GeneralDataLoader
+print('generaldataloader')
 from view.site_report import SiteReport
 from view.sites_page import SitesPage
 from view.problematic_pairs import ProblematicPairsPage
 from view.pair_plots import PairPlotsPage
+print('Finish Normal views')
+# from model.parquet_creation import main
+print('Finish parquet')
 import utils.helpers as hp
+print('finish 2nd section')
 
 import threading
 import time
@@ -27,17 +34,24 @@ from functools import reduce, wraps
 from datetime import datetime, timedelta
 import numpy as np
 from  scipy.stats import zscore
+print('finish 3rd section')
 
 import model.queries as qrs
 from model.NodesMetaData import NodesMetaData
 import utils.helpers as hp
 from utils.helpers import timer
+print('finish 4th section')
 
+import asyncio
+import parquet_creation as pcr
 
+from model.DataLoader import ParquetUpdater
+ParquetUpdater()
 
 
 # Start a thread which will update the data every hour
-Updater()
+# Updater()
+
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP]
 
 
@@ -52,6 +66,9 @@ app.css.append_css({"external_url": "https://codepen.io/chriddyp/pen/brPBPO.css"
 # cache.init_app(app.server, config=CACHE_CONFIG)
 
 # On start of application create the neccessary objects
+%run parquet_creation.py
+print('limt from the pcr file',pcr.limit)
+
 gdl = GeneralDataLoader()
 spage = SitesPage()
 sreport = SiteReport()
@@ -67,6 +84,7 @@ def serve_layout():
     ppage = ProblematicPairsPage()
     pplotpage = PairPlotsPage()
 
+    
     return html.Div([
                 dcc.Location(id='change-url', refresh=False),
                 dcc.Store(id='store-dropdown'),
@@ -301,17 +319,15 @@ def displayPage(pathname, url):
     elif url.endswith('/pairs') :
         return [None, pplotpage.defaultLayout(), False, False, True]
     elif url.startswith('/plot') or pathname.startswith('/plot'):
-        return [dcc.Loading([pplotpage.defaultLayout(), pplotpage.specificPairLayout(url)]), None, False, False, True]
+        return [dcc.Loading([pplotpage.defaultLayout(), pplotpage.specificPairLayout(url)],fullscreen=True), None, False, False, True]
     else: return [None, layout_notfound, False, False, False]
 
-@app.callback([Output('tabs-content', 'style')],
-              [Input('tabs-indeces', 'value'),
-               Input('tabs-prob-types', 'value')])
-def triggerspinner(value):
-    if value:
-        timer.sleep(1)
-        return [{'display':'inline'}]
+# @app.callback(Output('tabs-content', 'style'),
+#               [Input('tabs-indeces', 'value'),
+#                Input('tabs-prob-types', 'value')])
+# def triggerspinner(value):
+#     return {'display':'none'}
 
 
-app.run_server(debug=False, port=8050, host='0.0.0.0')
+app.run_server(debug=False, port=8050, host='localhost')
 print("Done")

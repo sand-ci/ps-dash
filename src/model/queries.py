@@ -3,13 +3,45 @@ import time
 import pandas as pd
 import itertools
 from elasticsearch import Elasticsearch
-from elasticsearch.helpers import scan
+from elasticsearch.helpers import scan, bulk
 
 import utils.helpers as hp
+
+from collections import deque
+import asyncio
 
 import urllib3
 urllib3.disable_warnings()
 
+async def getDataQuery(datefrom,dateto,idx):
+    print(datefrom,dateto,idx)
+    query = {
+        "query": {
+            "bool": {
+                    "filter": [
+                    {
+                        "range": {
+                            "timestamp": {
+                            "gte": datefrom,
+                            "lte": dateto
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+      }
+    data = scan(client=hp.es,index=idx,query=query)
+    ret_data = {}
+    count = 0
+    last_entry = 0
+    for item in data:
+        if not count%100000: print(idx,count)
+        ret_data[count] = item
+        ret_data[count] = ret_data[count]['_source']
+        count+=1
+#     print('Wait After')
+    return ret_data
 
 def queryNodesGeoLocation():
 
@@ -34,6 +66,7 @@ def queryNodesGeoLocation():
           }
     data = scan(client=hp.es, index='ps_meta', query=query,
                 _source=include, filter_path=['_scroll_id', '_shards', 'hits.hits._source'])
+       
 
     count = 0
     neatdata = []
@@ -229,7 +262,6 @@ def queryAllValues(idx, src, dest, period):
         if not count%100000: print(count)
         allData.append(res['_source'])
         count=count+1
-
     return allData
 
 

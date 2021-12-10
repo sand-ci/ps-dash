@@ -67,7 +67,7 @@ def getValueUnit(test_type):
 
 
 def defaultTimeRange(days=3):
-    now = roundTime(datetime.utcnow()) # 1 hour
+    now = roundTime(datetime.now()) # 1 hour
     defaultEnd = datetime.strftime(now, '%Y-%m-%d %H:%M')
     defaultStart = datetime.strftime(now - timedelta(days), '%Y-%m-%d %H:%M')
     return [defaultStart, defaultEnd]
