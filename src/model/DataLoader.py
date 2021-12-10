@@ -12,6 +12,15 @@ from model.NodesMetaData import NodesMetaData
 import utils.helpers as hp
 from utils.helpers import timer
 
+import parquet_creation as pcr
+import glob
+import os
+import dask
+import dask.dataframe as dd
+
+
+
+
 
 class Singleton(type):
 
@@ -82,6 +91,79 @@ class Updater(object):
         thread = threading.Timer(3600, self.UpdateAllData) # 1hour
         thread.daemon = True
         thread.start()
+        
+class ParquetUpdater(object):
+    
+    def __init__(self):
+        self.StartThread()
+    
+    @timer    
+    def Update(self):
+        print('Starting Parquet Updater')
+        limit = pcr.limit
+        indices = pcr.indices
+        files = glob.glob('..\parquet\*')
+        print('files',files)
+        file_end = str(int(limit*24))
+        print('end of file trigger',file_end)
+        for f in files:
+            if f.endswith(file_end):
+                os.remove(f)
+        files = glob.glob('..\parquet\*')
+        print('files2',files)
+        for idx in indices:
+            j=int((limit*24)-1)
+            print('idx',idx,'j',j)
+            for f in files[::-1]:
+                file_end = str(idx)
+                end = file_end+str(j)
+                print('f',f,'end',end)
+                if f.endswith(end):
+                    new_name = file_end+str(j+1)
+                    head = '..\parquet\\'
+                    final = head+new_name
+                    print('f',f,'final',final)
+                    os.rename(f,final)
+                    j -= 1
+        jobs = []
+        limit = 1/24
+        timerange = pcr.queryrange(limit)
+        for idx in indices:
+            thread = threading.Thread(target=pcr.btwfunc,args=(idx,timerange))
+            jobs.append(thread)
+        for j in jobs:
+            j.start()
+        for j in jobs:
+            j.join()
+    #     print('Finished Querying')
+        for idx in indices:
+            filenames = pcr.ReadParquet(idx,limit)
+            if idx == 'ps_packetloss':
+                print(filenames)
+                plsdf = dd.read_parquet(filenames).compute()
+                print('Before drops',len(plsdf))
+                plsdf = plsdf.drop_duplicates()
+                print('After Drops',len(plsdf))
+                print('packetloss\n',plsdf)
+            if idx == 'ps_owd':
+                owddf = dd.read_parquet(filenames).compute()
+                print('owd\n',owddf)
+            if idx == 'ps_retransmits':
+                rtmdf = dd.read_parquet(filenames).compute()
+                print('retransmits\n',rtmdf)
+            if idx == 'ps_throughput':
+                trpdf = dd.read_parquet(filenames).compute()    
+                print('throughput\n',trpdf)
+            print('dask df complete')
+
+        self.lastUpdated = hp.roundTime(datetime.utcnow())
+        self.StartThread()
+        
+    def StartThread(self):
+        thread = threading.Timer(3600, self.Update) # 1hour
+        thread.daemon = True
+        thread.start()
+        
 
 
 class GeneralDataLoader(object, metaclass=Singleton):
