@@ -18,7 +18,7 @@ from elasticsearch.helpers import scan
 import getpass
 
 
-INDECES = ['ps_packetloss', 'ps_owd', 'ps_retransmits', 'ps_throughput']
+INDICES = ['ps_packetloss', 'ps_owd', 'ps_retransmits', 'ps_throughput', 'ps_trace']
 
 user, passwd, mapboxtoken = None, None, None
 with open("/etc/ps-dash/creds.key") as f:
