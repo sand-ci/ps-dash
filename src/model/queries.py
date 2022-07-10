@@ -1,20 +1,227 @@
-from datetime import datetime, timedelta
-import time
 import pandas as pd
 import itertools
-from elasticsearch import Elasticsearch
-from elasticsearch.helpers import scan, bulk
+from elasticsearch.helpers import scan
 
 import utils.helpers as hp
-
-from collections import deque
-import asyncio
 
 import urllib3
 urllib3.disable_warnings()
 
-async def getDataQuery(datefrom,dateto,idx):
-    print(datefrom,dateto,idx)
+def alarms(period):
+    q = {
+      "query" : {
+        "bool": {
+          "must": [
+              {
+                "range" : {
+                  "created_at" : {
+                    "from" : period[0],
+                    "to": period[1]
+                  }
+                }
+              },
+              {
+              "term" : {
+                "subcategory" : {
+                  "value" : "Perfsonar",
+                  "boost" : 1.0
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+    result = scan(client=hp.es,index='aaas_alarms',query=q)
+    data = {}
+
+    for item in result:
+        event = item['_source']['event']
+        temp = []
+        if event in data.keys(): 
+            temp = data[event]
+        
+        desc = item['_source']['source']
+        desc['tag'] = item['_source']['tags']
+        temp.append(item['_source']['source'])
+        data[event] = temp
+
+    return data
+
+
+
+def allTestedNodes(period):
+    def query(direction):
+        return {
+      "size" : 0,
+      "query" : {
+        "bool" : {
+          "must" : [
+            {
+              "range" : {
+                "timestamp" : {
+                  "gt" : period[0],
+                  "lte": period[1]
+                }
+              }
+            }
+          ]
+        }
+      },
+      "aggregations" : {
+        "groupby" : {
+          "composite" : {
+            "size" : 9999,
+            "sources" : [
+              {
+                direction : {
+                  "terms" : {
+                    "field" : "src"
+                  }
+                }
+              },
+              {
+                f"{direction}_host" : {
+                  "terms" : {
+                    "field" : "src_host"
+                  }
+                }
+              },
+              {
+                f"{direction}_site" : {
+                  "terms" : {
+                    "field" : "src_site"
+                  }
+                }
+              },
+              {
+                "ipv6" : {
+                  "terms" : {
+                    "field" : "ipv6"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+    aggrs = []
+    pairsDf = pd.DataFrame()
+    for idx in hp.INDICES:
+        aggdata = hp.es.search(index=idx, body=query('src'))
+        aggrs = []
+        for item in aggdata['aggregations']['groupby']['buckets']:
+            aggrs.append({
+                          'ip': item['key']['src'],
+                          'ipv6': item['key']['ipv6'],
+                          'host': item['key']['src_host'],
+                          'site': item['key']['src_site'],
+            })
+
+        aggdata = hp.es.search(index=idx, body=query('dest'))
+        for item in aggdata['aggregations']['groupby']['buckets']:
+            aggrs.append({
+                          'ip': item['key']['dest'],
+                          'ipv6': item['key']['ipv6'],
+                          'host': item['key']['dest_host'],
+                          'site': item['key']['dest_site'],
+                         })
+    
+            
+        pairsDf = pairsDf.append(aggrs)
+        pairsDf = pairsDf.drop_duplicates()
+        print(idx, 'Len unique nodes ',len(pairsDf), 'period:', period)
+    return pairsDf
+
+
+
+def mostRecentMetaRecord(ip, ipv6, period):
+    forTimeRange=''
+    if period:
+        forTimeRange = {
+                  "range" : {
+                    "timestamp" : {
+                      "gt" : period[0],
+                      "lte": period[1]
+                    }
+                  }
+                }
+
+    def q(ip, ipv):
+        return {
+          "size" : 1,
+          "_source": ["geolocation",f"external_address.{ipv}_address", "config.site_name", "host","administrator.name","administrator.email","timestamp"],  
+            "sort" : [
+            {
+              "timestamp" : {
+                "order" : "desc"
+              }
+            }
+          ],
+          "query" : {
+            "bool" : {
+              "must" : [
+                forTimeRange,
+                {
+                  "term" : {
+                    f"external_address.{ipv}_address" : {
+                      "value" : ip
+                    }
+                  }
+                },
+                {
+                  "bool": {
+                    "should": [
+                      {
+                        "exists": {"field": "host"}
+                      },
+                      {
+                        "exists": {"field": "config.site_name"}
+                      },
+                      {
+                        "exists": {"field": "geolocation"}
+                      },
+                      {
+                        "exists": {"field": "administrator.email"}
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+    
+    
+    ipv = 'ipv6' if ipv6 == True else 'ipv4'
+#     print(str(q).replace("\'", "\""))
+    values = {}
+    data = hp.es.search(index='ps_meta', body=q(ip,ipv))
+
+    if data['hits']['hits']:
+        records = data['hits']['hits'][0]['_source']
+        values['ip'] = ip
+        if 'timestamp' in records:
+            values['timestamp'] = records['timestamp']
+        if 'host' in records:
+            values['host'] = records['host']
+        if 'config' in records:
+            if 'site_name' in records['config']:
+                values['site_meta'] = records['config']['site_name']
+        if 'administrator' in records:
+            if 'name' in records['administrator']:
+                values['administrator'] = records['administrator']['name']
+            if 'email' in records['administrator']:
+                values['email'] = records['administrator']['email']
+        if 'geolocation' in records:
+            values['lat'], values['lon'] = records['geolocation'].split(",")
+    return values
+
+
+
+def queryIndex(datefrom, dateto, idx):
+    print('query ^^^^^^^^^^^^^^^^^^^',datefrom,dateto,idx)
     query = {
         "query": {
             "bool": {
@@ -23,7 +230,7 @@ async def getDataQuery(datefrom,dateto,idx):
                         "range": {
                             "timestamp": {
                             "gte": datefrom,
-                            "lte": dateto
+                            "lt": dateto
                             }
                         }
                     }
@@ -31,17 +238,21 @@ async def getDataQuery(datefrom,dateto,idx):
             }
         }
       }
-    data = scan(client=hp.es,index=idx,query=query)
-    ret_data = {}
-    count = 0
-    last_entry = 0
-    for item in data:
-        if not count%100000: print(idx,count)
-        ret_data[count] = item
-        ret_data[count] = ret_data[count]['_source']
-        count+=1
-#     print('Wait After')
-    return ret_data
+    try:
+        data = scan(client=hp.es,index=idx,query=query)
+        ret_data = {}
+        count = 0
+        last_entry = 0
+        for item in data:
+            if not count%10000: print(idx,count)
+            ret_data[count] = item
+            ret_data[count] = ret_data[count]['_source']
+            count+=1
+
+        return ret_data
+    except Exception as e:
+        print(traceback.format_exc())
+
 
 def queryNodesGeoLocation():
 
@@ -325,14 +536,14 @@ def query4Avg(idx, dateFrom, dateTo):
               }
             }
 
-
-#     print(idx, str(query).replace("\'", "\""))
     aggrs = []
 
     aggdata = hp.es.search(index=idx, body=query)
     for item in aggdata['aggregations']['groupby']['buckets']:
-        aggrs.append({'hash': str(item['key']['src']+'-'+item['key']['dest']),
+        aggrs.append({'pair': str(item['key']['src']+'-'+item['key']['dest']),
                       'src': item['key']['src'], 'dest': item['key']['dest'],
+                      # 'src_host': item['key']['src'], 'dest_host': item['key']['dest'],
+                      # 'src_site': item['key']['src'], 'dest_site': item['key']['dest'],
                       'value': item[val_fld]['value'],
                       'from': dateFrom,
                       'to': dateTo,

@@ -4,11 +4,11 @@
 }
 
 body{
-    background-color: #efeeee;
+    background-color: #fff;
 }
 
 .page-cont {
-    margin: 0 20px;
+    margin: 0 40px;
 }
 
 /**********   Header   **********/
@@ -63,179 +63,6 @@ body{
     background-color: #fff;
 }
 
-.site-inner-cont {
-    padding: 0 0 5px 0;
-}
-
-.sites-header {
-/*     border-radius: 1rem; */
-    background-color: rgb(239 239 239);
-    border-bottom-width: 0;
-}
-
-.sites-title-left, .sites-title-right {
-    padding: 20px 0px;
-    color: #000;
-    font-size: 20px;
-    font-weight: 500;
-}
-
-.sites-title-left p, .sites-title-right p {
-    margin-bottom: 0;
-}
-
-.sites-title-left{
-    padding-left: 30px;
-}
-
-.sites-title-right {
-    text-align: right;
-    padding-right: 30px;
-}
-
-.card-body .left {
-    padding-right: 5px
-}
-
-.card-body .right {
-    padding-left: 5px
-}
-
-.tab--selected.jsx-3468109796, .tab.jsx-3468109796 {
-    font-size: 20px;
-}
-
-.site-details {
-    padding: 5px;
-}
-
-.site-report {
-    padding-left: 15px;
-    padding-right: 0;
-}
-
-th:not(.CalendarDay), td:not(.CalendarDay) {
-    padding: 0;
-}
-
-.site-title {
-    text-align: center;
-    margin-bottom: 15px;
-    font-size: 2em;
-}
-
-table.ip-table, table.packetloss, table.owd, table.throughput, table.retransmits {
-    width: inherit;
-}
-
-th.latency-head, th.throughput-head {
-    text-align: center;
-    font-size: 15px;
-    color: #fff;
-}
-
-th.latency-head {
-    background-color: #2f2f2f;
-}
-
-th.throughput-head {
-    background-color: #2f2f2f;
-}
-
-td.ipv-type, td.ipv-count, td.inout-type, td.inout-value {
-    border-left: 1px solid #E1E1E1;
-    border-right: 1px solid #E1E1E1;
-    border-bottom: 1px solid #E1E1E1;
-    padding: 5px;
-    text-align: center;
-    font-size: 11px;
-}
-
-td.ipv-type, td.ipv-count {
-    padding: 0px;
-    font-size: 16px;
-    background-color: white;
-}
-
-td.ipv-type, td.inout-type {
-    border-bottom: white;
-}
-
-th.packetloss-tests, th.owd-tests, th.throughput-tests, th.retransmits-tests {
-    text-align: center;
-    font-weight: bold;
-    font-size: 13px;
-    padding-top: 10px;
-}
-
-table.packetloss td.inout-value,
-table.owd td.inout-value,
-table.throughput td.inout-value,
-table.retransmits td.inout-value {
-    background-color: #fff;
-    color: #000;
-}
-
-table.packetloss tr.change-values, table.owd tr.change-values,
-table.throughput tr.change-values, table.retransmits tr.change-values {
-    background-color: #00245a;
-    color: white;
-}
-
-
-table.packetloss td.inout-type,
-table.owd td.inout-type,
-table.throughput td.inout-type,
-table.retransmits td.inout-type {
-    background-color: #2f2f2f;
-    color: #fff;
-}
-
-table.packetloss tr.change-values td, table.owd tr.change-values td,
-table.throughput tr.change-values td, table.retransmits tr.change-values td {
-    padding-left: 5px;
-}
-
-table.packetloss, table.owd, table.throughput, table.retransmits {
-    font-size: 12px;
-}
-
-td.change-title {
-    text-align: center;
-}
-
-.site {
-    padding: 1%;
-}
-
-.site-card {
-    padding-bottom: 10px;
-}
-
-.site-inner-cont {
-    padding: 10px 0;
-}
-
-/**********   Nodes   **********/
-
-.side-menu {
-/*     background-color: #00245a; */
-    padding: 0;
-}
-
-.blank-menu-item {
-/*     background-color: #00245a; */
-}
-
-.tabs-prob-types-parent {
-    padding-right: 20px;
-}
-
-.tab-container .tab {
-    background-color: #00245a !important;
-    color: white !important;
-}
-
 .tab-container .tab--selected {
     background-color: #fff !important;
     color: black !important;
@@ -247,176 +74,6 @@ td.change-title {
     border-left: 1px solid #03266c !important;
 }
 
-.dash-fixed-content {
-    width: 100%;
-}
-
-.dash-spreadsheet-menu {
-    margin-top: 0 !important;
-}
-
-.dash-table-container table td {
-    border: 0px !important;
-}
-
-.dash-table-container th {
-    border-left: 0px !important;
-    border-right: 0px !important;
-    border-top-color: white !important;
-    border-bottom-color: white !important;
-    background-color: #ffc107 !important;
-}
-
-.column-header--sort {
-    color: white !important;
-    font-size: 16px !important;
-}
-
-.dash-table-container th.dash-filter {
-    background-color: #e7f8fa !important;
-}
-
-.problems-tab-header {
-    background-color: #1768AC;
-    color: white;
-}
-
-.tab-parent--vert {
-    width: 100%;
-    padding-top: 20px;
-}
-
-.problems-tabs-content, .tabs-prob-types {
-    padding: 20px;
-    margin-right: 10px;
-}
-
-.problems-tabs-content .card {
-    margin-bottom: 20px;
-}
-
-.plot-input-button {
-    background-color: white;
-}
-
-.indeces-types {
-    width: 100%;
-    font-size: 18px;
-}
-
-.problem-table {
-    width: 100%;
-    margin: 20px 0
-}
-
-.problem-table td {
-    font-size: 14px;
-    border-bottom: none;
-}
-
-.problem-table th {
-    font-size: 16px;
-}
-
-.last-updated {
-    background-color: #ffc107;
-}
-
-.last-update {
-    text-align: center;
-    padding: 10px 0;
-}
-
-.index-title {
-    padding: 20 0 0 10px;
-}
-
-.prob-types {
-    font-size: 14px;
-}
-
-.idx-tab {
-    padding: 10px;
-}
-
-.period-element {
-    padding: 10px;
-}
-
-.period-times {
-    text-align: center;
-}
-
-.loading-problems .dash-spinner {
-    margin-top: 40em;
-}
-
-.input-type {
-    padding: 10px;
-}
-
-.plot-input, .plot-input-button {
-    margin: 10px;
-    font-size: 14px;
-    color: #fff;
-    background-color: #00255a;
-    width: 100px;
-}
-
-.plot-input-button:hover, .plot-input-button:active, .plot-input-button:focus {
-  color: white;
-  background-color: #1868ac;
-}
-
-.input-value {
-    width: 280px;
-}
-
-.ppage-header {
-    color: #EEF0F2;
-    font-size: 1.6em;
-    padding: 5%;
-    height: 100%;
-}
-
-.ppage-header h1 {
-    color: white;
-}
-
-
-/**********   Pairs   **********/
-
-.dd-container {
-    margin-top: 1%;
-    padding-bottom: 1%;
-}
-
-.fields-wrapper {
-    padding: 0.1%;
-/*     background-color: #fff; */
-    margin: 0.5%;
-}
-
-.fields-wrapper label {
-    font-size: 1.6em;
-    color: black;
-}
-
-.fields-wrapper p {
-/*     font-size: 1.6em; */
-    color: black;
-}
-
-.fields-wrapper .dd-fields {
-    margin-left: 5px;
-}
-
-.fields-wrapper .dd-count {
-  margin-left: 5px;
-  margin-top: 5px;
-  line-height: 0em;
-}
-
 .dash-spinner-container {
     width: 50% !important;
     margin-top: 20% !important;
@@ -424,55 +81,55 @@ td.change-title {
     position: relative !important;
 }
 
-.issue-header {
-    min-height: 150px;
-    margin-bottom: 0.5%;
+.datatables-cont {
+    padding: 20px;
 }
 
-.issue-wrapper {
-    height: 100%;
-    padding: 0;
-    margin-right: 0px;
-    margin-left: 0px;
+.single-table {
+    margin-top: 10px;
 }
 
-.issue {
-    background-color: #720026;
+.cell--selected {
+    border-color: #00245a !important;
+    background-color: rgb(227, 234, 244) !important;
 }
 
-.src-issue {
-    background-color: #e4ac05;
-    color: white;
+.main-cont {
+	margin-bottom: 100px;
 }
 
-.dest-issue {
-    background-color: #00bcd4;
-    color: white;
+.dash-table-container {
+    --accent: #00245a !important;
+    --selected-background: rgb(227, 234, 244) !important;
 }
 
-.other-issue {
-    background-color: #1768AC;
+.container {
+    margin-bottom: 20px;
+    max-width: 1550px !important;
+  }
+
+.dash-table-container th {
+    border-left: 0px !important;
+    border-right: 0px !important;
+    border-top-color: white !important;
+    border-bottom-color: white !important;
+    background-color: #ebf1fd !important;
+    color: black;
 }
 
-.pair-plot {
-    padding: 5px;
+
+.cls-selected-site {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.cls-site-map {
+    height: 650px;
+    padding: 20px;
 }
 
 /**********   Loading   **********/
 
 .loader-cont {
-    margin-top: 10em;
+    margin-top: 1em;
 }
-
-/* The following style is neccessary because otherwise no loading spinner is shown on click of
-   a button and it looks like the page is not loading at all. */
-
-/* *[data-dash-is-loading="true"]{
-    visibility: hidden;
-}
-*[data-dash-is-loading="true"]::before{
-    content: "Loading...";
-    display: inline-block;
-    color: magenta;
-    visibility: visible;
-} */
