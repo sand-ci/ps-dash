@@ -3,7 +3,6 @@ from dash import Dash, dash_table, dcc, html
 import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output
 
-
 from elasticsearch.helpers import scan
 
 import plotly.graph_objects as go
@@ -11,11 +10,7 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 
 import pandas as pd
-
-import dash
-from dash import Dash, dash_table, dcc, html
-import dash_bootstrap_components as dbc
-
+import traceback
 
 from utils.parquet import Parquet
 from model.Updater import ParquetUpdater
@@ -25,7 +20,7 @@ from utils.helpers import timer
 
 
 @timer
-def getAlarms(period):
+def getAlarms(period, metaDf, taggedNodes):
     q = {
       "query" : {
         "bool": {
@@ -68,6 +63,11 @@ def getAlarms(period):
         data[event] = temp
         
         for t in tags:
+            if event in taggedNodes:
+                site = metaDf[metaDf['host']==t]['site'].values[0]
+                print(metaDf[metaDf['host']==t][['host','site']].values)
+                t = site
+
             if t in sites.keys():
                 if event not in sites[t]:
                     temp = sites[t]
@@ -92,11 +92,11 @@ def getMetaData():
 
 
 @timer
-def unpackAlarms(data, metaDf):
+def unpackAlarms(data, metaDf, taggedNodes):
     events = ['path changed', 'large clock correction', 'high packet loss', 'high packet loss on multiple links',
             'complete packet loss', 'bandwidth decreased from/to multiple sites', 'bandwidth decreased',
             'bandwidth increased from/to multiple sites', 'bandwidth increased', 'destination cannot be reached from any',
-            'source cannot reach any', 'destination cannot be reached from multiple']
+            'source cannot reach any', 'destination cannot be reached from multiple', 'firewall issue']
 
     # print(data.keys())
     frames, pivotFrames = {},{}
@@ -123,31 +123,38 @@ def unpackAlarms(data, metaDf):
     sign = {'bandwidth increased from/to multiple sites': '+',
             'bandwidth decreased from/to multiple sites': '-'}
 
-    for e in events:
-        if e in data.keys():
-            df =  pd.DataFrame(data[e])
-            df['tag_str'] = df['tag'].apply(lambda x: ', '.join(x))
-            
-            if 'sites' in df.columns:
-                df['sites'] = df['tag'].apply(lambda x: ' \n '.join(x))
-            
-            if 'dest_change' in df.columns:
-                df['change']=df[['dest_sites','dest_change']].apply(lambda x: list2str(x, sign[e]), axis=1)
-            if 'src_change' in df.columns:
-                df['change']=df[['dest_sites','dest_change']].apply(lambda x: list2str(x, sign[e]), axis=1)
+    try:
+        for e in events:
+            if e in data.keys():
+                df =  pd.DataFrame(data[e])
+                df['tag_str'] = df['tag'].apply(lambda x: ', '.join(x))
+                
+                if 'sites' in df.columns:
+                    df['sites'] = df['tag'].apply(lambda x: ' \n '.join(x))
+                
+                if 'dest_change' in df.columns:
+                    df['change']=df[['dest_sites','dest_change']].apply(lambda x: list2str(x, sign[e]), axis=1)
+                if 'src_change' in df.columns:
+                    df['change']=df[['dest_sites','dest_change']].apply(lambda x: list2str(x, sign[e]), axis=1)
 
 
-            frames[e] = df
+                frames[e] = df
 
-            df = list2rows(df)
-            df['id'] = df.index
-            metaDf = metaDf[(metaDf['site']!='')&(metaDf['lat']!='')][['site','lat','lon']].sort_values(['site','lat'], na_position='last').drop_duplicates()
-            df = pd.merge(metaDf[['site','lat','lon']], df, left_on='site', right_on='tag', how='right')
+                df = list2rows(df)
+                df['id'] = df.index
+                metaDf = metaDf[(metaDf['site']!='')&(metaDf['lat']!='')].sort_values(['site','lat'], na_position='last').drop_duplicates()
 
-            if 'site_x' in df.columns:
-                df = df.drop(columns=['site_x']).rename(columns={'site_y': 'site'})
+                if e not in taggedNodes:
+                    df = pd.merge(metaDf[['site','lat','lon']], df, left_on='site', right_on='tag', how='right')
+                else:
+                    df = pd.merge(metaDf[['host','lat','lon','site']], df, left_on='host', right_on='tag', how='right')
 
-            pivotFrames[e] = df
+                if 'site_x' in df.columns:
+                    df = df.drop(columns=['site_x']).rename(columns={'site_y': 'site'})
+
+                pivotFrames[e] = df
+    except Exception as e:
+        print(traceback.format_exc())
 
     return [frames, pivotFrames]
 
@@ -345,14 +352,19 @@ dash.register_page(__name__, path='/')
 # cache the data needed for the overview charts. Run the code on the background every 2 min and store the data in /parquet.
 ParquetUpdater(120)
 
+# most alarms tag sites, but some tag nodes instead
+taggedNodes = ['large clock correction']
+
 pq = Parquet()
+metaDf = getMetaData()
 
 dateFrom, dateTo = hp.defaultTimeRange(1)
 # dateFrom, dateTo = ['2022-05-25 09:40', '2022-05-25 21:40']
-data, sites = getAlarms(hp.GetTimeRanges(dateFrom, dateTo))
-metaDf = getMetaData()
-frames, pivotFrames = unpackAlarms(data, metaDf)
+data, sites = getAlarms(hp.GetTimeRanges(dateFrom, dateTo), metaDf, taggedNodes)
+
+frames, pivotFrames = unpackAlarms(data, metaDf, taggedNodes)
 alarmCnt = groupAlarms(sites, metaDf)
+
 
 
 layout = html.Div([
@@ -415,10 +427,14 @@ def generate_tables(site):
     out = []
 
     if alarmCnt[alarmCnt['site']==site]['cnt'].values[0] > 0:
-        for event in sites[site]:
+        for event in sorted(sites[site]):
             eventDf = pivotFrames[event]
+
             # find all cases where selected site was pinned in tag field
-            ids = eventDf[eventDf['tag']==site]['id'].values
+            if event not in taggedNodes:
+                ids = eventDf[eventDf['tag']==site]['id'].values
+            else: ids = eventDf[eventDf['site']==site]['id'].values
+
             tagsDf = frames[event]
             dfr = tagsDf[tagsDf.index.isin(ids)]
                 
