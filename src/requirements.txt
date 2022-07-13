@@ -8,4 +8,5 @@ dash_bootstrap_components>=1.2.0
 dash-table>=5.0.0
 plotly>=5.9.0
 plotly_express>=0.4.1
-pyarrow
+pyarrow>=5.0.0
+dask>=2021.4.0
