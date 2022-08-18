@@ -14,12 +14,15 @@ import pandas as pd
 
 class ParquetUpdater(object):
     
-    def __init__(self, iterval):
+    def __init__(self):
         self.createLocation('parquet/')
         self.createLocation('parquet/raw/')
-        self.cacheData()
+        self.pq = Parquet()
+        self.cacheIndexData()
+        self.cacheTraceChanges()
         try:
-            Scheduler(iterval, self.cacheData)
+            Scheduler(120, self.cacheIndexData)
+            Scheduler(15, self.cacheTraceChanges)
         except Exception as e:
             print(traceback.format_exc())
 
@@ -40,8 +43,7 @@ class ParquetUpdater(object):
 
 
     @timer
-    def cacheData(self):
-        pq = Parquet()
+    def cacheIndexData(self):
         location = 'parquet/raw/'
         dateFrom, dateTo = hp.defaultTimeRange(1)
         INDICES = ['ps_packetloss', 'ps_owd', 'ps_retransmits', 'ps_throughput']
@@ -51,7 +53,23 @@ class ParquetUpdater(object):
             # pq.writeToFile(df, f'{location}{idx}.parquet')
             df['idx'] = idx
             measures = pd.concat([measures, df])
-        pq.writeToFile(measures, f'{location}measures.parquet')
+        self.pq.writeToFile(measures, f'{location}measures.parquet')
+
+
+    @timer  
+    def cacheTraceChanges(self, days=60):
+        location = 'parquet/raw/'
+        dateFrom, dateTo = hp.defaultTimeRange(days)
+        chdf, posDf, baseline, altPaths = qrs.queryTraceChanges(dateFrom, dateTo)
+        chdf = chdf.round(2)
+        posDf = posDf.round(2)
+        baseline = baseline.round(2)
+        altPaths = altPaths.round(2)
+
+        self.pq.writeToFile(chdf, f'{location}chdf.parquet')
+        self.pq.writeToFile(posDf, f'{location}posDf.parquet')
+        self.pq.writeToFile(baseline, f'{location}baseline.parquet')
+        self.pq.writeToFile(altPaths, f'{location}altPaths.parquet')
 
 
     def createLocation(self,location):

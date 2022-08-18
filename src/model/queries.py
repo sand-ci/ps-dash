@@ -7,6 +7,89 @@ import utils.helpers as hp
 import urllib3
 urllib3.disable_warnings()
 
+
+def queryTraceChanges(fromDate, toDate):
+    q = {
+      "query": {
+        "bool": {
+          "must": [
+            {
+              "range": {
+                "from_date.keyword": {
+                  "gte": fromDate
+                }
+              }
+            },
+            {
+              "range": {
+                "to_date.keyword": {
+                  "lte": toDate
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+
+    # print(str(q).replace("\'", "\""))
+    result = scan(client=hp.es,index='ps_trace_changes',query=q)
+    data, positions, baseline, altPaths = [],[],[],[]
+    positions = []
+    for item in result:
+
+        tempD = {}
+        for k,v in item['_source'].items():
+            if k not in ['positions', 'baseline', 'alt_paths', 'created_at']:
+                tempD[k] = v
+        data.append(tempD)
+
+        src,dest,src_site,dest_site, = item['_source']['src'], item['_source']['dest'], item['_source']['src_site'], item['_source']['dest_site']
+        from_date,to_date = item['_source']['from_date'], item['_source']['to_date']
+
+        temp = item['_source']['positions']
+        for p in temp:
+            p['src'] = src
+            p['dest'] = dest
+            p['src_site'] = src_site
+            p['dest_site'] = dest_site
+            p['from_date'] = from_date
+            p['to_date'] = to_date
+        positions.extend(temp)
+        
+        temp = item['_source']['baseline']
+        for p in temp:
+            p['src'] = src
+            p['dest'] = dest
+            p['src_site'] = src_site
+            p['dest_site'] = dest_site
+            p['from_date'] = from_date
+            p['to_date'] = to_date
+        baseline.extend(temp)
+
+        temp = item['_source']['alt_paths']
+        for p in temp:
+            p['src'] = src
+            p['dest'] = dest
+            p['src_site'] = src_site
+            p['dest_site'] = dest_site
+            p['from_date'] = from_date
+            p['to_date'] = to_date
+        altPaths.extend(temp)
+
+    df = pd.DataFrame(data)
+    posDf = pd.DataFrame(positions)
+    baseline = pd.DataFrame(baseline)
+    altPaths = pd.DataFrame(altPaths)
+    
+    posDf['pair'] = posDf['src']+' -> '+posDf['dest']
+    df['pair'] = df['src']+' -> '+df['dest']
+    baseline['pair'] = baseline['src']+' -> '+baseline['dest']
+    altPaths['pair'] = altPaths['src']+' -> '+altPaths['dest']
+
+    return df, posDf, baseline, altPaths
+
+
 def alarms(period):
     q = {
       "query" : {
@@ -136,87 +219,6 @@ def allTestedNodes(period):
 
 
 
-def mostRecentMetaRecord(ip, ipv6, period):
-    forTimeRange=''
-    if period:
-        forTimeRange = {
-                  "range" : {
-                    "timestamp" : {
-                      "gt" : period[0],
-                      "lte": period[1]
-                    }
-                  }
-                }
-
-    def q(ip, ipv):
-        return {
-          "size" : 1,
-          "_source": ["geolocation",f"external_address.{ipv}_address", "config.site_name", "host","administrator.name","administrator.email","timestamp"],  
-            "sort" : [
-            {
-              "timestamp" : {
-                "order" : "desc"
-              }
-            }
-          ],
-          "query" : {
-            "bool" : {
-              "must" : [
-                forTimeRange,
-                {
-                  "term" : {
-                    f"external_address.{ipv}_address" : {
-                      "value" : ip
-                    }
-                  }
-                },
-                {
-                  "bool": {
-                    "should": [
-                      {
-                        "exists": {"field": "host"}
-                      },
-                      {
-                        "exists": {"field": "config.site_name"}
-                      },
-                      {
-                        "exists": {"field": "geolocation"}
-                      },
-                      {
-                        "exists": {"field": "administrator.email"}
-                      }
-                    ]
-                  }
-                }
-              ]
-            }
-          }
-        }
-    
-    
-    ipv = 'ipv6' if ipv6 == True else 'ipv4'
-#     print(str(q).replace("\'", "\""))
-    values = {}
-    data = hp.es.search(index='ps_meta', body=q(ip,ipv))
-
-    if data['hits']['hits']:
-        records = data['hits']['hits'][0]['_source']
-        values['ip'] = ip
-        if 'timestamp' in records:
-            values['timestamp'] = records['timestamp']
-        if 'host' in records:
-            values['host'] = records['host']
-        if 'config' in records:
-            if 'site_name' in records['config']:
-                values['site_meta'] = records['config']['site_name']
-        if 'administrator' in records:
-            if 'name' in records['administrator']:
-                values['administrator'] = records['administrator']['name']
-            if 'email' in records['administrator']:
-                values['email'] = records['administrator']['email']
-        if 'geolocation' in records:
-            values['lat'], values['lon'] = records['geolocation'].split(",")
-    return values
 
 
 
@@ -252,124 +254,6 @@ def queryIndex(datefrom, dateto, idx):
         return ret_data
     except Exception as e:
         print(traceback.format_exc())
-
-
-def queryNodesGeoLocation():
-
-    include=["geolocation","external_address.ipv4_address", "external_address.ipv6_address", "config.site_name", "host"]
-    period = hp.GetTimeRanges(*hp.defaultTimeRange(days=30))
-
-    query = {
-            "query": {
-                "bool": {
-                        "filter": [
-                        {
-                            "range": {
-                                "timestamp": {
-                                "gte": period[0],
-                                "lte": period[1]
-                                }
-                            }
-                        }
-                    ]
-                }
-            }
-          }
-    data = scan(client=hp.es, index='ps_meta', query=query,
-                _source=include, filter_path=['_scroll_id', '_shards', 'hits.hits._source'])
-       
-
-    count = 0
-    neatdata = []
-    ddict = {}
-    for res in data:
-        if not count%100000: print(count)
-        data = res['_source']
-
-        if 'config' in data:
-            site = data['config']['site_name']
-        else: site = None
-
-        if 'ipv4_address' in  data['external_address']:
-            ip = data['external_address']['ipv4_address']
-        else: ip = data['external_address']['ipv6_address']
-
-        geoip = [None, None]
-        if 'geolocation' in data:
-            geoip = data['geolocation'].split(",")
-
-#         if 'speed' in  data['external_address']:
-#             speed = data['external_address']['speed']
-
-        if (ip in ddict) and (site is not None):
-            ddict[ip]['site'] = site
-        else: ddict[ip] = {'lat': geoip[0], 'lon': geoip[1], 'site': site, 'host':data['host']}
-
-        count=count+1
-    return ddict
-
-
-def queryAllTestedPairs(period):
-    query = {
-      "size" : 0,
-      "query" : {
-        "bool" : {
-          "must" : [
-            {
-              "range" : {
-                "timestamp" : {
-                  "gt" : period[0],
-                  "lte": period[1]
-                }
-              }
-            },
-            {
-              "term" : {
-                "src_production" : True
-              }
-            },
-            {
-              "term" : {
-                "dest_production" : True
-              }
-            }
-          ]
-        }
-      },
-      "aggregations" : {
-        "groupby" : {
-          "composite" : {
-            "size" : 9999,
-            "sources" : [
-              {
-                "src" : {
-                  "terms" : {
-                    "field" : "src"
-                  }
-                }
-              },
-              {
-                "dest" : {
-                  "terms" : {
-                    "field" : "dest"
-                  }
-                }
-              }
-            ]
-          }
-        }
-      }
-    }
-
-    aggrs = []
-    for idx in hp.INDECES:
-        aggdata = hp.es.search(index=idx, body=query)
-        for item in aggdata['aggregations']['groupby']['buckets']:
-            aggrs.append({'idx': idx,
-                          'src': item['key']['src'],
-                          'dest': item['key']['dest']
-                         })
-    return aggrs
 
 
 def queryAllValuesFromList(idx, fld_type, val_list, period):
@@ -413,7 +297,7 @@ def queryAllValuesFromList(idx, fld_type, val_list, period):
     return allData
 
 
-def queryAllValues(idx, src, dest, period):
+def queryAllValues(idx, src, dest, timeFrom, ):
     val_fld = hp.getValueField(idx)
     query = {
             "size": 0,
