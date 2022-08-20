@@ -18,11 +18,11 @@ class ParquetUpdater(object):
         self.createLocation('parquet/')
         self.createLocation('parquet/raw/')
         self.pq = Parquet()
-        self.cacheIndexData()
-        self.cacheTraceChanges()
+        # self.cacheIndexData()
+        # self.cacheTraceChanges()
         try:
-            Scheduler(120, self.cacheIndexData)
-            Scheduler(15, self.cacheTraceChanges)
+            Scheduler(3600, self.cacheIndexData)
+            Scheduler(1800, self.cacheTraceChanges)
         except Exception as e:
             print(traceback.format_exc())
 
