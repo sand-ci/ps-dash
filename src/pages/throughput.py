@@ -370,27 +370,14 @@ def buildGraphComponents(alarmData, dateFrom, dateTo, event):
             ], width=7)
         ], className="", justify="evenly"),
       dbc.Row(
-        # dbc.Col(
-          html.Div(buildDataTable(df), className='single-table p-2'),
-        # width=9), 
+        html.Div(buildDataTable(df), className='single-table p-4'),
       justify="evenly")
 
     ], className='boxwithshadow')
 
 
 
-def buildDataTable(df, splitRows = False):
-    if splitRows:
-        style_cell={
-                    'padding': '3px',
-                    'whiteSpace': 'pre-line'
-                }
-        
-    else:
-        style_cell={
-                    'padding': '3px'
-                }
-
+def buildDataTable(df):
     return html.Div(dash_table.DataTable(
                 data=df.to_dict('records'),
                 columns=[{"name": i, "id": i} for i in df.columns],
@@ -401,7 +388,9 @@ def buildDataTable(df, splitRows = False):
                 page_action="native",
                 page_current= 0,
                 page_size= 10,
-                style_cell=style_cell,
+                style_cell={
+                  'padding': '3px'
+                },
                 style_header={
                     'fontWeight': 'bold'
                 },
