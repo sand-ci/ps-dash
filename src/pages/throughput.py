@@ -1,14 +1,13 @@
-from turtle import width
 import dash
-from dash import Dash, dash_table, dcc, html
+from dash import dash_table, dcc, html
 import dash_bootstrap_components as dbc
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, MATCH, State
 
 from elasticsearch.helpers import scan
 
 import plotly.graph_objects as go
 import plotly.express as px
-from plotly.subplots import make_subplots
+
 
 import pandas as pd
 from datetime import datetime
@@ -20,8 +19,6 @@ import utils.helpers as hp
 
 import urllib3
 urllib3.disable_warnings()
-
-
 
 
 
@@ -101,7 +98,6 @@ def getRawDataFromES(src, dest, ipv6, dateFrom, dateTo):
     return df
 
 
-
 def getOtherAlarmsCount(dateFrom, dateTo, src_site, dest_site, event):
   query = {
       "bool" : {
@@ -151,9 +147,6 @@ def getOtherAlarmsCount(dateFrom, dateTo, src_site, dest_site, event):
 
   res = []
 
-  # print(str(query).replace("\'", "\""))
-  # print(str(aggs).replace("\'", "\""))
-  print()
   aggdata = hp.es.search(index='aaas_alarms', query=query, size=0, aggs=aggs)
 
   for item in aggdata['aggregations']['alarms']['buckets']:
@@ -168,12 +161,10 @@ def getOtherAlarmsCount(dateFrom, dateTo, src_site, dest_site, event):
   return res
 
 
-
-@timer
 def getAlarm(id):
     q = {
           "term": {
-            "_id": id
+            "source.alarm_id": id
         }
       }
     data = []
@@ -218,54 +209,55 @@ def buildSummary(alarm):
         if alarm['source']['src_sites']:
             if firstIn:
                 temp+= ' and '
-            temp += f"from sites: {'  |  '.join(alarm['source']['src_sites'])}, change in percentages: {('  |  '.join([str(l) for l in alarm['source']['src_sites']]))}"
+            temp += f"from sites: {'  |  '.join(alarm['source']['src_sites'])}, change in percentages: {('  |  '.join([str(l) for l in alarm['source']['src_change']]))}"
 
         temp += " with respect to the 21-day average."
         return temp
 
 
+def getSitePairs(alarm):
+  sitePairs = []
+  event = alarm['event']
+
+  if event == 'bandwidth decreased':
+      sitePairs = [{'src_site': alarm['source']['src_site'],
+                  'dest_site': alarm['source']['dest_site'],
+                  'ipv6': alarm['source']['ipv6'],
+                  'change':  alarm['source']['%change']}]
+
+  elif event == 'bandwidth decreased from/to multiple sites':
+      for i,s in enumerate(alarm['source']['dest_sites']):
+          temp = {'src_site': alarm['source']['site'],
+                  'dest_site': s,
+                  'ipv6': alarm['source']['ipv6'],
+                  'change':  alarm['source']['dest_change'][i]}
+          sitePairs.append(temp)
+
+      for i,s in enumerate(alarm['source']['src_sites']):
+          temp = {'src_site': s,
+                  'dest_site': alarm['source']['site'],
+                  'ipv6': alarm['source']['ipv6'],
+                  'change':  alarm['source']['src_change'][i]}
+          sitePairs.append(temp)
+  
+  print(sitePairs)
+  return sitePairs
+
+
+
 def layout(q=None, **other_unknown_query_strings):
     if q:
         alarm = getAlarm(q)
-        print(alarm)
-
-        dateFrom, dateTo, event = alarm['source']['from'], alarm['source']['to'], alarm['event']
-
-        
-        sitePairs = []
-
-        if event == 'bandwidth decreased':
-            sitePairs = [{'src_site': alarm['source']['src_site'],
-                        'dest_site': alarm['source']['dest_site'],
-                        'ipv6': alarm['source']['ipv6'],
-                        'change':  alarm['source']['%change']}]
-
-        elif event == 'bandwidth decreased from/to multiple sites':
-            for i,s in enumerate(alarm['source']['dest_sites']):
-                temp = {'src_site': alarm['source']['site'],
-                        'dest_site': s,
-                        'ipv6': alarm['source']['ipv6'],
-                        'change':  alarm['source']['dest_change'][i]}
-                sitePairs.append(temp)
-
-            for i,s in enumerate(alarm['source']['src_sites']):
-                temp = {'src_site': s,
-                        'dest_site': alarm['source']['site'],
-                        'ipv6': alarm['source']['ipv6'],
-                        'change':  alarm['source']['src_change'][i]}
-                sitePairs.append(temp)
-
-        print(sitePairs)
-
-
-
+        sitePairs = getSitePairs(alarm)
 
         return html.Div([
             dbc.Row([
+              dbc.Row([
                 dbc.Col([
-                  html.H3(f"{event.upper()}", className="text-center bold p-1"),
+                  html.H3(f"{alarm['event'].upper()}", className="text-center bold p-4"),
                 ], width=2),
                 dbc.Col(
+                  
                     html.Div(
                         [
                           dbc.Row([
@@ -275,24 +267,68 @@ def layout(q=None, **other_unknown_query_strings):
                             dbc.Row([
                               html.P(buildSummary(alarm), className='subtitle'),
                               ], justify="start"),
-                            ], className="pair-details")
+                            ])
                         ],
-                    ), width=10
-            ),
-            ], justify="between", align="center", className="boxwithshadow page-cont asn-header"),
-            dcc.Loading([
-                dbc.Row([
-                    buildGraphComponents(item, dateFrom, dateTo, event) for item in sitePairs 
-                    ], className="rounded-border-1", align="start")
-            ])
+                    ),
+                width=10)
+              ], className="boxwithshadow alarm-header pair-details g-0", justify="between", align="center")
+            ], style={"padding": "0.5% 1.5%"}),
+          dcc.Store(id='alarm-store', data=alarm),
+          dbc.Row([
+            html.Div(id=f'site-section-throughput{i}',
+              children=[
+                dbc.Button(
+                    alarmData['src_site']+' to '+alarmData['dest_site'],
+                    value = alarmData,
+                    id={
+                        'type': 'tp-collapse-button',
+                        'index': f'throughput{i}'
+                    },
+                    className="collapse-button",
+                    color="white",
+                    n_clicks=0,
+                ),
+                dcc.Loading(
+                  dbc.Collapse(
+                      id={
+                          'type': 'tp-collapse',
+                          'index': f'throughput{i}'
+                      },
+                      is_open=False, className="collaps-container rounded-border-1"
+                ), color='#e9e9e9', style={"top":0}),
+              ]) for i, alarmData in enumerate(sitePairs)
+            ], className="rounded-border-1", align="start", style={"padding": "0.5% 1.5%"})
           ])
 
 
-def buildGraphComponents(item, dateFrom, dateTo, event):
-    df = getRawDataFromES(item['src_site'], item['dest_site'], item['ipv6'], dateFrom, dateTo)
-    print(dateFrom, dateTo, item['src_site'], item['dest_site'], event)
-    otherAlarms = getOtherAlarmsCount(dateFrom, dateTo, item['src_site'], item['dest_site'], event)
 
+@dash.callback(
+    [
+      Output({'type': 'tp-collapse', 'index': MATCH},  "is_open"),
+      Output({'type': 'tp-collapse', 'index': MATCH},  "children")
+    ],
+    [
+      Input({'type': 'tp-collapse-button', 'index': MATCH}, "n_clicks"),
+      Input({'type': 'tp-collapse-button', 'index': MATCH}, "value"),
+      Input('alarm-store', 'data')
+    ],
+    [State({'type': 'tp-collapse', 'index': MATCH},  "is_open")],
+)
+def toggle_collapse(n, alarmData, alarm, is_open):
+    data = ''
+    if n:
+      if is_open==False:
+        data = buildGraphComponents(alarmData, alarm['source']['from'], alarm['source']['to'], alarm['event'])
+      return [not is_open, data]
+    return [is_open, data]
+
+
+
+def buildGraphComponents(alarmData, dateFrom, dateTo, event):
+    df = getRawDataFromES(alarmData['src_site'], alarmData['dest_site'], alarmData['ipv6'], dateFrom, dateTo)
+    
+    otherAlarms = getOtherAlarmsCount(dateFrom, dateTo, alarmData['src_site'], alarmData['dest_site'], event)
+    
     if not otherAlarms:
         cntAlarms = 'None found'
     else: 
@@ -307,34 +343,72 @@ def buildGraphComponents(item, dateFrom, dateTo, event):
                 dbc.Row([
                     dbc.Col([
                         dbc.Row([html.P('Source', className="text-center")]),
-                        dbc.Row([html.B(item['src_site'], className="text-center")], align="center", justify="start"),
+                        dbc.Row([html.B(alarmData['src_site'], className="text-center")], align="center", justify="start"),
                     ]),
                 ], className="more-alarms change-section rounded-border-1 mb-1", align="center"),
                 dbc.Row([
                     dbc.Col([
                         dbc.Row([html.P('Destination', className="text-center")]),
-                        dbc.Row([html.B(item['dest_site'], className="text-center")], align="center", justify="start",),
+                        dbc.Row([html.B(alarmData['dest_site'], className="text-center")], align="center", justify="start",),
                     ])
                 ], className="more-alarms change-section rounded-border-1 mb-1", align="center"),
                 dbc.Row([
                     dbc.Col([
-                        dbc.Row([html.B(f'Change: {item["change"]}%', className="text-center site-details")]),
+                        dbc.Row([html.B(f"Change: {alarmData['change']}%", className="text-center site-details")]),
                     ])
                 ], className="more-alarms change-section rounded-border-1 mb-1", align="center"),
 
                 dbc.Row([
-                html.H4(f"Total number of throughput measures: {len(df)}", className="text-center"),
-                # align="left", justify="start", className="text-right mt-10"),
-                # dbc.Row([
-                html.H4(f"Other networking alarms {cntAlarms}", className="text-center"),
-                # html.H4(cntAlarms, className="text-center")
+                  html.H4( f"Total number of throughput measures: {len(df)}", className="text-center"),
+                  html.H4(f"Other networking alarms {cntAlarms}", className="text-center"),
                 ], align="left", justify="center", className="more-alarms change-section rounded-border-1 mb-1 pb-4")
             ], width={"size":"4"}, align="center"),
             dbc.Col([
-                    dcc.Graph(id="alarm-row", className="site-plots site-inner-cont", figure=buildPlot(df)),
+              dcc.Loading([
+                    html.Div(dcc.Graph(className="site-plots site-inner-cont", figure=buildPlot(df))),
+              ], className='loader-tp', color='#00245A', style = {"position": "relative", "top": "10rem"})
             ], width=7)
-        ], className="boxwithshadow page-cont", justify="evenly") 
+        ], className="", justify="evenly"),
+      dbc.Row(
+        # dbc.Col(
+          html.Div(buildDataTable(df), className='single-table p-2'),
+        # width=9), 
+      justify="evenly")
 
-    ], className='mb-1 rounded-border-1')
+    ], className='boxwithshadow')
 
 
+
+def buildDataTable(df, splitRows = False):
+    if splitRows:
+        style_cell={
+                    'padding': '3px',
+                    'whiteSpace': 'pre-line'
+                }
+        
+    else:
+        style_cell={
+                    'padding': '3px'
+                }
+
+    return html.Div(dash_table.DataTable(
+                data=df.to_dict('records'),
+                columns=[{"name": i, "id": i} for i in df.columns],
+                id='tbl-raw',
+                style_table={
+                    'overflowX': 'auto'
+                },
+                page_action="native",
+                page_current= 0,
+                page_size= 10,
+                style_cell=style_cell,
+                style_header={
+                    'fontWeight': 'bold'
+                },
+                style_data={
+                    'height': 'auto',
+                    'lineHeight': '15px',
+                },
+                filter_action="native",
+                sort_action="native",
+            ))
