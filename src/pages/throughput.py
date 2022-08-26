@@ -42,7 +42,7 @@ dash.register_page(
 
 
 def convertTime(ts):
-    stripped = datetime.strptime(ts, '%Y-%m-%dT%H:%M')
+    stripped = datetime.strptime(ts, '%Y-%m-%d %H:%M')
     return int((stripped - datetime(1970, 1, 1)).total_seconds()*1000)
 
 
@@ -205,7 +205,6 @@ def buildPlot(df):
 
 
 def buildSummary(alarm):
-  print(alarm['event'])
   desc = 'Bandwidth decreased' if alarm['event'].startswith('bandwidth decreased') else 'Bandwidth increased'
 
   if alarm['event'] in ['bandwidth decreased', 'bandwidth increased']:
