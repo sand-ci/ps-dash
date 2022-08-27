@@ -14,6 +14,7 @@ from utils.helpers import timer
 from elasticsearch.helpers import scan
 
 import utils.helpers as hp
+import model.queries as qrs
 
 import urllib3
 urllib3.disable_warnings()
@@ -21,11 +22,13 @@ urllib3.disable_warnings()
 
 
 def title(q=None):
-    return f"Asset Analysis: {q}"
+    return f"Path diverged through {q}"
+
 
 
 def description(q=None):
-    return f"This is the AVN Industries A   sset Analysis: {q}"
+    return f"Visual represention on a selected path-changed alarm {q}"
+
 
 
 dash.register_page(
@@ -35,16 +38,14 @@ dash.register_page(
     description=description,
 )
 
-def plotRaw(vals):
-    print(vals)
 
 
-
+@timer
 def getAlarm(id):
     q = {
         "query": {
           "term": {
-            "_id": id
+            "source.alarm_id": id
           }
         }
       }
@@ -60,6 +61,7 @@ def getAlarm(id):
 
 
 
+@timer
 def getStats(fromDate, toDate, affectedSites):
     q = {
           "query": {
@@ -99,7 +101,7 @@ def getStats(fromDate, toDate, affectedSites):
             }
           }
         }
-    print(str(q).replace("\'", "\""))
+    # print(str(q).replace("\'", "\""))
     result = scan(client=hp.es,index='ps_trace_changes',query=q)
     data, positions, baseline, altPaths = [],[],[],[]
     positions = []
@@ -151,6 +153,7 @@ def getStats(fromDate, toDate, affectedSites):
 
 
 
+@timer
 def getOtherAlarmsCount(dateFrom, dateTo, src_site, dest_site):
   query = {
       "bool" : {
@@ -202,12 +205,10 @@ def getOtherAlarmsCount(dateFrom, dateTo, src_site, dest_site):
 
   # print(str(query).replace("\'", "\""))
   # print(str(aggs).replace("\'", "\""))
-  print()
   aggdata = hp.es.search(index='aaas_alarms', query=query, size=0, aggs=aggs)
 
   for item in aggdata['aggregations']['alarms']['buckets']:
     if item:
-      print(src_site, dest_site, item)
       res.append({
                   'event': item['key'],
                   'count': item['doc_count']
@@ -216,6 +217,8 @@ def getOtherAlarmsCount(dateFrom, dateTo, src_site, dest_site):
   return res
 
 
+
+@timer
 def getASNInfo(ids):
 
     query = {
@@ -226,7 +229,7 @@ def getASNInfo(ids):
         }
     }
 
-    print(str(query).replace("\'", "\""))
+    # print(str(query).replace("\'", "\""))
     asnDict = {}
     data = scan(hp.es, index='ps_asns', query=query)
     if data:
@@ -236,15 +239,31 @@ def getASNInfo(ids):
 
     return asnDict
 
+
+
+
+chdf, posDf, baseline, altPaths = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
+
+
 @timer
 def layout(q=None, **other_unknown_query_strings):
-    pq = Parquet()
-    location = 'parquet/raw/'
+    # pq = Parquet()
+    # location = 'parquet/raw/'
+    global chdf
+    global posDf
+    global baseline
+    global altPaths
+
+    print('I AM IN')
+
     print(q, other_unknown_query_strings)
     if q:
         alarm = getAlarm(q)
 
-        chdf, posDf, baseline, altPaths = pq.readFile(f'{location}chdf.parquet'), pq.readFile(f'{location}posDf.parquet'), pq.readFile(f'{location}baseline.parquet'), pq.readFile(f'{location}altPaths.parquet')
+        # chdf, posDf, baseline, altPaths = pq.readFile(f'{location}chdf.parquet'), pq.readFile(f'{location}posDf.parquet'), pq.readFile(f'{location}baseline.parquet'), pq.readFile(f'{location}altPaths.parquet')
+        chdf, posDf, baseline, altPaths = qrs.queryTraceChanges(alarm['from'], alarm['to'])
+        
         chdf = chdf[(chdf['from_date']==alarm['from']) & (chdf['to_date']==alarm['to'])]
         baseline = baseline[(baseline['from_date']==alarm['from']) & (baseline['to_date']==alarm['to'])]
         altPaths = altPaths[(altPaths['from_date']==alarm['from']) & (altPaths['to_date']==alarm['to'])]
@@ -253,6 +272,7 @@ def layout(q=None, **other_unknown_query_strings):
         dsts = chdf.groupby('dest_site')[['pair']].count().reset_index().rename(columns={'dest_site':'site'})
         srcs = chdf.groupby('src_site')[['pair']].count().reset_index().rename(columns={'src_site':'site'})
         pairCount = pd.concat([dsts, srcs]).groupby(['site']).sum().reset_index().sort_values('pair', ascending=False)
+        topDownList = pairCount[pairCount['site'].isin(alarm['sites'])]['site'].values.tolist()
         print(alarm)
 
 
@@ -261,7 +281,7 @@ def layout(q=None, **other_unknown_query_strings):
 
         affected = '  |  '.join(alarm["sites"])
 
-        selectedTab = pairCount['site'].values[0]
+        selectedTab = topDownList[0]
         if 'site' in other_unknown_query_strings.keys():
           if other_unknown_query_strings['site'] in pairCount['site'].values:
             selectedTab = other_unknown_query_strings['site']
@@ -299,38 +319,59 @@ def layout(q=None, **other_unknown_query_strings):
                     children=[
                       dcc.Tab(label=site, value=site,
                       id=site,
-                      className='custom-tab text-center ', selected_className='custom-tab--selected rounded-border-1 mr-2',
+                      className='custom-tab text-center ', selected_className='custom-tab--selected rounded-border-1 mr-2 p-1',
                       children=buildSiteBox(site,
                                             pairCount[pairCount['site']==site]['pair'].values[0], 
                                             chdf[(chdf['src_site']==site) | (chdf['dest_site']==site)],
                                             posDf[(posDf['src_site']==site) | (posDf['dest_site']==site)],
                                             baseline[(baseline['src_site']==site) | (baseline['dest_site']==site)],
-                                            altPaths[(altPaths['src_site']==site) | (altPaths['dest_site']==site)])
-                                            ) for site in alarm['sites']
+                                            altPaths[(altPaths['src_site']==site) | (altPaths['dest_site']==site)],
+                                            alarm['asn'])
+                                            ) for site in topDownList
                       ], vertical=True),
             )
           ])
 
 
 
+def extractRelatedOnly(chdf, asn):
+  chdf['spair'] = chdf[['src_site', 'dest_site']].apply(lambda x: '->'.join(x), axis=1)
+
+  diffData = []
+  for el in chdf[['pair','spair','diff']].to_dict('records'):
+      for d in el['diff']:
+          diffData.append([el['spair'], el['pair'],d])
+
+  diffDf = pd.DataFrame(diffData, columns=['spair', 'pair', 'diff'])
+  return diffDf[diffDf['diff']==asn]
+
+
+
 @timer
-def buildSiteBox(site, cnt, chdf, posDf, baseline, altPaths):
+def buildSiteBox(site, cnt, chdf, posDf, baseline, altPaths, asn):
     if site:
-      print(site)
       baseline['spair'] = baseline['src_site']+' -> '+baseline['dest_site']
 
       bline = baseline[(baseline['src_site']==site)].sort_values(['src_site'])
       allPairs = pd.concat([bline, baseline[(baseline['dest_site']==site)].sort_values(['dest_site'])])[['spair', 'pair']]
 
-      if len(allPairs)>10:
-        allPairs = allPairs.sample(10)
+      # if len(allPairs)>10:
+      #   allPairs = allPairs.sample(10)
+      # sitePairs = allPairs['spair'].values
+      # nodePairs = allPairs['pair'].values
 
-      sitePairs = allPairs['spair'].values
-      nodePairs = allPairs['pair'].values
+      showSample = ''
+      related2FlaggedASN = extractRelatedOnly(chdf, asn)
+      cntRelated = len(related2FlaggedASN)
+      if len(related2FlaggedASN)>10:
+        showSample = "Bellow is a subset of 10."
+        related2FlaggedASN = related2FlaggedASN.sample(10)
+      sitePairs = related2FlaggedASN['spair'].values
+      nodePairs = related2FlaggedASN['pair'].values
+      
+      
       diffs = sorted(list(set([str(el) for v in chdf['diff'].values.tolist() for el in v])))
       diffs_str = '  |  '.join(diffs)
-
-      print(site, len(sitePairs))
 
       return html.Div([
               dbc.Row([
@@ -338,10 +379,12 @@ def buildSiteBox(site, cnt, chdf, posDf, baseline, altPaths):
                   dbc.Col([
                     dbc.Row([
                       dbc.Col(
-                        html.P(f"{cnt} traceroute alarms related to that site"), align='left', width=12, className='mt-1 site-details'),
+                        html.P(f"{cnt} is the total number of traceroute alarms which involve site {site}"), align='left', width=12, className='site-details'),
                       dbc.Col(
-                        html.P(f"Flagged AS numbers:  {diffs_str}"), align='left', width=12, className='site-details'),
-                      ], className='mb-1 site-header-line rounded-border-1 p-2'),
+                       html.P(f"{cntRelated} (out of {cnt}) concern a path change to ASN {asn}. {showSample}"), align='left', width=12, className='site-details'),
+                      dbc.Col(
+                        html.P(f"Other flagged AS numbers:  {diffs_str}"), align='left', width=12, className='site-details')
+                      ], className='m-1 mb-1 site-header-line rounded-border-1 p-2'),
                     dbc.Row(
                     [
                       html.Div(id=f'pair-section{site+str(i)}',
@@ -364,16 +407,13 @@ def buildSiteBox(site, cnt, chdf, posDf, baseline, altPaths):
                                     'index': site+str(i)
                                 },
                                 is_open=False, className="collaps-container rounded-border-1"
-                          )
-                          , type='dot', style={'height':'0.5rem'}, color='#e9e9e9'),
+                          ), type='dot', style={'height':'0.5rem'}, color='#e9e9e9'),
                         ]
                       ) for i, pair in enumerate(nodePairs)
-                    ]
-                    ) ,
+                    ]),
                   ], width={"size": '12'}),
-                  
-                ], justify="between", align="center"),
-              ], justify="center", align="center")
+                ]),
+              ])
             ])
 
 
@@ -393,13 +433,16 @@ def buildSiteBox(site, cnt, chdf, posDf, baseline, altPaths):
 )
 def toggle_collapse(n, pair, alarm, is_open):
     data = ''
-    pq = Parquet()
-    location = 'parquet/raw/'
+    # pq = Parquet()
+    # location = 'parquet/raw/'
+    global chdf
+    global posDf
+    global baseline
+    global altPaths
 
     if n:
       if is_open==False:
-        
-        chdf, posDf, baseline, altPaths = pq.readFile(f'{location}chdf.parquet'), pq.readFile(f'{location}posDf.parquet'), pq.readFile(f'{location}baseline.parquet'), pq.readFile(f'{location}altPaths.parquet')
+        # chdf, posDf, baseline, altPaths = pq.readFile(f'{location}chdf.parquet'), pq.readFile(f'{location}posDf.parquet'), pq.readFile(f'{location}baseline.parquet'), pq.readFile(f'{location}altPaths.parquet')
         data = pairDetails(pair, alarm,
                         chdf[(chdf['pair']==pair) & (chdf['from_date']==alarm['from']) & (chdf['to_date']==alarm['to'])],
                         baseline[(baseline['pair']==pair) & (baseline['from_date']==alarm['from']) & (baseline['to_date']==alarm['to'])],
@@ -408,36 +451,31 @@ def toggle_collapse(n, pair, alarm, is_open):
       return [not is_open, data]
     return [is_open, data]
 
+
+
 def getColor(asn, diffs):
   if asn in diffs:
-    # print('red!')
     return '#ff5f5f'
-  # print('grey!')
   return 'rgb(0 35 90)'
+
+
 
 @timer
 def pairDetails(pair, alarm, chdf, baseline, altpaths, hopPositions):
-  
-  
-  # print('                 3. pairDetails')
-  # print(alarm)
+
   sites = baseline[['src_site','dest_site']].values.tolist()[0]
   howPathChanged = descChange(pair, chdf, hopPositions)
   diffs = chdf[chdf["pair"]==pair]['diff'].to_list()[0]
 
   otherAlarms = getOtherAlarmsCount(alarm['from'], alarm['to'], sites[0], sites[1])
-  # print(otherAlarms, alarm['from'], alarm['to'], sites[0], sites[1])
 
   if not otherAlarms:
     cntAlarms = 'None found'
   else: 
     cntAlarms = ''
     for res in otherAlarms:
-      print(res)
       cntAlarms += (res['event']).capitalize()+': '+str(res['count'])+'  |   '
-  
-  
-  
+
   return   html.Div([
             dbc.Row([
               dbc.Col([
@@ -479,7 +517,7 @@ def pairDetails(pair, alarm, chdf, baseline, altpaths, hopPositions):
                         dbc.Badge(f"Taken in {str(round(baseline['hash_freq'].values.tolist()[0]*100))}% of time", text_color="dark", color="#e9e9e9",  className="label w-100")
                         ], width=6),
                       dbc.Col([
-                        dbc.Badge(f"Always reaches destination: {['YES' if baseline['all_dests_reached'].values[0] else 'NO'][0]}", text_color="dark", color="#e9e9e9",  className="label w-100")
+                        dbc.Badge(f"Always reaches destination: {['YES' if baseline['path_always_reaches_dest'].values[0] else 'NO'][0]}", text_color="dark", color="#e9e9e9",  className="label w-100")
                         ], width=6),
                     ], justify="center", align="center", className="bg-gray rounded-border-1"),
                     dbc.Row([
@@ -497,13 +535,13 @@ def pairDetails(pair, alarm, chdf, baseline, altpaths, hopPositions):
                               dbc.Badge(f"Taken in {str(round(hash_freq*100,2))}% of time", text_color="dark", color="rgb(255, 255, 255)",  className="w-100")
                               ]),
                             dbc.Col([
-                              dbc.Badge(f"Always reaches destination: {['YES' if all_dests_reached else 'NO'][0]}", text_color="dark", color="rgb(255, 255, 255))",  className="w-100")
+                              dbc.Badge(f"Always reaches destination: {['YES' if path_always_reaches_dest else 'NO'][0]}", text_color="dark", color="rgb(255, 255, 255))",  className="w-100")
                               ]),
                           ], className="bg-white"),
                           
                           html.Div(children=[
                             dbc.Badge(asn, text_color="light", color=getColor(asn, diffs), className="me-2") for asn in path])
-                        ], className="text-center mb-2") for path, hash_freq, all_dests_reached in altpaths[["asns_updated","hash_freq","all_dests_reached"]].values.tolist()
+                        ], className="text-center mb-2") for path, hash_freq, path_always_reaches_dest in altpaths[["asns_updated","hash_freq","path_always_reaches_dest"]].values.tolist()
                     ])
                     ], justify="center", align="center")
                 ], className="bordered-box mt-1")
@@ -518,8 +556,8 @@ def pairDetails(pair, alarm, chdf, baseline, altpaths, hopPositions):
 
                       dbc.Row([
                         dbc.Col(html.P('At position'), className=' text-right'),
-                        dbc.Col(html.P('Hopped from'), className='text-center'),
-                        dbc.Col(html.P('Hopped to'), className=' text-center')
+                        dbc.Col(html.P('Tipically goes through'), className='text-center'),
+                        dbc.Col(html.P('Changed to'), className=' text-center')
                       ]),
                       dbc.Row([
                         dbc.Col(html.B(str(round(item['atPos']))), className='text-right'),
@@ -535,9 +573,10 @@ def pairDetails(pair, alarm, chdf, baseline, altpaths, hopPositions):
                   for item in howPathChanged.to_dict('records') ], className="rounded-border-1", align="start")
                     ], align="start", className=''),
 
-              ], justify="start", align="start"),
-          
-  ])
+            ], justify="start", align="start"),
+          ])
+
+
 
 @timer
 def singlePlotPositions(dd):
@@ -562,10 +601,8 @@ def singlePlotPositions(dd):
 
 
 
-
 @timer
 def descChange(pair, chdf, posDf):
-  print(pair, getASNInfo(chdf[(chdf['pair']==pair)]['diff'].values.tolist()[0]))
   owners = getASNInfo(posDf[(posDf['pair']==pair)]['asn'].values.tolist())
   owners['-1'] = 'OFF/Unavailable'
   howPathChanged = []
@@ -575,7 +612,6 @@ def descChange(pair, chdf, posDf):
 
           if len(atPos)>0 and P<1:
             atPos.remove(diff)
-            # print(getASNInfo(atPos))
             for newASN in atPos:
               if newASN not in [0, -1]:
                 howPathChanged.append({'diff': diff,
