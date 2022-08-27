@@ -22,7 +22,7 @@ urllib3.disable_warnings()
 
 
 def title(q=None):
-    return f"Path diverged through {q}"
+    return f"Alarm ID: {q}"
 
 
 
