@@ -13,9 +13,6 @@ body{
     margin-bottom: 0em;
 }
 
-.page-cont {
-    margin: 0 40px;
-}
 
 /**********   Header   **********/
 .logo {
@@ -65,7 +62,6 @@ body{
     border: 1px solid rgba(0,0,0,.125);
     border-radius: 1rem;
     box-shadow: 4px 4px 7px -1px #b4b2b2;
-    margin-bottom: 20px;
     background-color: #fff;
 }
 
@@ -75,17 +71,6 @@ body{
     margin-bottom: 20px;
     background-color: #fff;
 }
-
-/* .tab-container .tab--selected {
-    background-color: #fff !important;
-    color: black !important;
-    border-top: 1px solid #03266c !important;
-}
-
-.indeces-types .tab--selected {
-    border-top: 1px solid #d6d6d6 !important;
-    border-left: 1px solid #03266c !important;
-} */
 
 .dash-spinner-container {
     width: 50% !important;
@@ -143,12 +128,6 @@ body{
 }
 
 /**********   Loading   **********/
-/* 
-.outer {
-    margin-top: 15rem !important;
-    height: 10% !important;
-    top: 20px !important;
-} */
 
 
 
@@ -156,6 +135,12 @@ body{
     background-color: #EEF6FC !important;
     color: rgb(9, 9, 9);
 }
+
+.alarm-header col-2 {
+   width: 13% !important;
+}
+
+
 
 .site-title {
     font-size: 3rem !important;
@@ -323,18 +308,11 @@ body{
     text-align: right;
 }
 
-
 .custom-tab--selected {
-    /* background-color: #e9e9e9 !important; */
-    background-image: linear-gradient(to right, #f6f9fb , #e9e9e9);
+    background-image: linear-gradient(to right, #fff , #ebebeb);
     color: black !important;
-    /* border-radius: 5px !important; */
     font-size: 2rem !important;
 }
-
-/* .custom-tabs-container {
-    width: 20%;
-} */
 
 .site-header {
     padding: 20px 25px !important;
@@ -371,5 +349,5 @@ body{
 }
 
 .tab-container--vert .tab:last-of-type {
-    border-bottom: white;
+    border-bottom: 0px white !important;
 }

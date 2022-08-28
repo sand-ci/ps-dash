@@ -290,6 +290,7 @@ def layout(q=None, **other_unknown_query_strings):
         return html.Div([
             dcc.Store(id='local-store', data=alarm),
             dbc.Row([
+              dbc.Row([
                 dbc.Col([
                   html.H3(f"ASN {alarm['asn']}", className="text-center bold"),
                   # html.Hr(className="my-2"),
@@ -312,24 +313,27 @@ def layout(q=None, **other_unknown_query_strings):
                             ], className="pair-details")
                         ],
                     ), width=10
-            ),
-            ], justify="between", align="center", className="asn-header"),
-            dbc.Row(
-                dcc.Tabs(id="tabs-example-graph", value=selectedTab, parent_className='custom-tabs', className='custom-tabs-container col-2',
-                    children=[
-                      dcc.Tab(label=site, value=site,
-                      id=site,
-                      className='custom-tab text-center ', selected_className='custom-tab--selected rounded-border-1 mr-2 p-1',
-                      children=buildSiteBox(site,
-                                            pairCount[pairCount['site']==site]['pair'].values[0], 
-                                            chdf[(chdf['src_site']==site) | (chdf['dest_site']==site)],
-                                            posDf[(posDf['src_site']==site) | (posDf['dest_site']==site)],
-                                            baseline[(baseline['src_site']==site) | (baseline['dest_site']==site)],
-                                            altPaths[(altPaths['src_site']==site) | (altPaths['dest_site']==site)],
-                                            alarm['asn'])
-                                            ) for site in topDownList
-                      ], vertical=True),
-            )
+                  ),
+              ], justify="between", align="center", className="boxwithshadow alarm-header pair-details")
+            ], style={"padding": "0.5% 1.5%"}, className='g-0'),
+            dbc.Row([
+              dbc.Row([
+                  dcc.Tabs(id="tabs-example-graph", value=selectedTab, parent_className='custom-tabs', className='custom-tabs-container col-2',
+                      children=[
+                        dcc.Tab(label=site, value=site,
+                        id=site,
+                        className='custom-tab text-center ', selected_className='custom-tab--selected rounded-border-1 mr-2 m-1',
+                        children=buildSiteBox(site,
+                                              pairCount[pairCount['site']==site]['pair'].values[0], 
+                                              chdf[(chdf['src_site']==site) | (chdf['dest_site']==site)],
+                                              posDf[(posDf['src_site']==site) | (posDf['dest_site']==site)],
+                                              baseline[(baseline['src_site']==site) | (baseline['dest_site']==site)],
+                                              altPaths[(altPaths['src_site']==site) | (altPaths['dest_site']==site)],
+                                              alarm['asn'])
+                                              ) for site in topDownList
+                        ], vertical=True)
+              ], className="boxwithshadow")
+            ], style={"padding": "0.5% 1.5%"}, className='g-0'),
           ])
 
 
@@ -384,7 +388,7 @@ def buildSiteBox(site, cnt, chdf, posDf, baseline, altPaths, asn):
                        html.P(f"{cntRelated} (out of {cnt}) concern a path change to ASN {asn}. {showSample}"), align='left', width=12, className='site-details'),
                       dbc.Col(
                         html.P(f"Other flagged AS numbers:  {diffs_str}"), align='left', width=12, className='site-details')
-                      ], className='m-1 mb-1 site-header-line rounded-border-1 p-2'),
+                      ], className='m-2 mb-1 site-header-line rounded-border-1 p-2'),
                     dbc.Row(
                     [
                       html.Div(id=f'pair-section{site+str(i)}',
@@ -407,11 +411,11 @@ def buildSiteBox(site, cnt, chdf, posDf, baseline, altPaths, asn):
                                     'index': site+str(i)
                                 },
                                 is_open=False, className="collaps-container rounded-border-1"
-                          ), type='dot', style={'height':'0.5rem'}, color='#e9e9e9'),
+                          ), style={'height':'0.5rem'}, color='#e9e9e9'),
                         ]
                       ) for i, pair in enumerate(nodePairs)
-                    ]),
-                  ], width={"size": '12'}),
+                    ],),
+                  ]),
                 ]),
               ])
             ])

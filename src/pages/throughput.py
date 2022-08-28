@@ -261,6 +261,10 @@ def layout(q=None, **other_unknown_query_strings):
       alarm = getAlarm(q)
       sitePairs = getSitePairs(alarm)
 
+      expand = False
+      if alarm['event'] in ['bandwidth decreased', 'bandwidth increased']:
+        expand = True
+
       return html.Div([
               dbc.Row([
                 dbc.Row([
@@ -282,7 +286,7 @@ def layout(q=None, **other_unknown_query_strings):
                       ),
                   width=10)
                 ], className="boxwithshadow alarm-header pair-details g-0", justify="between", align="center")
-              ], style={"padding": "0.5% 1.5%"}),
+              ], style={"padding": "0.5% 1.5%"}, className='g-0'),
             dcc.Store(id='alarm-store', data=alarm),
             dbc.Row([
               html.Div(id=f'site-section-throughput{i}',
@@ -304,10 +308,10 @@ def layout(q=None, **other_unknown_query_strings):
                             'type': 'tp-collapse',
                             'index': f'throughput{i}'
                         },
-                        is_open=False, className="collaps-container rounded-border-1"
+                        is_open=expand, className="collaps-container rounded-border-1"
                   ), color='#e9e9e9', style={"top":0}),
                 ]) for i, alarmData in enumerate(sitePairs)
-              ], className="rounded-border-1", align="start", style={"padding": "0.5% 1.5%"})
+              ], className="rounded-border-1 g-0", align="start", style={"padding": "0.5% 1.5%"})
             ])
 
 
@@ -330,6 +334,9 @@ def toggle_collapse(n, alarmData, alarm, is_open):
     if is_open==False:
       data = buildGraphComponents(alarmData, alarm['source']['from'], alarm['source']['to'], alarm['event'])
     return [not is_open, data]
+  if is_open==True:
+    data = buildGraphComponents(alarmData, alarm['source']['from'], alarm['source']['to'], alarm['event'])
+    return [is_open, data]
   return [is_open, data]
 
 
