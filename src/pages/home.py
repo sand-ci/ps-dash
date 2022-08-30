@@ -231,7 +231,7 @@ def SitesOverviewPlots(site_name, direction, metaDf, measures):
 
         colors = ['#720026', '#e4ac05', '#00bcd4', '#1768AC', '#ffa822', '#134e6f', '#ff6150', '#1ac0c6', '#492b7c', '#9467bd',
                   '#1f77b4', '#ff7f0e', '#2ca02c','#00224e', '#123570', '#3b496c', '#575d6d', '#707173', '#8a8678', '#a59c74',
-                  '#c3b369', '#e1cc55', '#fee838']
+                  '#c3b369', '#e1cc55', '#fee838', '#3e6595', '#4adfe1', '#b14ae1']
 
         # extract the data relevant for the given site name
         ips = metaDf[metaDf['site']==site_name]['ip'].values
@@ -350,7 +350,7 @@ def SitesOverviewPlots(site_name, direction, metaDf, measures):
 dash.register_page(__name__, path='/')
 
 # cache the data needed for the overview charts. Run the code on the background every 2 min and store the data in /parquet.
-ParquetUpdater()
+# ParquetUpdater()
 
 # most alarms tag sites, but some tag nodes instead
 taggedNodes = ['large clock correction']
@@ -367,37 +367,41 @@ alarmCnt = groupAlarms(sites, metaDf)
 
 
 
-layout = html.Div([
-                dcc.Loading(html.Div(
-                    dcc.Graph(figure=builMap(), id='site-map', className='cls-site-map boxwithshadow page-cont'),
-                )),
+layout = html.Div(
+            dbc.Row([
+                dbc.Row(
+                    dcc.Loading(
+                        dcc.Graph(figure=builMap(), id='site-map', className='cls-site-map boxwithshadow page-cont mb-2'),
+                    ), className='g-0'
+                ),
                 dbc.Row([
-                         dbc.Col(html.Div(id='selected-site'), className='cls-selected-site page-cont')
-                         ],align="center"),
+                         dbc.Col(dcc.Loading(id='selected-site'), className='cls-selected-site page-cont')
+                         ],align="center",   className='boxwithshadow page-cont mb-2 g-0'),
                 dbc.Row([
                          dbc.Col(
                              dcc.Loading(
                                 html.Div(id='datatables', children=[], className='datatables-cont'),
                              color='#00245A'),
                         width=12)
-                    ],   className='site boxwithshadow page-cont', justify="center", align="center"),
+                    ],   className='site boxwithshadow page-cont mb-2 g-0', justify="center", align="center"),
                 dbc.Row([
                          dbc.Col(
                              dcc.Loading(
-                                 dcc.Graph(id="site-plots-out", className="site-plots site-inner-cont"),
+                                 dcc.Graph(id="site-plots-out", className="site-plots site-inner-cont p-05"),
                              color='#00245A'),
                         width=12)
-                    ],   className='site boxwithshadow page-cont', justify="center", align="center"),dbc.Row([
+                    ],   className='site boxwithshadow page-cont mb-2 g-0', justify="center", align="center"),
+                dbc.Row([
                          dbc.Col(
                              dcc.Loading(
-                                 dcc.Graph(id="site-plots-in", className="site-plots site-inner-cont"),
+                                 dcc.Graph(id="site-plots-in", className="site-plots site-inner-cont p-05"),
                             color='#00245A'), 
                          width=12)
-                    ],   className='site boxwithshadow page-cont', justify="center", align="center"),
+                    ],   className='site boxwithshadow page-cont mb-2 g-0', justify="center", align="center"),
                 html.Div(id='page-content-noloading'),
                 html.Br(),
                 
-            ], className='main-cont')
+            ], className='g-0', align="start", style={"padding": "0.5% 1.5%"}), className='main-cont')
 
 
 
@@ -416,6 +420,7 @@ def display_output(value):
     if value is not None:
         location = value['points'][0]['customdata'][0]
     else: location = list(sites)[42]
+    print('--------------------------',len(sites))
     measures = pq.readFile('parquet/raw/measures.parquet')
     return [generate_tables(location), html.H1(f'Selected site: {location}'), SitesOverviewPlots(location, 'src', metaDf, measures), SitesOverviewPlots(location, 'dest', metaDf, measures)]
 
