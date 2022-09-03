@@ -119,7 +119,7 @@ body{
 
 .cls-selected-site {
     text-align: center;
-    margin-bottom: 20px;
+    margin: 2%;
 }
 
 .cls-site-map {
@@ -168,7 +168,7 @@ body{
 
 .pair-details {
     background-color: #EEF6FC !important;
-    padding: 2% 1%;
+    padding: 0.5% 1%;
     color: black;
 }
 
@@ -215,6 +215,10 @@ body{
 
 .mr-2 {
     margin-right: 2% !important;
+}
+
+.p-05 {
+    padding: 0.5% !important;
 }
 
 .p-1 {
@@ -309,7 +313,8 @@ body{
 }
 
 .custom-tab--selected {
-    background-image: linear-gradient(to right, #fff , #ebebeb);
+    /* background-image: linear-gradient(to right, #fff , #ebebeb); */
+    background-color: #edf6fc !important;
     color: black !important;
     font-size: 2rem !important;
 }
@@ -330,6 +335,7 @@ body{
 }
 
 .collapse-button {
+    font-family: sans-serif 'Courier New', Courier, monospace !important;
     width: 100%;
     font-size: 2em;
     background-color: #434d5d;
@@ -348,6 +354,10 @@ body{
     margin-bottom: 2%;
 }
 
-.tab-container--vert .tab:last-of-type {
-    border-bottom: 0px white !important;
+.tab-container--vert .tab:last-of-type custom-tab:last-child {
+    border-bottom: 0px !important;
+}
+
+.site-btn {
+    font-size: 1.7em;
 }
