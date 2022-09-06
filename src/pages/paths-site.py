@@ -21,12 +21,12 @@ urllib3.disable_warnings()
 
 
 def title(q=None):
-    return f"Alarm ID: {q}"
+    return f"Site: {q}"
 
 
 
 def description(q=None):
-    return f"Visual represention on a selected path-changed alarm {q}"
+    return f"List traceroute 'path changed' alarms for site {q}"
 
 
 
@@ -225,16 +225,10 @@ def getASNInfo(ids):
     return asnDict
 
 
-chdf, posDf, baseline, altPaths = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-
 
 
 @timer
 def layout(q=None, **other_unknown_query_strings):
-    global chdf
-    global posDf
-    global baseline
-    global altPaths
 
     print(q, other_unknown_query_strings)
     if q:
@@ -259,7 +253,7 @@ def layout(q=None, **other_unknown_query_strings):
         diffs_str = '  |  '.join(diffs)
 
         return html.Div([
-            dcc.Store(id='site-local-store', data={'from': dateFrom, 'to': dateTo}),
+            dcc.Store(id='site-local-store', data=[{'from': dateFrom, 'to': dateTo}, chdf.to_dict(), posDf.to_dict(), baseline.to_dict(), altPaths.to_dict()]),
             dbc.Row([
               dbc.Row([
                 dbc.Col([
@@ -278,7 +272,7 @@ def layout(q=None, **other_unknown_query_strings):
                                 html.P(f"{cnt} traceroute alarms involve site {site} in the period between {dateFrom} and {dateTo}"), align='left', className='site-details'
                               ),
                             dbc.Row(
-                                html.P(f"Other flagged AS numbers:  {diffs_str}"
+                                html.P(f"Flagged AS numbers:  {diffs_str}"
                                 ), className='site-details'
                             )], className="pair-details")
                         ],
@@ -345,12 +339,9 @@ def buildSiteBox(site, allPairs):
     ],
     [State({'type': 'site-collapse', 'index': MATCH},  "is_open")],
 )
-def toggle_collapse(n, pair, period, is_open):
+def toggle_collapse(n, pair, store, is_open):
     data = ''
-    global chdf
-    global posDf
-    global baseline
-    global altPaths
+    period, chdf, posDf, baseline, altPaths = store[0], pd.DataFrame(store[1]), pd.DataFrame(store[2]), pd.DataFrame(store[3]), pd.DataFrame(store[4])
 
     if n:
       if is_open==False:
@@ -374,6 +365,8 @@ def getColor(asn, diffs):
 @timer
 def pairDetails(pair, period, chdf, baseline, altpaths, hopPositions):
   sites = baseline[['src_site','dest_site']].values.tolist()[0]
+  print(pair, chdf, hopPositions)
+
   howPathChanged = descChange(pair, chdf, hopPositions)
   diffs = chdf[chdf["pair"]==pair]['diff'].to_list()[0]
 
@@ -451,7 +444,7 @@ def pairDetails(pair, period, chdf, baseline, altpaths, hopPositions):
                     ])
                     ], justify="center", align="center")
                 ], className="bordered-box mt-1")
-              ], className="mlr-1"),
+              ], className="mr-1"),
 
               dbc.Col([
                 dbc.Row(
@@ -467,12 +460,12 @@ def pairDetails(pair, period, chdf, baseline, altpaths, hopPositions):
                       ]),
                       dbc.Row([
                         dbc.Col(html.B(str(round(item['atPos']))), className='text-right'),
-                        dbc.Col(html.B(item['jumped2']), className=' text-center'),
+                        dbc.Col(html.B(item['jumpedFrom']), className=' text-center'),
                         dbc.Col(html.B(item['diff']), className=' text-center')
                       ]),
                       dbc.Row([
                         dbc.Col(html.P(''), className=''),
-                        dbc.Col(html.P(item['jumpOwner']), className=' text-center'),
+                        dbc.Col(html.P(item['jumpedFromOwner']), className=' text-center'),
                         dbc.Col(html.P(item['diffOwner']), className=' text-center')
                       ]),
                     ], className='mb-1 change-section rounded-border-1')
@@ -516,15 +509,18 @@ def descChange(pair, chdf, posDf):
       for pos, P in posDf[(posDf['pair']==pair)&(posDf['asn']==diff)][['pos','P']].values:
           atPos = posDf[(posDf['pair']==pair) & (posDf['pos']==pos)]['asn'].values.tolist()
 
-          if len(atPos)>0 and P<1:
+          if len(atPos)>1 and P<1:
             atPos.remove(diff)
             for newASN in atPos:
               if newASN not in [0, -1]:
                 howPathChanged.append({'diff': diff,
                                       'diffOwner': owners[str(diff)],'atPos': pos, 
-                                      'jumped2': newASN, 'jumpOwner': owners[str(newASN)]})
+                                      'jumpedFrom': newASN, 'jumpedFromOwner': owners[str(newASN)]})
+          elif len(atPos) == 1:
+            howPathChanged.append({'diff': diff,
+                                  'diffOwner': owners[str(diff)],'atPos': pos, 
+                                  'jumpedFrom': "No data", 'jumpedFromOwner': ''})
 
-  
   if len(howPathChanged)>0:
     return pd.DataFrame(howPathChanged).sort_values('atPos')
 
