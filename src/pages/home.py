@@ -131,11 +131,20 @@ def unpackAlarms(data, metaDf, taggedNodes):
                 
                 if 'sites' in df.columns:
                     df['sites'] = df['tag'].apply(lambda x: ' \n '.join(x))
+                if 'hosts' in df.columns:
+                    df['hosts'] = df['hosts'].apply(lambda x: ' \n '.join(x))
+                if 'cannotBeReachedFrom' in df.columns:
+                    df['cannotBeReachedFrom'] = df['cannotBeReachedFrom'].apply(lambda x: ' \n '.join(x))
                 
                 if 'dest_change' in df.columns:
-                    df['change']=df[['dest_sites','dest_change']].apply(lambda x: list2str(x, sign[e]), axis=1)
+                    df['dest_change']=df[['dest_sites','dest_change']].apply(lambda x: list2str(x, sign[e]), axis=1)
                 if 'src_change' in df.columns:
-                    df['change']=df[['dest_sites','dest_change']].apply(lambda x: list2str(x, sign[e]), axis=1)
+                    df['src_change']=df[['src_sites','src_change']].apply(lambda x: list2str(x, sign[e]), axis=1)
+
+                if 'dest_loss' in df.columns:
+                    df['dest_loss']=df[['dest_sites','dest_loss']].apply(lambda x: list2str(x, ''), axis=1)
+                if 'src_loss' in df.columns:
+                    df['src_loss']=df[['src_sites','src_loss']].apply(lambda x: list2str(x, ''), axis=1)
 
 
                 frames[e] = df
@@ -350,7 +359,7 @@ def SitesOverviewPlots(site_name, direction, metaDf, measures):
 dash.register_page(__name__, path='/')
 
 # cache the data needed for the overview charts. Run the code on the background every 2 min and store the data in /parquet.
-ParquetUpdater()
+# ParquetUpdater()
 
 # most alarms tag sites, but some tag nodes instead
 taggedNodes = ['large clock correction']
