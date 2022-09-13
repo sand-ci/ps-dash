@@ -172,6 +172,10 @@ body{
     color: black;
 }
 
+.l-h-3 {
+    line-height: 3em;
+}
+
 .text-right {
     text-align: right !important;
 }
@@ -225,12 +229,16 @@ body{
     padding: 0.5% !important;
 }
 
+.pl-2 {
+    padding: 2% !important;
+}
+
 .p-1 {
-    padding: 1%;
+    padding: 1% !important;
 }
 
 .p-2 {
-    padding: 2%;
+    padding: 2% !important;
 }
 
 .pb-4 {
@@ -364,4 +372,38 @@ body{
 
 .site-btn {
     font-size: 1.7em;
+}
+
+.DateRangePicker_picker.DateRangePicker_picker_1.DateRangePicker_picker__directionLeft.DateRangePicker_picker__directionLeft_2 {
+    z-index: 999 !important;
+}
+
+.CalendarDay__selected, .CalendarDay__selected:active, .CalendarDay__selected:hover,
+.CalendarDay__selected_span:active, .CalendarDay__selected_span:hover {
+    background: #d0e4f8;
+    border: 1px double #d1e3f8;
+    color: #000;
+}
+
+.CalendarDay__selected_span {
+    background: #ebf1fd;
+    border: 1px double #ebf1fd;
+    color: #000;
+  }
+
+.DayPickerKeyboardShortcuts_show__bottomRight::before {
+    border-right: 33px solid #a7bbd3;
+  }
+
+  input[type="email"]:focus, input[type="number"]:focus, input[type="search"]:focus, input[type="text"]:focus, input[type="tel"]:focus, input[type="url"]:focus, input[type="password"]:focus, textarea:focus, select:focus {
+    border: 1px solid #d1e3f8;
+  }
+
+
+.DateRangePickerInput__withBorder {
+    border: none !important;
+}
+
+.page-cont {
+    min-height: 200px;
 }
