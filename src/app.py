@@ -3,7 +3,7 @@ from dash import Dash, dcc, html
 import dash_bootstrap_components as dbc
 
 
-external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP]
+external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP]
 
 app = Dash(__name__, external_stylesheets=external_stylesheets, suppress_callback_exceptions=True, use_pages=True)
 
@@ -31,18 +31,21 @@ app.layout = html.Div([
             className="external-button",
             href='https://perfsonar.uc.ssl-hep.org'
         ))
-    ], className="external-links", justify='center', align="center"),dbc.Nav(
+    ], className="external-links g-0", justify='center', align="center"),
+    dbc.Nav(
         [
             dbc.NavItem(dbc.NavLink(
                 html.Img(src=dash.get_asset_url('ps-dash.png'), height="35px"
                         ), disabled=True, href="/", className="logo")),
             dbc.NavItem(dbc.NavLink("SITES", href="/", id='sites-tab')),
-            # dbc.NavItem(dbc.NavLink("LINKS", href="/nodes", id='nodes-tab')),
+            dbc.NavItem(dbc.NavLink("SEACRH", href="/search-alarms", id='search-tab')),
             # dbc.NavItem(dbc.NavLink("PLOTS", href="/pairs", id='pairs-tab')),
         ], fill=True, justified=True, id='navbar'
     ),
-
-	dash.page_container
+    # dcc.Loading(
+	    dash.page_container
+    #     , color='#00245A'
+    # )
 ])
 
 
