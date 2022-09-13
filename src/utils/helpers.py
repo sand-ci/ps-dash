@@ -66,10 +66,15 @@ def getValueUnit(test_type):
         return 'delay (ms) avg'
 
 
-def defaultTimeRange(days=3):
+def defaultTimeRange(days=3, datesOnly=False):
+    format = '%Y-%m-%d %H:%M'
+    if datesOnly:
+        format = '%Y-%m-%d'
+    
     now = roundTime(datetime.now()) # 1 hour
-    defaultEnd = datetime.strftime(now, '%Y-%m-%d %H:%M')
-    defaultStart = datetime.strftime(now - timedelta(days), '%Y-%m-%d %H:%M')
+    defaultEnd = datetime.strftime(now, format)
+    defaultStart = datetime.strftime(now - timedelta(days), format)
+
     return [defaultStart, defaultEnd]
 
 
