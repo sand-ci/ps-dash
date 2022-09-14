@@ -116,6 +116,11 @@ body{
     color: black;
 }
 
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner td div.dash-cell-value.cell-markdown, 
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner th div.dash-cell-value.cell-markdown {
+    text-align: right !important;
+}
+
 
 .cls-selected-site {
     text-align: center;
