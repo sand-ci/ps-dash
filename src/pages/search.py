@@ -145,12 +145,12 @@ def layout(**other_unknown_query_strings):
                 dcc.Loading(
                   html.Div(id="alarms-sunburst"),
                 style={'height':'0.5rem'}, color='#00245A'),
-            align="start", width='5'),
+            align="start", width='5', className="mr-1"),
             dbc.Col([
                 dbc.Row([
                     dbc.Col([
                         html.H1(f"Search & explore the Networking alarms", className="l-h-3 pl-2"),
-                    ], width=10, align="center", className="text-left pair-details")
+                    ], width=10, align="center", className="text-left pair-details rounded-border-1")
                 ], justify="start", align="center"),
                 html.Br(),
                 html.Br(),
@@ -169,8 +169,7 @@ def layout(**other_unknown_query_strings):
                 html.Br(),
                 dbc.Row([
                     dbc.Col([
-                        # "Site",
-                        dcc.Dropdown(multi=True, id='sites-dropdown', placeholder="Search for a specific site name"),
+                        dcc.Dropdown(multi=True, id='sites-dropdown', placeholder="Search for a site"),
                     ], width=10),
                 ]),
                 html.Br(),

@@ -38,7 +38,7 @@ app.layout = html.Div([
                 html.Img(src=dash.get_asset_url('ps-dash.png'), height="35px"
                         ), disabled=True, href="/", className="logo")),
             dbc.NavItem(dbc.NavLink("SITES", href="/", id='sites-tab')),
-            dbc.NavItem(dbc.NavLink("SEACRH", href="/search-alarms", id='search-tab')),
+            dbc.NavItem(dbc.NavLink("SEARCH", href="/search-alarms", id='search-tab')),
             # dbc.NavItem(dbc.NavLink("PLOTS", href="/pairs", id='pairs-tab')),
         ], fill=True, justified=True, id='navbar'
     ),
