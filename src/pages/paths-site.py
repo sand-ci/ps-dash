@@ -14,6 +14,7 @@ from utils.helpers import timer
 from elasticsearch.helpers import scan
 
 import utils.helpers as hp
+from model.OtherAlarms import OtherAlarms
 
 import urllib3
 urllib3.disable_warnings()
@@ -80,7 +81,7 @@ def getStats(fromDate, toDate, site):
         }
         }
 
-        # print(str(q).replace("\'", "\""))
+    print(str(q).replace("\'", "\""))
     result = scan(client=hp.es,index='ps_trace_changes',query=q)
     data, positions, baseline, altPaths = [],[],[],[]
     positions = []
@@ -130,76 +131,13 @@ def getStats(fromDate, toDate, site):
     baseline = pd.DataFrame(baseline)
     altPaths = pd.DataFrame(altPaths)
     
-    posDf['pair'] = posDf['src']+' -> '+posDf['dest']
-    df['pair'] = df['src']+' -> '+df['dest']
-    baseline['pair'] = baseline['src']+' -> '+baseline['dest']
-    altPaths['pair'] = altPaths['src']+' -> '+altPaths['dest']
+    if len(df)>0:
+      posDf['pair'] = posDf['src']+' -> '+posDf['dest']
+      df['pair'] = df['src']+' -> '+df['dest']
+      baseline['pair'] = baseline['src']+' -> '+baseline['dest']
+      altPaths['pair'] = altPaths['src']+' -> '+altPaths['dest']
 
     return df, posDf, baseline, altPaths
-
-
-@timer
-def getOtherAlarmsCount(dateFrom, dateTo, src_site, dest_site):
-  query = {
-      "bool" : {
-        "must" : [
-          {
-            "range" : {
-              "source.from.keyword": {
-                "gte" : dateFrom
-              }
-            }
-          },
-          {
-            "range" : {
-              "source.to.keyword": {
-                "lte" : dateTo
-              }
-            }
-          },
-          {
-            "term" : {
-              "source.src_site.keyword": {
-                "value": src_site,
-                "case_insensitive": True
-              }
-            }
-          },
-          {
-            "term" : {
-              "source.dest_site.keyword": {
-                "value": dest_site,
-                "case_insensitive": True
-              }
-            }
-          }
-          ]
-      }
-  }
-
-  aggs = {
-      "alarms": {
-        "terms": {
-          "field": "event"
-        }
-      }
-    }
-
-
-  res = []
-
-  # print(str(query).replace("\'", "\""))
-  # print(str(aggs).replace("\'", "\""))
-  aggdata = hp.es.search(index='aaas_alarms', query=query, size=0, aggs=aggs)
-
-  for item in aggdata['aggregations']['alarms']['buckets']:
-    if item:
-      res.append({
-                  'event': item['key'],
-                  'count': item['doc_count']
-                })
-
-  return res
 
 
 
@@ -235,57 +173,74 @@ def layout(q=None, **other_unknown_query_strings):
         site  = q
         dateFrom = other_unknown_query_strings['dateFrom']
         dateTo = other_unknown_query_strings['dateTo']
+        print('=====================================================', q)
         
         chdf, posDf, baseline, altPaths = getStats(dateFrom, dateTo, site)
 
-        dsts = chdf.groupby('dest_site')[['pair']].count().reset_index().rename(columns={'dest_site':'site'})
-        srcs = chdf.groupby('src_site')[['pair']].count().reset_index().rename(columns={'src_site':'site'})
-        pairCount = pd.concat([dsts, srcs]).groupby(['site']).sum().reset_index().sort_values('pair', ascending=False)
+        if len(chdf) > 0:
+          dsts = chdf.groupby('dest_site')[['pair']].count().reset_index().rename(columns={'dest_site':'site'})
+          srcs = chdf.groupby('src_site')[['pair']].count().reset_index().rename(columns={'src_site':'site'})
+          pairCount = pd.concat([dsts, srcs]).groupby(['site']).sum().reset_index().sort_values('pair', ascending=False)
 
-        baseline['spair'] = baseline['src_site']+' -> '+baseline['dest_site']
+          baseline['spair'] = baseline['src_site']+' -> '+baseline['dest_site']
 
-        bline = baseline[(baseline['src_site']==site)].sort_values(['src_site'])
-        allPairs = pd.concat([bline, baseline[(baseline['dest_site']==site)].sort_values(['dest_site'])])[['spair', 'pair']]
+          bline = baseline[(baseline['src_site']==site)].sort_values(['src_site'])
+          allPairs = pd.concat([bline, baseline[(baseline['dest_site']==site)].sort_values(['dest_site'])])[['spair', 'pair']]
 
-        cnt = pairCount[pairCount['site']==site]['pair'].values[0]
-        
-        diffs = sorted(list(set([str(el) for v in chdf['diff'].values.tolist() for el in v])))
-        diffs_str = '  |  '.join(diffs)
+          cnt = pairCount[pairCount['site']==site]['pair'].values[0]
+          
+          diffs = sorted(list(set([str(el) for v in chdf['diff'].values.tolist() for el in v])))
+          diffs_str = '  |  '.join(diffs)
 
-        return html.Div([
-            dcc.Store(id='site-local-store', data=[{'from': dateFrom, 'to': dateTo}, chdf.to_dict(), posDf.to_dict(), baseline.to_dict(), altPaths.to_dict()]),
-            dbc.Row([
+
+          otherAlarms = OtherAlarms(currEvent='path changed', alarmEnd=dateTo, site=site).formatted
+
+          return html.Div([
+              dcc.Store(id='site-local-store', data=[{'from': dateFrom, 'to': dateTo}, chdf.to_dict(), posDf.to_dict(), baseline.to_dict(), altPaths.to_dict()]),
               dbc.Row([
-                dbc.Col([
-                  html.H3('SITE', className="text-center bold"),
-                  html.H3(site.upper(), className="text-center bold"),
-                ], width=3),
-                dbc.Col(
-                    html.Div(
-                        [
-                          dbc.Row([
+                dbc.Row([
+                  dbc.Col([
+                    html.H3('SITE', className="text-center bold"),
+                    html.H3(site.upper(), className="text-center bold"),
+                  ], width=3),
+                  dbc.Col(
+                      html.Div(
+                          [
                             dbc.Row([
-                              html.H1(f"Summary", className="text-left"),
-                              html.Hr(className="my-2")
-                            ]),
-                            dbc.Row(
-                                html.P(f"{cnt} traceroute alarms involve site {site} in the period between {dateFrom} and {dateTo}"), align='left', className='site-details'
-                              ),
-                            dbc.Row(
-                                html.P(f"Flagged AS numbers:  {diffs_str}"
-                                ), className='site-details'
-                            )], className="pair-details")
-                        ],
-                    ), width=9
-                  ),
-              ], justify="between", align="center", className="boxwithshadow alarm-header pair-details")
-            ], style={"padding": "0.5% 1.5%"}, className='g-0'),
-            dbc.Row([
+                              dbc.Row([
+                                html.H1(f"Summary", className="text-left"),
+                                html.Hr(className="my-2")
+                              ]),
+                              dbc.Row(
+                                  html.P(f"{cnt} traceroute alarms involve site {site} in the period between {dateFrom} and {dateTo}"), align='left', className='site-details'
+                                ),
+                              dbc.Row(
+                                  html.P(f"Flagged AS numbers:  {diffs_str}"
+                                  ), className='site-details'
+                              )], className="pair-details")
+                          ],
+                      ), width=9
+                    ),
+                ], justify="between", align="center", className="boxwithshadow alarm-header pair-details")
+              ], style={"padding": "0.5% 1.5%"}, className='g-0'),
               dbc.Row([
-                  buildSiteBox(site, allPairs)
-              ], className="boxwithshadow")
-            ], style={"padding": "0.5% 1.5%"}, className='g-0'),
-          ])
+                dbc.Row([
+                      html.P(f'Site {site} takes part in the following alarms in the period 24h prior and up to 24h after the current alarm end ({dateTo})', className='subtitle'),
+                      html.B(otherAlarms, className='subtitle')
+                  ], className="boxwithshadow alarm-header pair-details", justify="between", align="center"),
+                ], style={"padding": "0.5% 1.5%"}, className='g-0'),
+              dbc.Row([
+                dbc.Row([
+                    buildSiteBox(site, allPairs)
+                ], className="boxwithshadow")
+              ], style={"padding": "0.5% 1.5%"}, className='g-0'),
+            ])
+        else:
+          return dbc.Row([
+              dbc.Row([
+                    html.P(f'Site {site} has no alarms relaated to changed path in the period between {dateFrom} and {dateTo}', className='subtitle')
+                ], className="boxwithshadow alarm-header pair-details g-0", justify="between", align="center"),
+              ], style={"padding": "0.5% 1.5%"}, className='g-0')
 
 
 
@@ -370,14 +325,7 @@ def pairDetails(pair, period, chdf, baseline, altpaths, hopPositions):
   howPathChanged = descChange(pair, chdf, hopPositions)
   diffs = chdf[chdf["pair"]==pair]['diff'].to_list()[0]
 
-  otherAlarms = getOtherAlarmsCount(period['from'], period['to'], sites[0], sites[1])
-
-  if not otherAlarms:
-    cntAlarms = 'None found'
-  else: 
-    cntAlarms = ''
-    for res in otherAlarms:
-      cntAlarms += (res['event']).capitalize()+': '+str(res['count'])+'  |   '
+  cntAlarms = OtherAlarms(currEvent='path changed', alarmEnd=period['to'], src_site=sites[0], dest_site=sites[1]).formatted
 
   return   html.Div([
             dbc.Row([
@@ -479,24 +427,24 @@ def pairDetails(pair, period, chdf, baseline, altpaths, hopPositions):
 
 @timer
 def singlePlotPositions(dd):
-    dd.replace(-1, 'OFF', inplace=True)
-    fig = go.Figure(go.Heatmap(
-            y = dd['asn'].astype(str).values,
-            x = dd['pos'].astype(str).values,
-            z = dd['P'].values,
-            text=dd['asn'].values,
-            texttemplate="%{text}", colorscale='deep'
-        )
-    )
+  dd.replace(-1, 'OFF', inplace=True)
+  fig = go.Figure(go.Heatmap(
+          y = dd['asn'].astype(str).values,
+          x = dd['pos'].astype(str).values,
+          z = dd['P'].values,
+          text=dd['asn'].values,
+          texttemplate="%{text}", colorscale='deep'
+      )
+  )
 
-    fig.update_annotations(font_size=12)
-    fig.update_layout(template='plotly_white', title='AS numbers for every hop and the frequency of their occurences at each position (source and destination not included)',
-                      yaxis={'visible': False, 'showticklabels': False},
-                      xaxis={'title': 'Position on the path'},
-                      title_font_size=12
-                     )
+  fig.update_annotations(font_size=12)
+  fig.update_layout(template='plotly_white', title='AS numbers for every hop and the frequency of their occurences at each position (source and destination not included)',
+                    yaxis={'visible': False, 'showticklabels': False},
+                    xaxis={'title': 'Position on the path'},
+                    title_font_size=12
+                    )
 
-    return go.Figure(data=fig)
+  return go.Figure(data=fig)
 
 
 
@@ -505,6 +453,7 @@ def descChange(pair, chdf, posDf):
   owners = getASNInfo(posDf[(posDf['pair']==pair)]['asn'].values.tolist())
   owners['-1'] = 'OFF/Unavailable'
   howPathChanged = []
+
   for diff in chdf[(chdf['pair']==pair)]['diff'].values.tolist()[0]:
       for pos, P in posDf[(posDf['pair']==pair)&(posDf['asn']==diff)][['pos','P']].values:
           atPos = posDf[(posDf['pair']==pair) & (posDf['pos']==pos)]['asn'].values.tolist()
@@ -523,5 +472,6 @@ def descChange(pair, chdf, posDf):
 
   if len(howPathChanged)>0:
     return pd.DataFrame(howPathChanged).sort_values('atPos')
+  return pd.DataFrame()
 
 

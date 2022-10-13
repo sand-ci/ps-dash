@@ -16,6 +16,7 @@ from utils.helpers import timer
 from elasticsearch.helpers import scan
 
 import utils.helpers as hp
+from model.OtherAlarms import OtherAlarms
 
 import urllib3
 urllib3.disable_warnings()
@@ -103,71 +104,7 @@ def getRawDataFromES(src, dest, ipv6, dateFrom, dateTo):
     return df
 
 
-
-def getOtherAlarmsCount(dateFrom, dateTo, src_site, dest_site, event):
-  query = {
-      "bool" : {
-        "must" : [
-          {
-            "range" : {
-              "source.from.keyword": {
-                "gte" : dateFrom
-              }
-            }
-          },
-          {
-            "range" : {
-              "source.to.keyword": {
-                "lte" : dateTo
-              }
-            }
-          },
-          {
-            "term" : {
-              "source.src_site.keyword": {
-                "value": src_site,
-                "case_insensitive": True
-              }
-            }
-          },
-          {
-            "term" : {
-              "source.dest_site.keyword": {
-                "value": dest_site,
-                "case_insensitive": True
-              }
-            }
-          }
-          ]
-      }
-  }
-
-  aggs = {
-      "alarms": {
-        "terms": {
-          "field": "event"
-        }
-      }
-    }
-
-
-  res = []
-
-  aggdata = hp.es.search(index='aaas_alarms', query=query, size=0, aggs=aggs)
-
-  for item in aggdata['aggregations']['alarms']['buckets']:
-    if item:
-      # print(src_site, dest_site, item)
-      if item['key'] != event:
-        res.append({
-                    'event': item['key'],
-                    'count': item['doc_count']
-                    })
-
-  return res
-
-
-
+@timer
 def getAlarm(id):
   q = {
         "term": {
@@ -178,16 +115,17 @@ def getAlarm(id):
   results = hp.es.search(index='aaas_alarms', size=100, query=q)
   for res in results['hits']['hits']:
     data.append(res['_source'])
-      
+  
+  print(id, data)
   if len(data) == 1:
     return data[0]
 
 
-
+@timer
 def buildPlot(df):
   fig = go.Figure(data=px.scatter(
       df,
-      y = 'throughput',
+      y = 'MBps',
       x = 'dt',
       color='pair'
       
@@ -203,7 +141,7 @@ def buildPlot(df):
   return fig
 
 
-
+@timer
 def buildSummary(alarm):
   desc = 'Bandwidth decreased' if alarm['event'].startswith('bandwidth decreased') else 'Bandwidth increased'
 
@@ -226,7 +164,7 @@ def buildSummary(alarm):
     return temp
 
 
-
+@timer
 def getSitePairs(alarm):
   sitePairs = []
   event = alarm['event']
@@ -255,15 +193,20 @@ def getSitePairs(alarm):
   return sitePairs
 
 
-
 def layout(q=None, **other_unknown_query_strings):
     if q:
       alarm = getAlarm(q)
+      print(q)
       sitePairs = getSitePairs(alarm)
+      
 
       expand = False
       if alarm['event'] in ['bandwidth decreased', 'bandwidth increased']:
         expand = True
+
+      alarmData = alarm['source']
+      cntAlarms = OtherAlarms(currEvent=alarm['event'], alarmEnd=alarmData['to'], site=alarmData['site']).formatted
+
 
       return html.Div([
               dbc.Row([
@@ -285,7 +228,13 @@ def layout(q=None, **other_unknown_query_strings):
                         ],
                       ),
                   width=10)
-                ], className="boxwithshadow alarm-header pair-details g-0", justify="between", align="center")
+                ], className="boxwithshadow alarm-header pair-details g-0", justify="between", align="center")                
+              ], style={"padding": "0.5% 1.5%"}, className='g-0'),
+            dbc.Row([
+              dbc.Row([
+                    html.P(f'Site {alarmData["site"]} takes part in the following alarms in the period 24h prior and up to 24h after the current alarm end ({alarmData["to"]})', className='subtitle'),
+                    html.B(cntAlarms, className='subtitle')
+                ], className="boxwithshadow alarm-header pair-details g-0", justify="between", align="center"),
               ], style={"padding": "0.5% 1.5%"}, className='g-0'),
             dcc.Store(id='alarm-store', data=alarm),
             dbc.Row([
@@ -341,18 +290,12 @@ def toggle_collapse(n, alarmData, alarm, is_open):
 
 
 
+@timer
 def buildGraphComponents(alarmData, dateFrom, dateTo, event):
   df = getRawDataFromES(alarmData['src_site'], alarmData['dest_site'], alarmData['ipv6'], dateFrom, dateTo)
+  df.loc[:, 'MBps'] = df['throughput'].apply(lambda x: round(x/1e+6, 2))
   
-  otherAlarms = getOtherAlarmsCount(dateFrom, dateTo, alarmData['src_site'], alarmData['dest_site'], event)
-  
-  if not otherAlarms:
-      cntAlarms = 'None found'
-  else: 
-      cntAlarms = ''
-      for res in otherAlarms:
-          print(res)
-          cntAlarms += (res['event']).capitalize()+': '+str(res['count'])+'  |   '
+  cntAlarms = OtherAlarms(currEvent=event, alarmEnd=dateTo, src_site=alarmData['src_site'], dest_site=alarmData['dest_site']).formatted
 
   return html.Div(children=[
           dbc.Row([
@@ -377,7 +320,8 @@ def buildGraphComponents(alarmData, dateFrom, dateTo, event):
 
               dbc.Row([
                 html.H4( f"Total number of throughput measures: {len(df)}", className="text-center"),
-                html.H4(f"Other networking alarms {cntAlarms}", className="text-center"),
+                html.H4(f"Other networking alarms", className="text-center"),
+                html.H4(cntAlarms, className="text-center"),
               ], align="left", justify="center", className="more-alarms change-section rounded-border-1 mb-1 pb-4")
             ], width={"size":"4"}, align="center"),
             dbc.Col([

@@ -384,8 +384,8 @@ layout = html.Div(
                     ), className='g-0'
                 ),
                 dbc.Row([
-                         dbc.Col(dcc.Loading(id='selected-site'), className='cls-selected-site page-cont')
-                         ],align="center",   className='boxwithshadow page-cont mb-2 g-0'),
+                         dbc.Col(dcc.Loading(id='selected-site'), className='cls-selected-site')
+                         ], align="center", className='boxwithshadow mb-2 g-0'),
                 dbc.Row([
                          dbc.Col(
                              dcc.Loading(

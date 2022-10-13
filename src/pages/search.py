@@ -236,6 +236,7 @@ def update_output(start_date, end_date, sites, all, events, allevents, sitesStat
         period = [f'{start_date} 00:01', f'{end_date} 23:59']
     else: period = hp.defaultTimeRange(1)
     
+    print(sites, all, events, allevents, sitesState, eventsState)
 
     scntdf, eventTypes = getAlarm(period)
     frames, pivotFrames = unpackAlarms(eventTypes)
@@ -243,7 +244,7 @@ def update_output(start_date, end_date, sites, all, events, allevents, sitesStat
 
     # sites
     graphData = scntdf.copy()
-    if sitesState is not None and len(sitesState)>0:
+    if (sitesState is not None and len(sitesState)>0):
       graphData = graphData[graphData['site'].isin(sitesState)]
 
     sdropdown_items = []
@@ -271,7 +272,7 @@ def update_output(start_date, end_date, sites, all, events, allevents, sitesStat
 
 
     dataTables = []
-    events = list(eventTypes.keys()) if not eventsState else eventsState
+    events = list(eventTypes.keys()) if not eventsState or events else eventsState
 
     for event in sorted(events):
         df = pivotFrames[event]

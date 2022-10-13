@@ -5,6 +5,7 @@ import threading
 import traceback
 
 from utils.parquet import Parquet
+from model.OtherAlarms import OtherAlarms
 import utils.helpers as hp
 from utils.helpers import timer
 import model.queries as qrs
@@ -17,12 +18,14 @@ class ParquetUpdater(object):
     def __init__(self):
         self.createLocation('parquet/')
         self.createLocation('parquet/raw/')
+        self.createLocation('parquet/frames/')
+        self.createLocation('parquet/pivot/')
         self.pq = Parquet()
         self.cacheIndexData()
-        # self.cacheTraceChanges()
+        self.storeAlarms()
         try:
             Scheduler(3600, self.cacheIndexData)
-            # Scheduler(1800, self.cacheTraceChanges)
+            Scheduler(1800, self.storeAlarms)
         except Exception as e:
             print(traceback.format_exc())
 
@@ -56,20 +59,34 @@ class ParquetUpdater(object):
         self.pq.writeToFile(measures, f'{location}measures.parquet')
 
 
-    @timer  
-    def cacheTraceChanges(self, days=60):
-        location = 'parquet/raw/'
-        dateFrom, dateTo = hp.defaultTimeRange(days)
-        chdf, posDf, baseline, altPaths = qrs.queryTraceChanges(dateFrom, dateTo)
-        chdf = chdf.round(2)
-        posDf = posDf.round(2)
-        baseline = baseline.round(2)
-        altPaths = altPaths.round(2)
+    # @timer  
+    # def cacheTraceChanges(self, days=60):
+    #     location = 'parquet/raw/'
+    #     dateFrom, dateTo = hp.defaultTimeRange(days)
+    #     chdf, posDf, baseline, altPaths = qrs.queryTraceChanges(dateFrom, dateTo)
+    #     chdf = chdf.round(2)
+    #     posDf = posDf.round(2)
+    #     baseline = baseline.round(2)
+    #     altPaths = altPaths.round(2)
 
-        self.pq.writeToFile(chdf, f'{location}chdf.parquet')
-        self.pq.writeToFile(posDf, f'{location}posDf.parquet')
-        self.pq.writeToFile(baseline, f'{location}baseline.parquet')
-        self.pq.writeToFile(altPaths, f'{location}altPaths.parquet')
+    #     self.pq.writeToFile(chdf, f'{location}chdf.parquet')
+    #     self.pq.writeToFile(posDf, f'{location}posDf.parquet')
+    #     self.pq.writeToFile(baseline, f'{location}baseline.parquet')
+    #     self.pq.writeToFile(altPaths, f'{location}altPaths.parquet')
+
+
+    
+    def storeAlarms(self):
+        dateFrom, dateTo = hp.defaultTimeRange(60)
+        oa = OtherAlarms(refresh=True)
+        frames, pivotFrames = oa.getAlarms(dateFrom, dateTo)
+
+        for event,df in pivotFrames.items():
+            filename = oa.eventCF(event)
+            fdf = frames[event]
+            if len(fdf)>0:
+                self.pq.writeToFile(df, f"parquet/pivot/{filename}")
+                self.pq.writeToFile(fdf, f"parquet/frames/{filename}")
 
 
     def createLocation(self,location):
