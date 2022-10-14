@@ -30,6 +30,11 @@ app.layout = html.Div([
             "MEPHi Tracer: Traceroute explorer",
             className="external-button",
             href='https://perfsonar.uc.ssl-hep.org'
+        )),
+        dbc.Col(dbc.Button(
+            "Alarms description",
+            className="external-button",
+            href='https://docs.google.com/presentation/d/1QZseDVnhN8ghn6yaSQmPbMzTi53jwUFTr818V_hUjO8/edit#slide=id.p'
         ))
     ], className="external-links g-0", justify='center', align="center"),
     dbc.Nav(
@@ -50,4 +55,4 @@ app.layout = html.Div([
 
 
 if __name__ == '__main__':
-	app.run_server(debug=False, port=8050, host='0.0.0.0')
+	app.run_server(debug=True, port=8050, host='0.0.0.0')
