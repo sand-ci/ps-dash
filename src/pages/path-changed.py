@@ -12,10 +12,10 @@ import plotly.graph_objects as go
 import pandas as pd
 
 from utils.helpers import timer
-from elasticsearch.helpers import scan
 
 import utils.helpers as hp
 import model.queries as qrs
+from model.OtherAlarms import OtherAlarms
 
 import urllib3
 urllib3.disable_warnings()
@@ -151,71 +151,6 @@ def getStats(fromDate, toDate, affectedSites):
     altPaths['pair'] = altPaths['src']+'  ->   '+altPaths['dest']
     
     return df, posDf, baseline, altPaths
-
-
-
-@timer
-def getOtherAlarmsCount(dateFrom, dateTo, src_site, dest_site):
-  query = {
-      "bool" : {
-        "must" : [
-          {
-            "range" : {
-              "source.from.keyword": {
-                "gte" : dateFrom
-              }
-            }
-          },
-          {
-            "range" : {
-              "source.to.keyword": {
-                "lte" : dateTo
-              }
-            }
-          },
-          {
-            "term" : {
-              "source.src_site.keyword": {
-                "value": src_site,
-                "case_insensitive": True
-              }
-            }
-          },
-          {
-            "term" : {
-              "source.dest_site.keyword": {
-                "value": dest_site,
-                "case_insensitive": True
-              }
-            }
-          }
-          ]
-      }
-  }
-
-  aggs = {
-      "alarms": {
-        "terms": {
-          "field": "event"
-        }
-      }
-    }
-
-
-  res = []
-
-  # print(str(query).replace("\'", "\""))
-  # print(str(aggs).replace("\'", "\""))
-  aggdata = hp.es.search(index='aaas_alarms', query=query, size=0, aggs=aggs)
-
-  for item in aggdata['aggregations']['alarms']['buckets']:
-    if item:
-      res.append({
-                  'event': item['key'],
-                  'count': item['doc_count']
-                })
-
-  return res
 
 
 
@@ -360,6 +295,8 @@ def buildSiteBox(site, cnt, chdf, posDf, baseline, altPaths, alarm):
       diffs = sorted(list(set([str(el) for v in chdf['diff'].values.tolist() for el in v])))
       diffs_str = '  |  '.join(diffs)
 
+      otherAlarms = OtherAlarms(currEvent='path changed', alarmEnd=alarm["to"], site=site).formatted
+
       url = f'{request.host_url}paths-site/{site}?dateFrom={alarm["from"]}&dateTo={alarm["to"]}'
 
       return html.Div([
@@ -380,9 +317,9 @@ def buildSiteBox(site, cnt, chdf, posDf, baseline, altPaths, alarm):
                           html.Div([
                             html.A('View site in a new page', href=url, target='_blank',
                                   className='btn btn-secondary site-btn', id={
-                                                                    'type': 'site-new-page-btn',
-                                                                    'index': site
-                                                                  }
+                                                                                'type': 'site-new-page-btn',
+                                                                                'index': site
+                                                                              }
                               )
                           ]), 
                         align='right')
@@ -392,7 +329,13 @@ def buildSiteBox(site, cnt, chdf, posDf, baseline, altPaths, alarm):
                           html.P(f"Other flagged AS numbers:  {diffs_str}"
                         ), align='left', width=10, className='site-details')
                       ])
-                        ], className='m-2 mb-1 site-header-line rounded-border-1 p-2'),
+                      ], className='m-2 mb-1 site-header-line rounded-border-1 p-2'),
+                    dbc.Row([
+                      dbc.Row([
+                          html.P(f'Site {site} takes part in the following alarms in the period 24h prior and up to 24h after the current alarm end ({alarm["to"]})', className='subtitle'),
+                          html.B(otherAlarms, className='subtitle')
+                        ], justify="between", align="center"),
+                      ], className='m-2 mb-1 site-header-line rounded-border-1 p-2'),
                     dbc.Row(
                     [
                       html.Div(id=f'pair-section{site+str(i)}',
@@ -475,14 +418,7 @@ def pairDetails(pair, alarm, chdf, baseline, altpaths, hopPositions):
   howPathChanged = descChange(pair, chdf, hopPositions)
   diffs = chdf[chdf["pair"]==pair]['diff'].to_list()[0]
 
-  otherAlarms = getOtherAlarmsCount(alarm['from'], alarm['to'], sites[0], sites[1])
-
-  if not otherAlarms:
-    cntAlarms = 'None found'
-  else: 
-    cntAlarms = ''
-    for res in otherAlarms:
-      cntAlarms += (res['event']).capitalize()+': '+str(res['count'])+'  |   '
+  cntAlarms = OtherAlarms(currEvent='path changed', alarmEnd=alarm['to'], src_site=sites[0], dest_site=sites[1]).formatted
 
   return   html.Div([
             dbc.Row([
