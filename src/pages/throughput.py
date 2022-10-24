@@ -198,14 +198,24 @@ def layout(q=None, **other_unknown_query_strings):
       alarm = getAlarm(q)
       print(q)
       sitePairs = getSitePairs(alarm)
-      
-
-      expand = False
-      if alarm['event'] in ['bandwidth decreased', 'bandwidth increased']:
-        expand = True
-
       alarmData = alarm['source']
-      cntAlarms = OtherAlarms(currEvent=alarm['event'], alarmEnd=alarmData['to'], site=alarmData['site']).formatted
+
+      cntAlarms = OtherAlarms(currEvent=alarm['event'],
+                        alarmEnd=alarmData['to'],
+                        site=alarmData['site'] if 'site' in alarmData.keys() else None,
+                        src_site=alarmData['src_site'] if 'src_site' in alarmData.keys() else None,
+                        dest_site=alarmData['dest_site'] if 'dest_site' in alarmData.keys() else None).formatted
+
+      expand = True
+      alarmsIn48h = ''
+      if alarm['event'] not in ['bandwidth decreased', 'bandwidth increased']:
+        expand = False
+        alarmsIn48h = dbc.Row([
+                        dbc.Row([
+                              html.P(f'Site {alarmData["site"]} takes part in the following alarms in the period 24h prior and up to 24h after the current alarm end ({alarmData["to"]})', className='subtitle'),
+                              html.B(cntAlarms, className='subtitle')
+                          ], className="boxwithshadow alarm-header pair-details g-0", justify="between", align="center"),
+                      ], style={"padding": "0.5% 1.5%"}, className='g-0')
 
 
       return html.Div([
@@ -230,12 +240,7 @@ def layout(q=None, **other_unknown_query_strings):
                   width=10)
                 ], className="boxwithshadow alarm-header pair-details g-0", justify="between", align="center")                
               ], style={"padding": "0.5% 1.5%"}, className='g-0'),
-            dbc.Row([
-              dbc.Row([
-                    html.P(f'Site {alarmData["site"]} takes part in the following alarms in the period 24h prior and up to 24h after the current alarm end ({alarmData["to"]})', className='subtitle'),
-                    html.B(cntAlarms, className='subtitle')
-                ], className="boxwithshadow alarm-header pair-details g-0", justify="between", align="center"),
-              ], style={"padding": "0.5% 1.5%"}, className='g-0'),
+            alarmsIn48h,
             dcc.Store(id='alarm-store', data=alarm),
             dbc.Row([
               html.Div(id=f'site-section-throughput{i}',
