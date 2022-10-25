@@ -329,10 +329,10 @@ def unpackAlarms(eventTypes):
           if 'src_change' in df.columns:
               df['src_change'] = df[['src_sites','src_change']].apply(lambda x: list2str(x, sign[event]), axis=1)
 
-          if 'dest_loss' in df.columns:
-              df['to_dest_loss'] = df[['dest_sites','dest_loss']].apply(lambda x: list2str(x, ''), axis=1)
-          if 'src_loss' in df.columns:
-              df['from_src_loss'] = df[['src_sites','src_loss']].apply(lambda x: list2str(x, ''), axis=1)
+          if 'dest_loss%' in df.columns:
+              df['to_dest_loss'] = df[['dest_sites','dest_loss%']].apply(lambda x: list2str(x, ''), axis=1)
+          if 'src_loss%' in df.columns:
+              df['from_src_loss'] = df[['src_sites','src_loss%']].apply(lambda x: list2str(x, ''), axis=1)
 
           
           frames[event] = df
@@ -382,9 +382,9 @@ def generate_tables(frames, pivotFrames, event):
     if event in ['bandwidth decreased from/to multiple sites',
                 'bandwidth increased from/to multiple sites',
                 'high packet loss on multiple links']:
-        columns = [el for el in columns if el not in ['src_sites', 'dest_sites', 'src_change', 'dest_change', 'src_loss', 'dest_loss', 'tag_str']]
+        columns = [el for el in columns if el not in ['src_sites', 'dest_sites', 'src_change', 'dest_change', 'src_loss%', 'dest_loss%', 'tag_str']]
 
-
+    
     # create clickable cells leading to alarm pages
     if 'alarm_id' in columns:
         page = 'paths/' if event == 'path changed' else 'throughput/'
