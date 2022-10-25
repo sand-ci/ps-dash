@@ -359,7 +359,7 @@ def SitesOverviewPlots(site_name, direction, metaDf, measures):
 dash.register_page(__name__, path='/')
 
 # cache the data needed for the overview charts. Run the code on the background every 2 min and store the data in /parquet.
-# ParquetUpdater()
+# ParquetUpdater() 
 #  !!!!!!! DO NOT COMMIT
 #  !!!!!!! DO NOT COMMIT
 #  !!!!!!! DO NOT COMMIT
@@ -434,7 +434,7 @@ layout = html.Div(
 def display_output(value):
     if value is not None:
         location = value['points'][0]['customdata'][0]
-    else: location = list(sites)[42]
+    else: location = list(sites)[1]
     print('--------------------------',len(sites))
     measures = pq.readFile('parquet/raw/measures.parquet')
     return [generate_tables(location), html.H1(f'Selected site: {location}'), SitesOverviewPlots(location, 'src', metaDf, measures), SitesOverviewPlots(location, 'dest', metaDf, measures)]
