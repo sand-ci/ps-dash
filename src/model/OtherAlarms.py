@@ -308,9 +308,10 @@ class OtherAlarms(object):
 
     alarmsListed = {}
 
-    pivotFrames.pop('path changed')
-    pivotFrames['path changed'] = pivotFrames['path changed unfolded']
-    pivotFrames.pop('path changed unfolded')
+    if 'path changed' in pivotFrames.keys() and 'path changed unfolded' in pivotFrames.keys():
+      pivotFrames.pop('path changed')
+      pivotFrames['path changed'] = pivotFrames['path changed unfolded']
+      pivotFrames.pop('path changed unfolded')
 
     for event, pdf in pivotFrames.items():
       if not event==currEvent:

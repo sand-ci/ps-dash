@@ -359,12 +359,7 @@ def SitesOverviewPlots(site_name, direction, metaDf, measures):
 dash.register_page(__name__, path='/')
 
 # cache the data needed for the overview charts. Run the code on the background every 2 min and store the data in /parquet.
-# ParquetUpdater() 
-#  !!!!!!! DO NOT COMMIT
-#  !!!!!!! DO NOT COMMIT
-#  !!!!!!! DO NOT COMMIT
-#  !!!!!!! DO NOT COMMIT
-#  !!!!!!! DO NOT COMMIT
+ParquetUpdater() 
 
 
 # most alarms tag sites, but some tag nodes instead
