@@ -42,9 +42,9 @@ app.layout = html.Div([
             dbc.NavItem(dbc.NavLink(
                 html.Img(src=dash.get_asset_url('ps-dash.png'), height="35px"
                         ), disabled=True, href="/", className="logo")),
-            dbc.NavItem(dbc.NavLink("SITES", href="/", id='sites-tab')),
-            dbc.NavItem(dbc.NavLink("SEARCH", href="/search-alarms", id='search-tab')),
-            # dbc.NavItem(dbc.NavLink("PLOTS", href="/pairs", id='pairs-tab')),
+            dbc.NavItem(dbc.NavLink("SITES OVERVIEW", href="/", id='sites-tab')),
+            dbc.NavItem(dbc.NavLink("SEARCH ALARMS", href="/search-alarms", id='search-tab')),
+            dbc.NavItem(dbc.NavLink("EXPLORE PATHS", href="/explore-paths", id='paths-tab')),
         ], fill=True, justified=True, id='navbar'
     ),
     # dcc.Loading(
