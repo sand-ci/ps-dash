@@ -103,7 +103,7 @@ def getAlarm(period):
       temp = []
       if event in eventTypes.keys():
           temp = eventTypes[event]
-      else: print(event)
+    #   else: print(event)
 
       desc = item['source']
       tags = item['tags']
@@ -155,8 +155,7 @@ def layout(**other_unknown_query_strings):
                 html.Br(),
                 html.Br(),
                 html.Br(),
-                dbc.Row(
-                    
+                dbc.Row([
                     dcc.DatePickerRange(
                         id='date-picker-range',
                         month_format='M-D-Y',
@@ -164,9 +163,9 @@ def layout(**other_unknown_query_strings):
                         initial_visible_month=now[0],
                         start_date=now[0],
                         end_date=now[1]
-                    )
-                ),
-                html.Br(),
+                    ),
+                    html.P('Rounded to the day', style={"padding-left":"1.5%"})
+                ]),
                 dbc.Row([
                     dbc.Col([
                         dcc.Dropdown(multi=True, id='sites-dropdown', placeholder="Search for a site"),
@@ -183,6 +182,10 @@ def layout(**other_unknown_query_strings):
         ], className="p-1 site boxwithshadow page-cont mb-2 g-0", justify="center", align="center"),
         html.Br(),
         html.Br(),
+        # html.Iframe(src="https://atlas-kibana.mwt2.org:5601/s/aaas/app/dashboards?embed=true&auth_provider_hint=anonymous1#/view/c8ad7c20-5ad5-11ed-afcf-d91dad577662?_g=(filters:!(),refreshInterval:(pause:!t,value:0),time:(from:now-90d%2Fd,to:now))&_a=(description:'',filters:!(),fullScreenMode:!f,options:(hidePanelTitles:!f,syncColors:!f,syncTooltips:!f,useMargins:!t),panels:!((embeddableConfig:(enhancements:()),gridData:(h:18,i:dc51f967-3307-4579-94c5-f670f824f5a5,w:48,x:0,y:0),id:'3701e950-5ac6-11ed-afcf-d91dad577662',panelIndex:dc51f967-3307-4579-94c5-f670f824f5a5,type:search,version:'8.3.2')),query:(language:kuery,query:'source.site.keyword%20:USCMS-FNAL-WC1%20or%20source.src_site.keyword%20:USCMS-FNAL-WC1%20or%20source.src_sites.keyword%20:USCMS-FNAL-WC1%20or%20source.dest_site.keyword%20%20:USCMS-FNAL-WC1%20or%20source.dest_sites.keyword%20USCMS-FNAL-WC1'),tags:!('2d860c77-eb5b-5b73-bb1d-1439d2eff4c1'),timeRestore:!f,title:search4site,viewMode:view)&hide-filter-bar=true",
+        #         style={"height": "567px", "width": "100%"}
+                
+        #         ),
         dbc.Row([
             dbc.Row([
                 html.H1(f"List of alarms", className="text-center"),
@@ -203,7 +206,8 @@ def colorMap(eventTypes):
   colors = ['#75cbe6', '#3b6d8f', '#75E6DA', '#189AB4', '#2E8BC0', '#145DA0', '#05445E', '#0C2D48',
           '#5EACE0', '#d6ebff', '#498bcc', '#82cbf9', 
           '#2894f8', '#fee838', '#3e6595', '#4adfe1', '#b14ae1'
-          '#1f77b4', '#ff7f0e', '#2ca02c','#00224e', '#123570', '#3b496c', '#575d6d', '#707173', '#8a8678', '#a59c74']
+          '#1f77b4', '#ff7f0e', '#2ca02c','#00224e', '#123570', '#3b496c', '#575d6d', '#707173', '#8a8678', '#a59c74',
+          ]
 
   paletteDict = {}
   for i,e in enumerate(eventTypes.keys()):
@@ -276,12 +280,12 @@ def update_output(start_date, end_date, sites, all, events, allevents, sitesStat
 
     for event in sorted(events):
         df = pivotFrames[event]
-        df = df[df['tag'].isin(sitesState)] if sitesState is not None else df
+        df = df[df['tag'].isin(sitesState)] if sitesState is not None and len(sitesState)>0 else df
         if len(df)>0:
             dataTables.append(generate_tables(frames, df, event))
     dataTables = html.Div(dataTables)
 
-    
+
     return [sdropdown_items, edropdown_items, dcc.Graph(figure=fig), dataTables]
    
 
