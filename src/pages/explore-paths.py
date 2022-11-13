@@ -125,7 +125,7 @@ def convertTime(ts):
 
 
 def layout(**other_unknown_query_strings):
-    now = hp.defaultTimeRange(days=1, datesOnly=True)
+    now = hp.defaultTimeRange(days=7, datesOnly=True)
 
     return dbc.Row([
         
@@ -138,7 +138,7 @@ def layout(**other_unknown_query_strings):
             dbc.Col([
                 dbc.Row([
                     dbc.Col([
-                        html.H1(f"Explore the 'Path changed' alarms", className="l-h-3 pl-2"),
+                        html.H1(f'Explore the "Path changed" alarms', className="l-h-3 pl-2"),
                     ], width=10, align="center", className="text-left pair-details rounded-border-1")
                 ], justify="start", align="center"),
                 html.Br(),
@@ -324,7 +324,7 @@ def generate_tables(frames, pivotFrames, event):
     ids = pivotFrames['id'].values
     tagsDf = frames[event]
 
-    dfr = tagsDf[tagsDf.index.isin(ids)]
+    dfr = tagsDf[tagsDf.index.isin(ids)].sort_values('to',ascending=False)
 
     columns = dfr.columns.tolist()
     columns.remove('tag')
