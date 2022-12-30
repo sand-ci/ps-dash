@@ -1,4 +1,3 @@
-from utils.parquet import Parquet
 import dash
 from dash import Dash, dash_table, dcc, html
 import dash_bootstrap_components as dbc
@@ -15,7 +14,7 @@ from utils.helpers import timer
 
 import utils.helpers as hp
 import model.queries as qrs
-from model.OtherAlarms import OtherAlarms
+from model.Alarms import Alarms
 
 import urllib3
 urllib3.disable_warnings()
@@ -40,120 +39,6 @@ dash.register_page(
 )
 
 
-
-@timer
-def getAlarm(id):
-    q = {
-        "query": {
-          "term": {
-            "source.alarm_id": id
-          }
-        }
-      }
-
-    result = scan(client=hp.es,index='aaas_alarms',query=q)
-    data = []
-
-    for item in result:
-        data.append(item['_source']['source'])
-        
-    if len(data) == 1:
-      return data[0]
-
-
-
-@timer
-def getStats(fromDate, toDate, affectedSites):
-    q = {
-          "query": {
-            "bool": {
-              "must": [
-                {
-                  "term": {
-                    "from_date.keyword": {
-                      "value": fromDate
-                    }
-                  }
-                },
-                {
-                  "term": {
-                    "to_date.keyword": {
-                      "value": toDate
-                    }
-                  }
-                },
-                {
-                  "bool": {
-                    "should": [
-                      {
-                        "terms": {
-                          "src_site": affectedSites
-                        }
-                      },
-                      {
-                        "terms": {
-                          "dest_site": affectedSites
-                        }
-                      }
-                    ]
-                  }
-                }
-              ]
-            }
-          }
-        }
-    # print(str(q).replace("\'", "\""))
-    result = scan(client=hp.es,index='ps_trace_changes',query=q)
-    data, positions, baseline, altPaths = [],[],[],[]
-    positions = []
-    for item in result:
-        
-        tempD = {}
-        for k,v in item['_source'].items():
-            if k not in ['positions', 'baseline', 'alt_paths', 'created_at']:
-                tempD[k] = v
-        data.append(tempD)
-        
-        src,dest,src_site,dest_site = item['_source']['src'], item['_source']['dest'], item['_source']['src_site'], item['_source']['dest_site']
-        
-        temp = item['_source']['positions']
-        for p in temp:
-            p['src'] = src
-            p['dest'] = dest
-            p['src_site'] = src_site
-            p['dest_site'] = dest_site
-        positions.extend(temp)
-        
-        temp = item['_source']['baseline']
-        for p in temp:
-            p['src'] = src
-            p['dest'] = dest
-            p['src_site'] = src_site
-            p['dest_site'] = dest_site
-        baseline.extend(temp)
-        
-        altPaths = item['_source']['alt_paths']
-        for p in temp:
-            p['src'] = src
-            p['dest'] = dest
-            p['src_site'] = src_site
-            p['dest_site'] = dest_site
-        altPaths.extend(temp)
-        
-    df = pd.DataFrame(data)
-    posDf = pd.DataFrame(positions)
-    baseline = pd.DataFrame(baseline)
-    altPaths = pd.DataFrame(altPaths)
-    
-    posDf['pair'] = posDf['src']+'  ->   '+posDf['dest']
-    df['pair'] = df['src']+'  ->   '+df['dest']
-    baseline['pair'] = baseline['src']+'  ->   '+baseline['dest']
-    altPaths['pair'] = altPaths['src']+'  ->   '+altPaths['dest']
-    
-    return df, posDf, baseline, altPaths
-
-
-
 @timer
 def getASNInfo(ids):
 
@@ -176,29 +61,32 @@ def getASNInfo(ids):
     return asnDict
 
 
-
-
 chdf, posDf, baseline, altPaths = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-
+dateFrom, dateTo, frames, pivotFrames =  None, None, None, None
+alarmsInst = Alarms()
 
 
 @timer
 def layout(q=None, **other_unknown_query_strings):
-    # pq = Parquet()
-    # location = 'parquet/raw/'
     global chdf
     global posDf
     global baseline
     global altPaths
+    global dateFrom
+    global dateTo
+    global frames
+    global pivotFrames
 
-    
-
-    print(q, other_unknown_query_strings)
     if q:
-        alarm = getAlarm(q)
+        alarm = qrs.getAlarm(q)['source']
+        print('URL query:', q, other_unknown_query_strings)
+        print()
+        print('Alarm content:', alarm)
 
-        # chdf, posDf, baseline, altPaths = pq.readFile(f'{location}chdf.parquet'), pq.readFile(f'{location}posDf.parquet'), pq.readFile(f'{location}baseline.parquet'), pq.readFile(f'{location}altPaths.parquet')
         chdf, posDf, baseline, altPaths = qrs.queryTraceChanges(alarm['from'], alarm['to'])
+        dateFrom, dateTo = hp.getPriorNhPeriod(alarm["to"])
+        frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
+        posDf['asn'] = posDf['asn'].astype(int)
 
         dsts = chdf.groupby('dest_site')[['pair']].count().reset_index().rename(columns={'dest_site':'site'})
         srcs = chdf.groupby('src_site')[['pair']].count().reset_index().rename(columns={'src_site':'site'})
@@ -294,8 +182,9 @@ def buildSiteBox(site, cnt, chdf, posDf, baseline, altPaths, alarm):
       
       diffs = sorted(list(set([str(el) for v in chdf['diff'].values.tolist() for el in v])))
       diffs_str = '  |  '.join(diffs)
-
-      otherAlarms = OtherAlarms(currEvent='path changed', alarmEnd=alarm["to"], site=site).formatted
+      
+      data = alarmsInst.getOtherAlarms(currEvent='path changed', alarmEnd=alarm["to"], pivotFrames=pivotFrames, site=site)
+      otherAlarms = alarmsInst.formatOtherAlarms(data)
 
       url = f'{request.host_url}paths-site/{site}?dateFrom={alarm["from"]}&dateTo={alarm["to"]}'
 
@@ -304,32 +193,35 @@ def buildSiteBox(site, cnt, chdf, posDf, baseline, altPaths, alarm):
                 dbc.Row([
                   dbc.Col([
                     dbc.Row([
-                      dbc.Row([
-                        dbc.Col(
-                          html.P(f"{cnt} is the total number of traceroute alarms which involve site {site}"),
-                        align='left', width=10, className='site-details'),
-                      ]),
-                      dbc.Row([
-                        dbc.Col(
-                          html.P(f"{cntRelated} (out of {cnt}) concern a path change to ASN {alarm['asn']}. {showSample}"
-                        ), align='left', width=10, className='site-details'),
-                        dbc.Col(
-                          html.Div([
-                            html.A('View site in a new page', href=url, target='_blank',
-                                  className='btn btn-secondary site-btn', id={
-                                                                                'type': 'site-new-page-btn',
-                                                                                'index': site
-                                                                              }
-                              )
-                          ]), 
-                        align='right')
-                      ]),
-                      dbc.Row([
-                        dbc.Col(
-                          html.P(f"Other flagged AS numbers:  {diffs_str}"
-                        ), align='left', width=10, className='site-details')
-                      ])
-                      ], className='m-2 mb-1 site-header-line rounded-border-1 p-2'),
+                      dbc.Col([
+                        dbc.Row([
+                          dbc.Col(
+                            html.P(f"{cnt} is the total number of traceroute alarms which involve site {site}"),
+                          align='left', width=10, className='site-details'),
+                        ]),
+                        dbc.Row([
+                          dbc.Col(
+                            html.P(f"{cntRelated} (out of {cnt}) concern a path change to ASN {alarm['asn']}. {showSample}"
+                          ), align='left', width=10, className='site-details'),
+                        ]),
+                        dbc.Row([
+                          dbc.Col(
+                            html.P(f"Other flagged AS numbers:  {diffs_str}"
+                          ), align='left', width=10, className='site-details')
+                        ])
+                      ], width=10),
+                      dbc.Col(
+                        html.Div(
+                              html.A('View site in a new page', href=url, target='_blank',
+                                   className='btn btn-secondary site-btn', id={
+                                       'type': 'site-new-page-btn',
+                                       'index': site
+                                   }
+                              ),
+                        ), align='center'
+                      )
+                      ], className='m-2 mb-1 site-header-line rounded-border-1 p-2', justify="center", align="stretch"),
+                      
                     dbc.Row([
                       dbc.Row([
                           html.P(f'Site {site} takes part in the following alarms in the period 24h prior and up to 24h after the current alarm end ({alarm["to"]})', className='subtitle'),
@@ -418,7 +310,12 @@ def pairDetails(pair, alarm, chdf, baseline, altpaths, hopPositions):
   howPathChanged = descChange(pair, chdf, hopPositions)
   diffs = chdf[chdf["pair"]==pair]['diff'].to_list()[0]
 
-  cntAlarms = OtherAlarms(currEvent='path changed', alarmEnd=alarm['to'], src_site=sites[0], dest_site=sites[1]).formatted
+  # cntAlarms = Alarms(currEvent='path changed', alarmEnd=alarm['to'], src_site=sites[0], dest_site=sites[1]).formatted
+  print()
+  print("otherAlarms", alarm['to'], sites)
+  data = alarmsInst.getOtherAlarms(currEvent='path changed', alarmEnd=alarm['to'], pivotFrames=pivotFrames, src_site=sites[0], dest_site=sites[1])
+  print(data)
+  otherAlarms = alarmsInst.formatOtherAlarms(data)
 
   return   html.Div([
             dbc.Row([
@@ -444,8 +341,8 @@ def pairDetails(pair, alarm, chdf, baseline, altpaths, hopPositions):
                 # align="left", justify="start", className="text-right mt-10"
                 # ),
                 # dbc.Row([
-                  html.H4(f"Other networking alarms: {cntAlarms}", className="text-center"),
-                  # html.P(cntAlarms, className="text-left")
+                  html.H4(f"Other networking alarms: {otherAlarms}", className="text-center"),
+                  # html.P(otherAlarms, className="text-left")
                 ], align="left", justify="start", className="more-alarms change-section rounded-border-1 mb-1 pb-4"
                 ),
 
@@ -492,9 +389,18 @@ def pairDetails(pair, alarm, chdf, baseline, altpaths, hopPositions):
               ], className="mlr-1"),
 
               dbc.Col([
-                dbc.Row(
-                  dcc.Graph(id="graph-hops", figure=singlePlotPositions(hopPositions), className="p-1 bordered-box")
-                , align="start",),
+                dbc.Row([
+                  dcc.Graph(id="graph-hops", figure=singlePlotPositions(hopPositions), className="p-1 bordered-box mb-0"),
+                  html.P(
+                      f"The plot shows the AS numbers for every hop and the frequency of their occurences at each position (source and destination not included).",
+                      className="text-center mb-0 fs-5"),
+                  html.P(
+                      f"The dark blue values of 1 mean the ASN was always used at that position; \
+                        Close to 0, means the ASN rarely appeared; \
+                        OFF indicates the device did not respond at the time of the traceroute test;  \
+                        0 is when there was a responce, but the ASN was unknown.",
+                      className="text-center mb-0 fs-5"),
+                ], align="start", className="mb-1"),
                 dbc.Row([
                   html.Div(children=[
 
@@ -535,7 +441,7 @@ def singlePlotPositions(dd):
     )
 
     fig.update_annotations(font_size=12)
-    fig.update_layout(template='plotly_white', title='AS numbers for every hop and the frequency of their occurences at each position (source and destination not included)',
+    fig.update_layout(template='plotly_white',
                       yaxis={'visible': False, 'showticklabels': False},
                       xaxis={'title': 'Position on the path'},
                       title_font_size=12

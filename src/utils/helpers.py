@@ -1,12 +1,6 @@
-import re
-import socket
-import ipaddress
-import csv
+
 import multiprocessing as mp
-from functools import partial
-from contextlib import contextmanager
 from datetime import datetime, timedelta
-import dateutil.relativedelta
 import time
 import requests 
 import os
@@ -14,7 +8,6 @@ import pandas as pd
 import functools
 
 from elasticsearch import Elasticsearch
-from elasticsearch.helpers import scan
 import getpass
 
 
@@ -55,6 +48,14 @@ def timer(func):
     return wrapper_timer
 
 
+def getPriorNhPeriod(end, days=1):
+    fmt = '%Y-%m-%d %H:%M'
+    endT = datetime.strptime(end, fmt)
+    start = datetime.strftime(endT - timedelta(days), fmt)
+    end = datetime.strftime(endT + timedelta(days), fmt)
+    return start, end
+
+
 def getValueUnit(test_type):
     if (test_type == 'ps_packetloss'):
         return '% lost (packets) avg'
@@ -71,7 +72,7 @@ def defaultTimeRange(days=3, datesOnly=False):
     if datesOnly:
         format = '%Y-%m-%d'
     
-    now = roundTime(datetime.now()) # 1 hour
+    now = roundTime(datetime.utcnow())  # 1 hour
     defaultEnd = datetime.strftime(now, format)
     defaultStart = datetime.strftime(now - timedelta(days), format)
 

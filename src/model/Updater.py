@@ -5,7 +5,7 @@ import threading
 import traceback
 
 from utils.parquet import Parquet
-from model.OtherAlarms import OtherAlarms
+from model.Alarms import Alarms
 import utils.helpers as hp
 from utils.helpers import timer
 import model.queries as qrs
@@ -75,12 +75,13 @@ class ParquetUpdater(object):
     #     self.pq.writeToFile(altPaths, f'{location}altPaths.parquet')
 
 
-    
+    @timer
     def storeAlarms(self):
         dateFrom, dateTo = hp.defaultTimeRange(60)
-        oa = OtherAlarms(refresh=True)
-        frames, pivotFrames = oa.getAlarms(dateFrom, dateTo)
-
+        print("Update data. Get all alrms for the past 60 days...", dateFrom, dateTo)
+        oa = Alarms()
+        frames, pivotFrames = oa.getAllAlarms(dateFrom, dateTo)
+        
         for event,df in pivotFrames.items():
             filename = oa.eventCF(event)
             fdf = frames[event]
@@ -88,8 +89,9 @@ class ParquetUpdater(object):
                 self.pq.writeToFile(df, f"parquet/pivot/{filename}")
                 self.pq.writeToFile(fdf, f"parquet/frames/{filename}")
 
-
-    def createLocation(self,location):
+    
+    @staticmethod
+    def createLocation(location):
         if os.path.isdir(location):
             print(location,"exists.")
         else:

@@ -2,26 +2,26 @@ import dash
 from dash import dash_table, dcc, html
 import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, MATCH, State
-
-from elasticsearch.helpers import scan
-
 import plotly.graph_objects as go
 import plotly.express as px
 
+from elasticsearch.helpers import scan
 
 import pandas as pd
 from datetime import datetime
+import requests
+from urllib3.exceptions import InsecureRequestWarning
+import urllib3
 
-from utils.helpers import timer
-from elasticsearch.helpers import scan
 
 import utils.helpers as hp
-from model.OtherAlarms import OtherAlarms
+from utils.helpers import timer
+from model.Alarms import Alarms
+import model.queries as qrs
 
-import urllib3
+
 urllib3.disable_warnings()
-
-
+requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 def title(q=None):
     return f"Throughput alarm {q}"
@@ -50,6 +50,11 @@ def convertTime(ts):
 
 @timer
 def getRawDataFromES(src, dest, ipv6, dateFrom, dateTo):
+
+    metaDf = qrs.getMetaData()
+    sips = metaDf[(metaDf['site'] == src)]['ip'].values.tolist()
+    dips = metaDf[metaDf['site'] == dest]['ip'].values.tolist()
+
     q = {
         "query" : {  
             "bool" : {
@@ -63,25 +68,19 @@ def getRawDataFromES(src, dest, ipv6, dateFrom, dateTo):
                       }
                   },
                   {
-                    "term" : {
-                        "src_site": {
-                        "value": src,
-                        "case_insensitive": True
-                        }
+                    "terms" : {
+                      "src": sips
                     }
                   },
                   {
-                    "term" : {
-                        "dest_site": {
-                        "value":dest,
-                        "case_insensitive": True
-                        }
+                    "terms" : {
+                      "dest": dips
                     }
                   },
                   {
                     "term": {
                         "ipv6": {
-                        "value": ipv6
+                          "value": ipv6
                         }
                     }
                   }
@@ -89,7 +88,7 @@ def getRawDataFromES(src, dest, ipv6, dateFrom, dateTo):
             }
           }
         }
-    # print(idx, str(query).replace("\'", "\""))
+    # print(str(q).replace("\'", "\""))
 
     result = scan(client=hp.es,index='ps_throughput',query=q)
     data = []
@@ -105,20 +104,7 @@ def getRawDataFromES(src, dest, ipv6, dateFrom, dateTo):
 
 
 @timer
-def getAlarm(id):
-  q = {
-        "term": {
-          "source.alarm_id": id
-      }
-    }
-  data = []
-  results = hp.es.search(index='aaas_alarms', size=100, query=q)
-  for res in results['hits']['hits']:
-    data.append(res['_source'])
-  
-  print(id, data)
-  if len(data) == 1:
-    return data[0]
+
 
 
 @timer
@@ -193,80 +179,93 @@ def getSitePairs(alarm):
   return sitePairs
 
 
+alarmsInst = Alarms()
+
 def layout(q=None, **other_unknown_query_strings):
-    if q:
-      alarm = getAlarm(q)
-      print(q)
-      sitePairs = getSitePairs(alarm)
-      alarmData = alarm['source']
+  if q:
+    alarm = qrs.getAlarm(q)
+    print('URL query:', q)
+    print()
+    print('Alarm content:', alarm)
+    sitePairs = getSitePairs(alarm)
+    alarmData = alarm['source']
+    dateFrom, dateTo = hp.getPriorNhPeriod(alarmData['to'])
+    print('Alarm\'s content:', alarmData)
+    pivotFrames = alarmsInst.loadData(dateFrom, dateTo)[1]
+    data = alarmsInst.getOtherAlarms(
+                                    currEvent=alarm['event'],
+                                    alarmEnd=alarmData['to'],
+                                    pivotFrames=pivotFrames,
+                                    site=alarmData['site'] if 'site' in alarmData.keys() else None,
+                                    src_site=alarmData['src_site'] if 'src_site' in alarmData.keys() else None,
+                                    dest_site=alarmData['dest_site'] if 'dest_site' in alarmData.keys() else None
+                                    )
 
-      cntAlarms = OtherAlarms(currEvent=alarm['event'],
-                        alarmEnd=alarmData['to'],
-                        site=alarmData['site'] if 'site' in alarmData.keys() else None,
-                        src_site=alarmData['src_site'] if 'src_site' in alarmData.keys() else None,
-                        dest_site=alarmData['dest_site'] if 'dest_site' in alarmData.keys() else None).formatted
+    otherAlarms = alarmsInst.formatOtherAlarms(data)
 
-      expand = True
-      alarmsIn48h = ''
-      if alarm['event'] not in ['bandwidth decreased', 'bandwidth increased']:
-        expand = False
-        alarmsIn48h = dbc.Row([
-                        dbc.Row([
-                              html.P(f'Site {alarmData["site"]} takes part in the following alarms in the period 24h prior and up to 24h after the current alarm end ({alarmData["to"]})', className='subtitle'),
-                              html.B(cntAlarms, className='subtitle')
-                          ], className="boxwithshadow alarm-header pair-details g-0", justify="between", align="center"),
-                      ], style={"padding": "0.5% 1.5%"}, className='g-0')
+    expand = True
+    alarmsIn48h = ''
+    if alarm['event'] not in ['bandwidth decreased', 'bandwidth increased']:
+      expand = False
+      alarmsIn48h = dbc.Row([
+                      dbc.Row([
+                            html.P(f'Site {alarmData["site"]} takes part in the following alarms in the period 24h prior \
+                              and up to 24h after the current alarm end ({alarmData["to"]})', className='subtitle'),
+                            html.B(otherAlarms, className='subtitle')
+                        ], className="boxwithshadow alarm-header pair-details g-0", justify="between", align="center"),
+                    ], style={"padding": "0.5% 1.5%"}, className='g-0')
 
 
-      return html.Div([
-              dbc.Row([
-                dbc.Row([
-                  dbc.Col([
-                    html.H3(f"{alarm['event'].upper()}", className="text-center bold p-4"),
-                  ], width=2),
-                  dbc.Col(
-                      html.Div(
-                        [
-                          dbc.Row([
-                            dbc.Row([
-                              html.H1(f"Summary", className="text-left"),
-                              html.Hr(className="my-2")]),
-                            dbc.Row([
-                              html.P(buildSummary(alarm), className='subtitle'),
-                              ], justify="start"),
-                            ])
-                        ],
-                      ),
-                  width=10)
-                ], className="boxwithshadow alarm-header pair-details g-0", justify="between", align="center")                
-              ], style={"padding": "0.5% 1.5%"}, className='g-0'),
-            alarmsIn48h,
-            dcc.Store(id='alarm-store', data=alarm),
+    return html.Div([
             dbc.Row([
-              html.Div(id=f'site-section-throughput{i}',
-                children=[
-                  dbc.Button(
-                      alarmData['src_site']+' to '+alarmData['dest_site'],
-                      value = alarmData,
+              dbc.Row([
+                dbc.Col([
+                  html.H3(alarm['event'].upper(), className="text-center bold p-4"),
+                  html.H5(alarmData['to'], className="text-center bold"),
+                ], width=2),
+                dbc.Col(
+                    html.Div(
+                      [
+                        dbc.Row([
+                          dbc.Row([
+                            html.H1(f"Summary", className="text-left"),
+                            html.Hr(className="my-2")]),
+                          dbc.Row([
+                              html.P(alarmsInst.buildSummary(alarm), className='subtitle'),
+                            ], justify="start"),
+                          ])
+                      ],
+                    ),
+                width=10)
+              ], className="boxwithshadow alarm-header pair-details g-0", justify="between", align="center")                
+            ], style={"padding": "0.5% 1.5%"}, className='g-0'),
+          alarmsIn48h,
+          dcc.Store(id='alarm-store', data=alarm),
+          dbc.Row([
+            html.Div(id=f'site-section-throughput{i}',
+              children=[
+                dbc.Button(
+                    alarmData['src_site']+' to '+alarmData['dest_site'],
+                    value = alarmData,
+                    id={
+                        'type': 'tp-collapse-button',
+                        'index': f'throughput{i}'
+                    },
+                    className="collapse-button",
+                    color="white",
+                    n_clicks=0,
+                ),
+                dcc.Loading(
+                  dbc.Collapse(
                       id={
-                          'type': 'tp-collapse-button',
+                          'type': 'tp-collapse',
                           'index': f'throughput{i}'
                       },
-                      className="collapse-button",
-                      color="white",
-                      n_clicks=0,
-                  ),
-                  dcc.Loading(
-                    dbc.Collapse(
-                        id={
-                            'type': 'tp-collapse',
-                            'index': f'throughput{i}'
-                        },
-                        is_open=expand, className="collaps-container rounded-border-1"
-                  ), color='#e9e9e9', style={"top":0}),
-                ]) for i, alarmData in enumerate(sitePairs)
-              ], className="rounded-border-1 g-0", align="start", style={"padding": "0.5% 1.5%"})
-            ])
+                      is_open=expand, className="collaps-container rounded-border-1"
+                ), color='#e9e9e9', style={"top":0}),
+              ]) for i, alarmData in enumerate(sitePairs)
+            ], className="rounded-border-1 g-0", align="start", style={"padding": "0.5% 1.5%"})
+          ])
 
 
 
@@ -284,23 +283,31 @@ def layout(q=None, **other_unknown_query_strings):
 )
 def toggle_collapse(n, alarmData, alarm, is_open):
   data = ''
+
+  dateFrom, dateTo = hp.getPriorNhPeriod(alarm['source']['to'])
+  pivotFrames = alarmsInst.loadData(dateFrom, dateTo)[1]
   if n:
     if is_open==False:
-      data = buildGraphComponents(alarmData, alarm['source']['from'], alarm['source']['to'], alarm['event'])
+      data = buildGraphComponents(alarmData, alarm['source']['from'], alarm['source']['to'], alarm['event'], pivotFrames)
     return [not is_open, data]
   if is_open==True:
-    data = buildGraphComponents(alarmData, alarm['source']['from'], alarm['source']['to'], alarm['event'])
+    data = buildGraphComponents(alarmData, alarm['source']['from'], alarm['source']['to'], alarm['event'], pivotFrames)
     return [is_open, data]
   return [is_open, data]
 
 
 
 @timer
-def buildGraphComponents(alarmData, dateFrom, dateTo, event):
+def buildGraphComponents(alarmData, dateFrom, dateTo, event, pivotFrames):
+
   df = getRawDataFromES(alarmData['src_site'], alarmData['dest_site'], alarmData['ipv6'], dateFrom, dateTo)
   df.loc[:, 'MBps'] = df['throughput'].apply(lambda x: round(x/1e+6, 2))
+
   
-  cntAlarms = OtherAlarms(currEvent=event, alarmEnd=dateTo, src_site=alarmData['src_site'], dest_site=alarmData['dest_site']).formatted
+  data = alarmsInst.getOtherAlarms(currEvent=event, alarmEnd=dateTo, pivotFrames=pivotFrames,
+                                   src_site=alarmData['src_site'], dest_site=alarmData['dest_site'])
+  print(data)
+  otherAlarms = alarmsInst.formatOtherAlarms(data)
 
   return html.Div(children=[
           dbc.Row([
@@ -326,7 +333,7 @@ def buildGraphComponents(alarmData, dateFrom, dateTo, event):
               dbc.Row([
                 html.H4( f"Total number of throughput measures: {len(df)}", className="text-center"),
                 html.H4(f"Other networking alarms", className="text-center"),
-                html.H4(cntAlarms, className="text-center"),
+                html.H4(otherAlarms, className="text-center"),
               ], align="left", justify="center", className="more-alarms change-section rounded-border-1 mb-1 pb-4")
             ], width={"size":"4"}, align="center"),
             dbc.Col([

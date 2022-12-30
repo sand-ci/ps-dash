@@ -4,17 +4,16 @@ import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, State
 from flask import request
 
-from elasticsearch.helpers import scan
 
 import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime
 from datetime import date
-import traceback
 import pandas as pd
 from elasticsearch.helpers import scan
 
 import utils.helpers as hp
+from model.Alarms import Alarms
 
 import urllib3
 urllib3.disable_warnings()
@@ -37,96 +36,6 @@ dash.register_page(
     title=title,
     description=description,
 )
-
-
-
-
-def getAlarm(period):
-    dateFrom, dateTo = convertTime(period[0]), convertTime(period[1])
-    q = {
-          "query" : {  
-              "bool" : {
-                "must" : [
-                  {
-                    "range": {
-                      "created_at": {
-                        "gte": dateFrom
-                      }
-                    }
-                  },
-                  {
-                    "range": {
-                        "created_at": {
-                        "lte": dateTo
-                        }
-                    }
-                  },
-                  {
-                    "term": {
-                      "category": {
-                        "value": "Networking"
-                      }
-                    }
-                  }
-                ]
-              }
-            }
-          }
-    result = scan(client=hp.es,index='aaas_alarms',query=q)
-    single = ['src_site', 'dest_site', 'site']
-    multy = ['sites']
-    multy = ['dest_sites', 'src_sites', 'sites']
-    sites = []
-    eventTypes = {}
-
-    for res in result:
-      item = res['_source']
-
-      rec = {}
-      subcategory = item['subcategory']
-      event = item['event']
-      rec = {
-        'subcategory': subcategory,
-        'event': event,
-      }
-      
-      for k,v in item['source'].items():
-        if k in single and v == v:
-                sites.append({'site': v, 'event': rec['event']})
-
-        if k in multy and v == v and len(v)>0:
-            for site in v:
-                sites.append({'site': site, 'event': rec['event']})
-
-
-      event = item['event']
-      temp = []
-      if event in eventTypes.keys():
-          temp = eventTypes[event]
-    #   else: print(event)
-
-      desc = item['source']
-      tags = item['tags']
-      desc['tag'] = tags
-      temp.append(item['source'])
-      eventTypes[event] = temp
-
-      
-      # most alarms tag sites, but some tag nodes instead
-      # taggedNodes = ['large clock correction']
-      # for t in tags:
-      #     if event in taggedNodes:
-      #         site = metaDf[metaDf['host']==t]['site'].values[0]
-      #         print(metaDf[metaDf['host']==t][['host','site']].values)
-      #         t = site
-
-
-    sitesdf = pd.DataFrame(sites)
-    scntdf = sitesdf.groupby(['site', 'event']).size().reset_index().rename(columns={0:'cnt'})
-
-
-    return [scntdf, eventTypes]
-
         
 
 def convertTime(ts):
@@ -182,10 +91,6 @@ def layout(**other_unknown_query_strings):
         ], className="p-1 site boxwithshadow page-cont mb-2 g-0", justify="center", align="center"),
         html.Br(),
         html.Br(),
-        # html.Iframe(src="https://atlas-kibana.mwt2.org:5601/s/aaas/app/dashboards?embed=true&auth_provider_hint=anonymous1#/view/c8ad7c20-5ad5-11ed-afcf-d91dad577662?_g=(filters:!(),refreshInterval:(pause:!t,value:0),time:(from:now-90d%2Fd,to:now))&_a=(description:'',filters:!(),fullScreenMode:!f,options:(hidePanelTitles:!f,syncColors:!f,syncTooltips:!f,useMargins:!t),panels:!((embeddableConfig:(enhancements:()),gridData:(h:18,i:dc51f967-3307-4579-94c5-f670f824f5a5,w:48,x:0,y:0),id:'3701e950-5ac6-11ed-afcf-d91dad577662',panelIndex:dc51f967-3307-4579-94c5-f670f824f5a5,type:search,version:'8.3.2')),query:(language:kuery,query:'source.site.keyword%20:USCMS-FNAL-WC1%20or%20source.src_site.keyword%20:USCMS-FNAL-WC1%20or%20source.src_sites.keyword%20:USCMS-FNAL-WC1%20or%20source.dest_site.keyword%20%20:USCMS-FNAL-WC1%20or%20source.dest_sites.keyword%20USCMS-FNAL-WC1'),tags:!('2d860c77-eb5b-5b73-bb1d-1439d2eff4c1'),timeRestore:!f,title:search4site,viewMode:view)&hide-filter-bar=true",
-        #         style={"height": "567px", "width": "100%"}
-                
-        #         ),
         dbc.Row([
             dbc.Row([
                 html.H1(f"List of alarms", className="text-center"),
@@ -210,7 +115,7 @@ def colorMap(eventTypes):
           ]
 
   paletteDict = {}
-  for i,e in enumerate(eventTypes.keys()):
+  for i,e in enumerate(eventTypes):
       paletteDict[e] = colors[i]
   
   return paletteDict
@@ -239,50 +144,54 @@ def update_output(start_date, end_date, sites, all, events, allevents, sitesStat
     if start_date and end_date:
         period = [f'{start_date} 00:01', f'{end_date} 23:59']
     else: period = hp.defaultTimeRange(1)
-    
-    print(sites, all, events, allevents, sitesState, eventsState)
 
-    scntdf, eventTypes = getAlarm(period)
-    frames, pivotFrames = unpackAlarms(eventTypes)
-    scntdf['site'] = scntdf['site'].str.upper()
+    alarmsInst = Alarms()
+    frames, pivotFrames = alarmsInst.loadData(period[0], period[1])
+
+    scntdf = pd.DataFrame()
+    for e, df in pivotFrames.items():
+        df = df[df['tag'] != ''].groupby('tag')[['id']].count(
+        ).reset_index().rename(columns={'id': 'cnt', 'tag': 'site'})
+        df['event'] = e
+        scntdf = pd.concat([scntdf, df])
 
     # sites
     graphData = scntdf.copy()
-    if (sitesState is not None and len(sitesState)>0):
-      graphData = graphData[graphData['site'].isin(sitesState)]
+    if (sitesState is not None and len(sitesState) > 0):
+        graphData = graphData[graphData['site'].isin(sitesState)]
 
     sdropdown_items = []
     for s in sorted(scntdf['site'].unique()):
         sdropdown_items.append({"label": s.upper(), "value": s.upper()})
 
     # events
-    if eventsState is not None and len(eventsState)>0:
+    if eventsState is not None and len(eventsState) > 0:
         graphData = graphData[graphData['event'].isin(eventsState)]
 
     edropdown_items = []
     for e in sorted(scntdf['event'].unique()):
         edropdown_items.append({"label": e, "value": e})
 
-    
+
     fig = go.Figure(data=px.sunburst(
-            graphData, path=['event', 'site'], 
-            values='cnt', 
-            color='event', 
-            color_discrete_map=colorMap(eventTypes)
-          ))
+        graphData, path=['event', 'site'],
+        values='cnt',
+        color='event',
+        color_discrete_map=colorMap(pivotFrames.keys())
+        ))
     fig.update_layout(
-        margin=dict(l=20, r=20, t=20, b=20),
+    margin=dict(l=20, r=20, t=20, b=20),
     )
 
-
     dataTables = []
-    events = list(eventTypes.keys()) if not eventsState or events else eventsState
+    events = list(pivotFrames.keys()) if not eventsState or events else eventsState
 
     for event in sorted(events):
         df = pivotFrames[event]
-        df = df[df['tag'].isin(sitesState)] if sitesState is not None and len(sitesState)>0 else df
-        if len(df)>0:
-            dataTables.append(generate_tables(frames, df, event))
+        df = df[df['tag'].isin(sitesState)] if sitesState is not None and len(sitesState) > 0 else df
+        if len(df) > 0:
+            dataTables.append(generate_tables(
+                frames[event], df, event, alarmsInst))
     dataTables = html.Div(dataTables)
 
 
@@ -308,92 +217,35 @@ def list2str(vals, sign):
 
 
 
-
-def unpackAlarms(eventTypes):
-  frames, pivotFrames = {},{}
-
-  sign = {'bandwidth increased from/to multiple sites': '+',
-          'bandwidth decreased from/to multiple sites': '-'}
-
-  try:
-    for event, alarms in eventTypes.items():
-          df =  pd.DataFrame(alarms)
-          df['tag'] = df['tag'].apply(lambda vals: [x.upper() for x in vals])
-          df['tag_str'] = df['tag'].apply(lambda x: ', '.join(x))
-          
-          if 'sites' in df.columns:
-              df['sites'] = df['tag'].apply(lambda x: ' \n '.join(x))
-          if 'hosts' in df.columns:
-              df['hosts'] = df['hosts'].apply(lambda x: ' \n '.join(x))
-          if 'cannotBeReachedFrom' in df.columns:
-              df['cannotBeReachedFrom'] = df['cannotBeReachedFrom'].apply(lambda x: ' \n '.join(x))
-          
-          if 'dest_change' in df.columns:
-              df['dest_change'] = df[['dest_sites','dest_change']].apply(lambda x: list2str(x, sign[event]), axis=1)
-          if 'src_change' in df.columns:
-              df['src_change'] = df[['src_sites','src_change']].apply(lambda x: list2str(x, sign[event]), axis=1)
-
-          if 'dest_loss%' in df.columns:
-              df['to_dest_loss'] = df[['dest_sites','dest_loss%']].apply(lambda x: list2str(x, ''), axis=1)
-          if 'src_loss%' in df.columns:
-              df['from_src_loss'] = df[['src_sites','src_loss%']].apply(lambda x: list2str(x, ''), axis=1)
-
-          
-          frames[event] = df
-          # display(df)
-          df = list2rows(df)
-          df['id'] = df.index
-          # metaDf = metaDf[(metaDf['site']!='')&(metaDf['lat']!='')].sort_values(['site','lat'], na_position='last').drop_duplicates()
-
-          # if e not in taggedNodes:
-          #     df = pd.merge(metaDf[['site','lat','lon']], df, left_on='site', right_on='tag', how='right')
-          # else:
-          #     df = pd.merge(metaDf[['host','lat','lon','site']], df, left_on='host', right_on='tag', how='right')
-
-          if 'site_x' in df.columns:
-              df = df.drop(columns=['site_x']).rename(columns={'site_y': 'site'})
-
-        #   print('df', df.columns)
-          pivotFrames[event] = df
-    return [frames, pivotFrames]
-  except Exception as e:
-      print(traceback.format_exc())
-
-  
-
-
-
 # '''Takes selected site from the Geo map and generates a Dash datatable'''
-def generate_tables(frames, pivotFrames, event):
-    # if alarmCnt[alarmCnt['site']==site]['cnt'].values[0] > 0:
-    # for event in sorted(sites[site]):
-    # eventDf = pivotFrames[event]
-
-    # find all cases where selected site was pinned in tag field
-    # if event not in taggedNodes:
-    #     ids = eventDf[eventDf['tag']==site]['id'].values
-    # else: ids = eventDf[eventDf['site']==site]['id'].values
-
-    
-    # pivotFrames
+def generate_tables(frame, pivotFrames, event, alarmsInst):
     ids = pivotFrames['id'].values
-    tagsDf = frames[event]
+    dfr = frame[frame.index.isin(ids)]
+    dfr = alarmsInst.formatDfValues(dfr, event).sort_values('to', ascending=False)
 
-    dfr = tagsDf[tagsDf.index.isin(ids)]
+    if event.startswith('bandwidth'):
+        page = 'throughput/'
+    elif event == 'path changed':
+        page = 'paths/'
+    elif event in ['firewall issue', 'complete packet loss', 'bandwidth decreased from/to multiple sites', 'high packet loss on multiple links', 'high packet loss']:
+        page = 'loss-delay/'
 
     columns = dfr.columns.tolist()
     columns.remove('tag')
-    if event in ['bandwidth decreased from/to multiple sites',
-                'bandwidth increased from/to multiple sites',
-                'high packet loss on multiple links']:
-        columns = [el for el in columns if el not in ['src_sites', 'dest_sites', 'src_change', 'dest_change', 'src_loss%', 'dest_loss%', 'tag_str']]
+    columns.remove('id')
 
-    
     # create clickable cells leading to alarm pages
     if 'alarm_id' in columns:
-        page = 'paths/' if event == 'path changed' else 'throughput/'
         url = f'{request.host_url}{page}'
         dfr['alarm_id'] = dfr['alarm_id'].apply(lambda id: f"<a href='{url}{id}' target='_blank'>VIEW</a>")
+
+    
+    if event in ['bandwidth decreased from/to multiple sites',
+                 'bandwidth increased from/to multiple sites',
+                 'high packet loss on multiple links']:
+        columns = [el for el in columns if el not in ['src_sites', 'dest_sites',
+                                                      'src_change', 'dest_change',
+                                                      'src_loss%', 'dest_loss%', 'tag_str']]
 
     element = html.Div([
                 html.Br(),

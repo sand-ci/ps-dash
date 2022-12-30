@@ -3,198 +3,46 @@ from dash import Dash, dash_table, dcc, html
 import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output
 
-from elasticsearch.helpers import scan
-
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
 
 import pandas as pd
-import traceback
 
-from utils.parquet import Parquet
+
 from model.Updater import ParquetUpdater
+from model.Alarms import Alarms
 import utils.helpers as hp
 from utils.helpers import timer
+import model.queries as qrs
+from utils.parquet import Parquet
 
 
+def countDistEvents(alarmCnt):
+    # NOTE: taking only the first found location for a given site name.
+    # Alarms are mostly based on sites, and we cannot destinguish
+    # at which location the issue appeared,
+    # since the alrm does not (generally) contain hosts/ips
+    def groupByEvent(group):
+        return pd.Series([group['event'].unique(), group.lat.values[0], group.lon.values[0], len(group['event'].unique())])
 
-@timer
-def getAlarms(period, metaDf, taggedNodes):
-    q = {
-      "query" : {
-        "bool": {
-          "must": [
-              {
-                "range" : {
-                  "created_at" : {
-                    "from" : period[0],
-                    "to": period[1]
-                  }
-                }
-              },
-              {
-              "term" : {
-                "category" : {
-                  "value" : "Networking",
-                  "boost" : 1.0
-                }
-              }
-            }
-          ]
-        }
-      }
-    }
-    result = scan(client=hp.es,index='aaas_alarms',query=q)
-    data = {}
-    
-    sites = {}
-    for item in result:
-        event = item['_source']['event']
-        temp = []
-        if event in data.keys():
-            temp = data[event]
-        else: print(event)
+    mapDf = alarmCnt[['site', 'event', 'lat', 'lon']].groupby('site').apply(groupByEvent).reset_index()
+    mapDf.columns = ['site', 'event', 'lat', 'lon', 'cnt']
+    mapDf['lat'] = mapDf['lat'].astype(float)
+    mapDf['lon'] = mapDf['lon'].astype(float)
 
-        desc = item['_source']['source']
-        tags = item['_source']['tags']
-        desc['tag'] = tags
-        temp.append(item['_source']['source'])
-        data[event] = temp
-        
-        for t in tags:
-
-            #TODO add the clock alarms after the recent tags update
-            # if event in taggedNodes:
-            #     site = metaDf[metaDf['host']==t]['site'].values[0]
-            #     print(metaDf[metaDf['host']==t][['host','site']].values)
-            #     t = site
-
-            if t in sites.keys():
-                if event not in sites[t]:
-                    temp = sites[t]
-                    temp.append(event)
-                    sites[t] = temp
-            else: sites[t] = [event] 
-
-    return [data, sites]
-
+    return mapDf
 
 
 @timer
-def getMetaData():
-    meta = []
-    data = scan(hp.es, index='ps_alarms_meta')
-    for item in data:
-        meta.append(item['_source'])
-
-    if meta:
-        return pd.DataFrame(meta)
-    else: print('No metadata!')
-
-
-@timer
-def unpackAlarms(data, metaDf, taggedNodes):
-    events = ['path changed', 'large clock correction', 'high packet loss', 'high packet loss on multiple links',
-            'complete packet loss', 'bandwidth decreased from/to multiple sites', 'bandwidth decreased',
-            'bandwidth increased from/to multiple sites', 'bandwidth increased', 'destination cannot be reached from any',
-            'source cannot reach any', 'destination cannot be reached from multiple', 'firewall issue']
-
-    # print(data.keys())
-    frames, pivotFrames = {},{}
-
-
-    def list2rows(df):
-        s = df.apply(lambda x: pd.Series(x['tag']),axis=1).stack().reset_index(level=1, drop=True)
-        s.name = 'tag'
-        df = df.drop('tag', axis=1).join(s)
-
-        return df
-
-
-    def list2str(vals, sign):
-        # print(vals.values)
-        values = vals.values
-        temp = ''
-        for i, s in enumerate(values[0]):
-            temp += f'{s}: {sign}{values[1][i]}% \n'
-
-        return temp
-
-
-    sign = {'bandwidth increased from/to multiple sites': '+',
-            'bandwidth decreased from/to multiple sites': '-'}
-
-    try:
-        for e in events:
-            if e in data.keys():
-                df =  pd.DataFrame(data[e])
-                df['tag_str'] = df['tag'].apply(lambda x: ', '.join(x))
-                
-                if 'sites' in df.columns:
-                    df['sites'] = df['tag'].apply(lambda x: ' \n '.join(x))
-                if 'hosts' in df.columns:
-                    df['hosts'] = df['hosts'].apply(lambda x: ' \n '.join(x))
-                if 'cannotBeReachedFrom' in df.columns:
-                    df['cannotBeReachedFrom'] = df['cannotBeReachedFrom'].apply(lambda x: ' \n '.join(x))
-                
-                if 'dest_change' in df.columns:
-                    df['dest_change']=df[['dest_sites','dest_change']].apply(lambda x: list2str(x, sign[e]), axis=1)
-                if 'src_change' in df.columns:
-                    df['src_change']=df[['src_sites','src_change']].apply(lambda x: list2str(x, sign[e]), axis=1)
-
-                if 'dest_loss%' in df.columns:
-                    df['dest_loss%']=df[['dest_sites','dest_loss%']].apply(lambda x: list2str(x, ''), axis=1)
-                if 'src_loss%' in df.columns:
-                    df['src_loss%']=df[['src_sites','src_loss%']].apply(lambda x: list2str(x, ''), axis=1)
-
-
-                frames[e] = df
-
-                df = list2rows(df)
-                df['id'] = df.index
-                metaDf = metaDf[(metaDf['site']!='')&(metaDf['lat']!='')].sort_values(['site','lat'], na_position='last').drop_duplicates()
-
-                if e not in taggedNodes:
-                    df = pd.merge(metaDf[['site','lat','lon']], df, left_on='site', right_on='tag', how='right')
-                else:
-                    df = pd.merge(metaDf[['host','lat','lon','site']], df, left_on='host', right_on='tag', how='right')
-
-                if 'site_x' in df.columns:
-                    df = df.drop(columns=['site_x']).rename(columns={'site_y': 'site'})
-
-                pivotFrames[e] = df
-    except Exception as e:
-        print(traceback.format_exc())
-
-    return [frames, pivotFrames]
-
-
-def groupAlarms(sites, metaDf):
-    alarmCnt = []
-    for s,v in sites.items():
-        if s:
-            alarmCnt.append({'site': s, 'cnt': len(v), 'events': v})
-    alarmCnt = pd.DataFrame(alarmCnt)
-    alarmCnt = pd.merge(metaDf[['site','lat','lon']].drop_duplicates(), alarmCnt, left_on='site', right_on='site', how='left')
-    alarmCnt = alarmCnt[(alarmCnt['lat']!='')&(alarmCnt['lon']!='')&(alarmCnt['site']!='')]
-    alarmCnt = alarmCnt.fillna(0)
-
-    return alarmCnt
-
-
-
-def builMap():
-    alarmCnt['lat'] = alarmCnt['lat'].astype(float)
-    alarmCnt['lon'] = alarmCnt['lon'].astype(float)
-
-    fig = px.scatter_mapbox(data_frame=alarmCnt, lat="lat", lon="lon",
+def builMap(mapDf):
+    fig = px.scatter_mapbox(data_frame=mapDf, lat="lat", lon="lon",
                             color="cnt", 
                             size="cnt",
                             color_continuous_scale=px.colors.sequential.deep,
                             size_max=10,
                             hover_name="site",
-                            custom_data=['site', 'events'],
+                            custom_data=['site', 'event'],
                             zoom=1
                         )
     fig.update_traces(
@@ -224,13 +72,14 @@ def builMap():
         )
         )
 
-    fig.update_layout(template='plotly_white', title=f'Distinct events/alarms for the period: {dateFrom} - {dateTo}')
+    fig.update_layout(template='plotly_white')
     # fig.update_annotations(font_size=12)
     # py.offline.plot(fig)
 
     return fig
 
 
+@timer
 # Generates the 4 plot for the 
 def SitesOverviewPlots(site_name, direction, metaDf, measures):
     units = {
@@ -358,41 +207,107 @@ def SitesOverviewPlots(site_name, direction, metaDf, measures):
 
     return fig
 
+import time 
+
+@timer
+def groupAlarms(pivotFrames, metaDf):
+  nodes = metaDf[~(metaDf['site'].isnull()) & ~(
+      metaDf['site'] == '') & ~(metaDf['lat'] == '') & ~(metaDf['lat'].isnull())]
+  alarmCnt = []
+
+  for site, lat, lon in nodes[['site', 'lat', 'lon']].drop_duplicates().values.tolist():
+    for e, df in pivotFrames.items():
+      sdf = df[(df['tag'] == site) & ((df['to'] >= dateFrom) | (df['from'] >= dateFrom))]
+      if not sdf.empty:
+        entry = {"event": e, "site": site, 'cnt': len(sdf),
+                 "lat": lat, "lon": lon}
+        alarmCnt.append(entry)
+
+  return pd.DataFrame(alarmCnt)
 
 
+@timer
+# '''Takes selected site from the Geo map and generates a Dash datatable'''
+def generate_tables(site):
+    out = []
+    alarms4Site = alarmCnt[alarmCnt['site'] == site]
+
+    if len(alarms4Site) > 0:
+        for event in sorted(alarms4Site['event'].unique()):
+            eventDf = pivotFrames[event]
+            # find all cases where selected site was pinned in tag field
+            ids = eventDf[(eventDf['tag'] == site) & ((eventDf['to'] >= dateFrom) | (eventDf['from'] >= dateFrom))]['id'].values
+
+            tagsDf = frames[event]
+            dfr = tagsDf[tagsDf.index.isin(ids)]
+            dfr = alarmsInst.formatDfValues(dfr, event).sort_values('to', ascending=False)
+
+            if len(ids):
+                element = html.Div([
+                    html.H3(event.upper()),
+                    dash_table.DataTable(
+                        data=dfr.to_dict('records'),
+                        columns=[{"name": i, "id": i}
+                                for i in dfr.columns],
+                        id='tbl',
+                        page_size=20,
+                        style_cell={
+                            'padding': '2px',
+                            'font-size': '13px',
+                            'whiteSpace': 'pre-line'
+                        },
+                        style_header={
+                            'backgroundColor': 'white',
+                            'fontWeight': 'bold'
+                        },
+                        style_data={
+                            'height': 'auto',
+                            'lineHeight': '15px',
+                            'overflowX': 'auto'
+                        },
+                        filter_action="native",
+                        sort_action="native",
+                    ),
+                ], className='single-table')
+
+                out.append(element)
+    else:
+        out = html.Div(html.H3('No events'))
+
+    return out
 
 
 dash.register_page(__name__, path='/')
 
 # cache the data needed for the overview charts. Run the code on the background every 2 min and store the data in /parquet.
 ParquetUpdater()
-
-
-# most alarms tag sites, but some tag nodes instead
-taggedNodes = ['large clock correction']
-
 pq = Parquet()
-metaDf = getMetaData()
+
 
 dateFrom, dateTo = hp.defaultTimeRange(1)
-# dateFrom, dateTo = ['2022-05-25 09:40', '2022-05-25 21:40']
-data, sites = getAlarms(hp.GetTimeRanges(dateFrom, dateTo), metaDf, taggedNodes)
+# dateFrom, dateTo = ['2022-12-11 09:40', '2022-12-11 21:40']
+alarmsInst = Alarms()
+frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
+metaDf = qrs.getMetaData()
 
-frames, pivotFrames = unpackAlarms(data, metaDf, taggedNodes)
-alarmCnt = groupAlarms(sites, metaDf)
-
+alarmCnt = groupAlarms(pivotFrames, metaDf)
+eventCnt = countDistEvents(alarmCnt)
+print(f'Number of alarms: {len(alarmCnt)}')
+print(f'Alarm types: {pivotFrames.keys()}')
 
 
 layout = html.Div(
             dbc.Row([
+                dbc.Row([
+                    dbc.Col(id='selected-site', className='cls-selected-site', align="start"),
+                    dbc.Col(html.H2(f'Alarms reported in the past 24 hours ({dateTo} UTC)'), className='cls-selected-site')
+                ], align="start", className='boxwithshadow mb-2 g-0'),
                 dbc.Row(
                     dcc.Loading(
-                        dcc.Graph(figure=builMap(), id='site-map', className='cls-site-map boxwithshadow page-cont mb-2'),
+                        dcc.Graph(figure=builMap(eventCnt), id='site-map',
+                                  className='cls-site-map boxwithshadow page-cont mb-2'),
                     ), className='g-0'
                 ),
-                dbc.Row([
-                         dbc.Col(dcc.Loading(id='selected-site'), className='cls-selected-site')
-                         ], align="center", className='boxwithshadow mb-2 g-0'),
                 dbc.Row([
                          dbc.Col(
                              dcc.Loading(
@@ -422,7 +337,7 @@ layout = html.Div(
 
 
 
-# '''Takes selected site from the Geo map and displays the relevant information'''
+# # '''Takes selected site from the Geo map and displays the relevant information'''
 @dash.callback(
     [
         Output('datatables', 'children'),
@@ -435,60 +350,7 @@ layout = html.Div(
 def display_output(value):
     if value is not None:
         location = value['points'][0]['customdata'][0]
-    else: location = list(sites)[1]
-    print('--------------------------',len(sites))
+    else:
+        location = eventCnt[eventCnt['cnt'] == eventCnt['cnt'].max()]['site'].values[0]
     measures = pq.readFile('parquet/raw/measures.parquet')
     return [generate_tables(location), html.H1(f'Selected site: {location}'), SitesOverviewPlots(location, 'src', metaDf, measures), SitesOverviewPlots(location, 'dest', metaDf, measures)]
-
-
-
-
-# '''Takes selected site from the Geo map and generates a Dash datatable'''
-def generate_tables(site):
-    out = []
-
-    if alarmCnt[alarmCnt['site']==site]['cnt'].values[0] > 0:
-        for event in sorted(sites[site]):
-            eventDf = pivotFrames[event]
-
-            # find all cases where selected site was pinned in tag field
-            if event not in taggedNodes:
-                ids = eventDf[eventDf['tag']==site]['id'].values
-            else: ids = eventDf[eventDf['site']==site]['id'].values
-
-            tagsDf = frames[event]
-            dfr = tagsDf[tagsDf.index.isin(ids)]
-                
-            columns = dfr.columns.tolist()
-            columns.remove('tag')
-            if event in ['bandwidth decreased from/to multiple sites', 'bandwidth increased from/to multiple sites']:
-                columns = [el for el in columns if el not in ['src_sites', 'dest_sites', 'src_change', 'dest_change']]
-
-            element = html.Div([
-                        html.H3(event.upper()),
-                        dash_table.DataTable(
-                            data=dfr[columns].to_dict('records'),
-                            columns=[{"name": i, "id": i} for i in columns],
-                            id='tbl',
-                            style_cell={
-                                'padding': '2px',
-                                'whiteSpace': 'pre-line'
-                                },
-                            style_header={
-                                'backgroundColor': 'white',
-                                'fontWeight': 'bold'
-                            },
-                            style_data={
-                                'height': 'auto',
-                                'lineHeight': '15px',
-                                'overflowX': 'auto'
-                            },
-                            filter_action="native",
-                            sort_action="native",
-                        ),
-                    ], className='single-table')
-
-            out.append(element)
-    else: out = html.Div(html.H3('No events'))
-
-    return out
