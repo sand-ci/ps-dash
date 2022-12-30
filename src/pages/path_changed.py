@@ -39,27 +39,6 @@ dash.register_page(
 )
 
 
-@timer
-def getASNInfo(ids):
-
-    query = {
-        "query": {
-            "terms": {
-                "_id": ids
-            }
-        }
-    }
-
-    # print(str(query).replace("\'", "\""))
-    asnDict = {}
-    data = scan(hp.es, index='ps_asns', query=query)
-    if data:
-      for item in data:
-          asnDict[str(item['_id'])] = item['_source']['owner']
-    else: print(ids, 'Not found')
-
-    return asnDict
-
 
 chdf, posDf, baseline, altPaths = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 dateFrom, dateTo, frames, pivotFrames =  None, None, None, None
@@ -276,8 +255,6 @@ def buildSiteBox(site, cnt, chdf, posDf, baseline, altPaths, alarm):
 )
 def toggle_collapse(n, pair, alarm, is_open):
     data = ''
-    # pq = Parquet()
-    # location = 'parquet/raw/'
     global chdf
     global posDf
     global baseline
@@ -310,7 +287,6 @@ def pairDetails(pair, alarm, chdf, baseline, altpaths, hopPositions):
   howPathChanged = descChange(pair, chdf, hopPositions)
   diffs = chdf[chdf["pair"]==pair]['diff'].to_list()[0]
 
-  # cntAlarms = Alarms(currEvent='path changed', alarmEnd=alarm['to'], src_site=sites[0], dest_site=sites[1]).formatted
   print()
   print("otherAlarms", alarm['to'], sites)
   data = alarmsInst.getOtherAlarms(currEvent='path changed', alarmEnd=alarm['to'], pivotFrames=pivotFrames, src_site=sites[0], dest_site=sites[1])
@@ -411,12 +387,12 @@ def pairDetails(pair, alarm, chdf, baseline, altpaths, hopPositions):
                       ]),
                       dbc.Row([
                         dbc.Col(html.B(str(round(item['atPos']))), className='text-right'),
-                        dbc.Col(html.B(item['jumped2']), className=' text-center'),
+                        dbc.Col(html.B(item['jumpedFrom']), className=' text-center'),
                         dbc.Col(html.B(item['diff']), className=' text-center')
                       ]),
                       dbc.Row([
                         dbc.Col(html.P(''), className=''),
-                        dbc.Col(html.P(item['jumpOwner']), className=' text-center'),
+                        dbc.Col(html.P(item['jumpedFromOwner']), className=' text-center'),
                         dbc.Col(html.P(item['diffOwner']), className=' text-center')
                       ]),
                     ], className='mb-1 change-section rounded-border-1')
@@ -435,6 +411,7 @@ def singlePlotPositions(dd):
             y = dd['asn'].astype(str).values,
             x = dd['pos'].astype(str).values,
             z = dd['P'].values,
+            zmin=0, zmax=1,
             text=dd['asn'].values,
             texttemplate="%{text}", colorscale='deep'
         )
@@ -450,25 +427,34 @@ def singlePlotPositions(dd):
     return go.Figure(data=fig)
 
 
-
 @timer
 def descChange(pair, chdf, posDf):
-  owners = getASNInfo(posDf[(posDf['pair']==pair)]['asn'].values.tolist())
+
+  owners = qrs.getASNInfo(posDf[(posDf['pair']==pair)]['asn'].values.tolist())
   owners['-1'] = 'OFF/Unavailable'
   howPathChanged = []
   for diff in chdf[(chdf['pair']==pair)]['diff'].values.tolist()[0]:
-      for pos, P in posDf[(posDf['pair']==pair)&(posDf['asn']==diff)][['pos','P']].values:
-          atPos = posDf[(posDf['pair']==pair) & (posDf['pos']==pos)]['asn'].values.tolist()
 
-          if len(atPos)>0 and P<1:
-            atPos.remove(diff)
-            for newASN in atPos:
-              if newASN not in [0, -1]:
+    for pos, P in posDf[(posDf['pair']==pair)&(posDf['asn']==diff)][['pos','P']].values:
+        atPos = posDf[(posDf['pair']==pair) & (posDf['pos']==pos)]['asn'].values.tolist()
+
+        if len(atPos)>0:
+          atPos.remove(diff)
+          for newASN in atPos:
+            if newASN not in [0, -1]:
+              if P < 1:
                 howPathChanged.append({'diff': diff,
-                                      'diffOwner': owners[str(diff)],'atPos': pos, 
-                                      'jumped2': newASN, 'jumpOwner': owners[str(newASN)]})
+                                      'diffOwner': owners[str(diff)], 'atPos': pos,
+                                      'jumpedFrom': newASN, 'jumpedFromOwner': owners[str(newASN)]})
+          # the following check is covering the cases when the change happened at the very end of the path
+          # i.e. the only ASN that appears at that position is the diff detected
+          if len(atPos) == 0:
+            howPathChanged.append({'diff': diff,
+                                  'diffOwner': owners[str(diff)], 'atPos': pos,
+                                  'jumpedFrom': "No data", 'jumpedFromOwner': ''})
 
   if len(howPathChanged)>0:
     return pd.DataFrame(howPathChanged).sort_values('atPos')
-
+  
+  return pd.DataFrame()
 

@@ -7,6 +7,27 @@ import urllib3
 urllib3.disable_warnings()
 
 
+def getASNInfo(ids):
+    query = {
+        "query": {
+            "terms": {
+                "_id": ids
+            }
+        }
+    }
+
+    # print(str(query).replace("\'", "\""))
+    asnDict = {}
+    data = scan(hp.es, index='ps_asns', query=query)
+    if data:
+      for item in data:
+          asnDict[str(item['_id'])] = item['_source']['owner']
+    else:
+        print(ids, 'Not found')
+
+    return asnDict
+
+
 def getMetaData():
     meta = []
     data = scan(hp.es, index='ps_alarms_meta')
