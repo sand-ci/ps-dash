@@ -150,8 +150,7 @@ def update_output(start_date, end_date, sites, all, events, allevents, sitesStat
 
     scntdf = pd.DataFrame()
     for e, df in pivotFrames.items():
-        df = df[df['tag'] != ''].groupby('tag')[['id']].count(
-        ).reset_index().rename(columns={'id': 'cnt', 'tag': 'site'})
+        df = df[df['tag'] != ''].groupby('tag')[['id']].count().reset_index().rename(columns={'id': 'cnt', 'tag': 'site'})
         df['event'] = e
         scntdf = pd.concat([scntdf, df])
 
@@ -179,9 +178,7 @@ def update_output(start_date, end_date, sites, all, events, allevents, sitesStat
         color='event',
         color_discrete_map=colorMap(pivotFrames.keys())
         ))
-    fig.update_layout(
-    margin=dict(l=20, r=20, t=20, b=20),
-    )
+    fig.update_layout(margin=dict(l=20, r=20, t=20, b=20))
 
     dataTables = []
     events = list(pivotFrames.keys()) if not eventsState or events else eventsState
@@ -190,8 +187,7 @@ def update_output(start_date, end_date, sites, all, events, allevents, sitesStat
         df = pivotFrames[event]
         df = df[df['tag'].isin(sitesState)] if sitesState is not None and len(sitesState) > 0 else df
         if len(df) > 0:
-            dataTables.append(generate_tables(
-                frames[event], df, event, alarmsInst))
+            dataTables.append(generate_tables(frames[event], df, event, alarmsInst))
     dataTables = html.Div(dataTables)
 
 
@@ -218,8 +214,8 @@ def list2str(vals, sign):
 
 
 # '''Takes selected site from the Geo map and generates a Dash datatable'''
-def generate_tables(frame, pivotFrames, event, alarmsInst):
-    ids = pivotFrames['id'].values
+def generate_tables(frame, unpacked, event, alarmsInst):
+    ids = unpacked['id'].values
     dfr = frame[frame.index.isin(ids)]
     dfr = alarmsInst.formatDfValues(dfr, event).sort_values('to', ascending=False)
 
@@ -237,15 +233,7 @@ def generate_tables(frame, pivotFrames, event, alarmsInst):
     # create clickable cells leading to alarm pages
     if 'alarm_id' in columns:
         url = f'{request.host_url}{page}'
-        dfr['alarm_id'] = dfr['alarm_id'].apply(lambda id: f"<a href='{url}{id}' target='_blank'>VIEW</a>")
-
-    
-    if event in ['bandwidth decreased from/to multiple sites',
-                 'bandwidth increased from/to multiple sites',
-                 'high packet loss on multiple links']:
-        columns = [el for el in columns if el not in ['src_sites', 'dest_sites',
-                                                      'src_change', 'dest_change',
-                                                      'src_loss%', 'dest_loss%', 'tag_str']]
+        dfr['alarm_id'] = dfr['alarm_id'].apply(lambda id: f"<a href='{url}{id}' target='_blank'>VIEW</a>" if id else '-')
 
     element = html.Div([
                 html.Br(),

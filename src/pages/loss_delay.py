@@ -14,7 +14,7 @@ urllib3.disable_warnings()
 
 
 def title(q=None):
-    return f"Throughput alarm {q}"
+    return f"Latency alarm {q}"
 
 
 
@@ -59,9 +59,7 @@ def layout(q=None, **other_unknown_query_strings):
         query = f'src_host: {alrmContent["host"]} or dest_host: {alrmContent["host"]}'
       elif 'host' in alrmContent.keys():
         query = f'dest_host: {alrmContent["host"]}'
-      # elif 'host' in alrmContent.keys() and event == 'firewall issue':
-      #   query = f'dest_host: {alrmContent["host"]}'
-      
+
 
       dates = hp.getPriorNhPeriod(alrmContent['to'], 3)
       dates = [dt.replace(' ', 'T')+':00.000Z' for dt in dates]
@@ -70,6 +68,32 @@ def layout(q=None, **other_unknown_query_strings):
 
       alarmsInst = Alarms()
       url = f'https://atlas-kibana.mwt2.org:5601/s/networking/app/dashboards?auth_provider_hint=anonymous1#/view/e015c210-65e2-11ed-afcf-d91dad577662?embed=true&_g=(filters%3A!()%2CrefreshInterval%3A(pause%3A!t%2Cvalue%3A0)%2Ctime%3A{timeRange})&show-query-input=true&show-time-filter=true&_a=(query:(language:kuery,query:\'{query}\'))'
+      
+      kibanaIframe = []
+      if alarm['event'] == 'high packet loss on multiple links':
+        if len(alrmContent["dest_sites"])>0:
+          dest_sites = str(list(s for s in set(alrmContent["dest_sites"]))).replace('\'', '"').replace('[','').replace(']','').replace(',', ' OR')
+          print()
+          print('dest_sites            ',dest_sites)
+          query = f'src_host: {alrmContent["host"]} and dest_site:({dest_sites})'
+          url = f'https://atlas-kibana.mwt2.org:5601/s/networking/app/dashboards?auth_provider_hint=anonymous1#/view/ee5a6310-8c40-11ed-8156-b9b28813464d?embed=true&_g=(filters%3A!()%2CrefreshInterval%3A(pause%3A!t%2Cvalue%3A0)%2Ctime%3A{timeRange})&show-query-input=true&show-time-filter=true&hide-filter-bar=true&_a=(query:(language:kuery,query:\'{query}\'))'
+
+          print(url)
+          kibanaIframe.append(dbc.Row([html.Iframe(src=url, style={"height": "600px"})], className="boxwithshadow pair-details g-0"))
+        
+        if len(alrmContent["src_sites"]) > 0:
+          src_sites = str(list(s for s in set(alrmContent["src_sites"]))).replace('\'', '"').replace('[', '').replace(']', '').replace(',', ' OR')
+          query = f'dest_host: {alrmContent["host"]} and src_site:({src_sites})'
+          print('src_sites                 ', src_sites)
+          url = f'https://atlas-kibana.mwt2.org:5601/s/networking/app/dashboards?auth_provider_hint=anonymous1#/view/ee5a6310-8c40-11ed-8156-b9b28813464d?embed=true&_g=(filters%3A!()%2CrefreshInterval%3A(pause%3A!t%2Cvalue%3A0)%2Ctime%3A{timeRange})&show-query-input=true&show-time-filter=true&_a=(query:(language:kuery,query:\'{query}\'))'
+          kibanaIframe.append(dbc.Row([html.Iframe(src=url, style={"height": "600px"})], className="boxwithshadow pair-details g-0"))
+      else:
+        kibanaIframe = dbc.Row([
+            html.Iframe(src=url,
+                        style={"height": "1000px"})
+        ], className="boxwithshadow pair-details g-0")
+
+
 
       return html.Div([
               dbc.Row([
@@ -92,14 +116,11 @@ def layout(q=None, **other_unknown_query_strings):
                         ],
                       ),
                   width=10)
-                ], className="boxwithshadow alarm-header pair-details g-0", justify="between", align="center")                
+                ], className="boxwithshadow alarm-header pair-details g-0", justify="between", align="center")
               ], style={"padding": "0.5% 1.5%"}, className='g-0'),
-            dbc.Row([
-                dbc.Row([
-                  html.Iframe(src=url,
-                  style={"height": "1000px"})
-                ], className="boxwithshadow pair-details g-0"),
-            ], style={"padding": "0.5% 1.5%"}, justify="between", align="center")
+            dbc.Row(
+                kibanaIframe
+            , style={"padding": "0.5% 1.5%"}, justify="between", align="center")
             ])
 
 

@@ -3,7 +3,7 @@ import os
 from elasticsearch.helpers import scan
 import pandas as pd
 import traceback
-from datetime import datetime, timedelta
+
 
 import utils.helpers as hp
 from utils.helpers import timer
@@ -16,132 +16,13 @@ urllib3.disable_warnings()
 
 class Alarms(object):
 
-  @timer
-  def queryAlarms(self, dateFrom, dateTo):
-      period = hp.GetTimeRanges(dateFrom, dateTo)
-      q = {
-          "query": {
-              "bool": {
-                  "must": [
-                      {
-                          "range": {
-                              "created_at": {
-                                  "from": period[0],
-                                  "to": period[1]
-                              }
-                          }
-                      },
-                      {
-                          "term": {
-                              "category": {
-                                  "value": "Networking",
-                                  "boost": 1.0
-                              }
-                          }
-                      }
-                  ]
-              }
-          }
-      }
-
-      try:
-        result = scan(client=hp.es, index='aaas_alarms', query=q)
-        data = {}
-
-        for item in result:
-            event = item['_source']['event']
-            # if event != 'path changed':
-            temp = []
-            if event in data.keys():
-                temp = data[event]
-
-            if 'source' in item['_source'].keys():
-              desc = item['_source']['source']
-              if 'tags' in item['_source'].keys():
-                tags = item['_source']['tags']
-                desc['tag'] = tags
-
-              if 'to' not in desc.keys():
-                desc['to'] = datetime.fromtimestamp(
-                    item['_source']['created_at']/1000.0)
-
-              if 'from' in desc.keys() and 'to' in desc.keys():
-                desc['from'] = desc['from'].replace('T', ' ')
-                desc['to'] = desc['to'].replace('T', ' ')
-              temp.append(desc)
-
-              data[event] = temp
-
-        # path changed details resides in a separate index
-        pathdf = self.queryPathChanged(dateFrom, dateTo)
-        data['path changed between sites'] = pathdf
-        return data
-      except Exception as e:
-        print('Exception:', e)
-        print(traceback.format_exc())
-
-
-  @timer
-  def queryPathChanged(self, dateFrom, dateTo):
-    start = datetime.strptime(dateFrom, '%Y-%m-%d %H:%M')
-    end = datetime.strptime(dateTo, '%Y-%m-%d %H:%M')
-    if (end - start).days < 2:
-      dateFrom, dateTo = self.getPriorNhPeriod(dateTo)
-
-    q = {
-        "_source": [
-            "from_date",
-            "to_date",
-            "src",
-            "dest",
-            "src_site",
-            "dest_site",
-            "diff"
-        ],
-        "query": {
-            "bool": {
-                "must": [
-                    {
-                        "range": {
-                            "from_date.keyword": {
-                                "gte": dateFrom
-                            }
-                        }
-                    },
-                    {
-                        "range": {
-                            "to_date.keyword": {
-                                "lte": dateTo
-                            }
-                        }
-                    }
-                ]
-            }
-        }
-    }
-    # print(str(q).replace("\'", "\""))
-    result = scan(client=hp.es, index='ps_trace_changes', query=q)
-    data = []
-
-    for item in result:
-      temp = item['_source']
-      temp['tag'] = [temp['src_site'], temp['dest_site']]
-      temp['from'] = temp['from_date']
-      temp['to'] = temp['to_date']
-      del temp['from_date']
-      del temp['to_date']
-      data.append(temp)
-
-    return data
-
-
   @staticmethod
   def list2rows(df):
       s = df.apply(lambda x: pd.Series(x['tag']), axis=1).stack().reset_index(level=1, drop=True)
       s.name = 'tag'
       df = df.drop('tag', axis=1).join(s)
       return df
-
+  
 
   def unpackAlarms(self, alarmsData):
     frames, pivotFrames = {}, {}
@@ -152,43 +33,46 @@ class Alarms(object):
           df = pd.DataFrame(alarms)
 
           df['id'] = df.index
-
-          for col in df.columns:
-            df = df[~df[col].isnull()]
-            if col in ['tag', 'src_sites', 'dest_sites', 'sites']:
-              df[col] = df[col].apply(lambda vals: [x.upper() for x in vals])
-            elif col in ['site', 'src_site', 'dest_site']:
-              df[col] = df[col].str.upper()
-
           frames[event] = df
 
           if event == 'destination cannot be reached from multiple':
-            pivotFrames[event] = self.one2manyUnfold(odf=df,
+            df = self.one2manyUnfold(odf=df,
                                                       fld='site',
                                                       fldNewName='dest_site',
                                                       listSites='cannotBeReachedFrom',
                                                       listedNewName='src_site')
-
+            df['tag'] = df['site']
           elif event == 'firewall issue':
             df = self.one2manyUnfold(odf=df,
                                      fld='site',
                                      fldNewName='dest_site',
                                      listSites='sites',
                                      listedNewName='src_site')
-            
+            df['tag'] = df['site']
 
           elif event in ['high packet loss on multiple links', 'bandwidth increased from/to multiple sites', 'bandwidth decreased from/to multiple sites']:
-            pivotFrames[event] = self.oneInBothWaysUnfold(df)
+            df = self.oneInBothWaysUnfold(df)
+
           elif event == 'large clock correction':
-            df['tags'] = df['tag']
-            df['site'] = df['tag'].apply(lambda x: x[1] if len(x) > 1 else '')
+            # df = df.drop('tags', axis=1)
+            df['site'] = df['tag'].apply(lambda x: x[1] if len(x) > 1 else x[0])
             df['tag'] = df['site']
             # df['tags'] = df['tag']
-            pivotFrames[event] = df
-          # else:
-          #   frames[event] = df
-          
-          pivotFrames[event] = self.list2rows(df)
+
+          elif event in ['high packet loss',
+                         'path changed',
+                         'destination cannot be reached from any',
+                         'source cannot reach any',
+                         'bandwidth decreased',
+                         'bandwidth increased',
+                         'complete packet loss',
+                         'path changed between sites']:
+            
+            
+            df = self.list2rows(df)
+
+    
+          pivotFrames[event] = df
 
     except Exception as e:
       print('Issue with', event, df.columns)
@@ -222,37 +106,54 @@ class Alarms(object):
 
   @staticmethod
   def oneInBothWaysUnfold(odf):
-      data = []
-      for r in odf.to_dict('records'):
-          for dest_site in r['dest_sites']:
-              rec = {
-                  'from': r['from'],
-                  'to': r['to'],
-                  # 'ipv6': r['ipv6'],
-                  'dest_site': dest_site,
-                  'src_site': r['site'],
-                  'id': r['id'],
-                  'tag': r['tag'][0]
-              }
-              data.append(rec)
+    data = []
+    for r in odf.to_dict('records'):
+      for i, dest_site in enumerate(r['dest_sites']):
+        rec = {
+          'from': r['from'],
+          'to': r['to'],
+          'dest_site': dest_site,
+          'src_site': r['site'],
+          'id': r['id'],
+          'tag': r['tag'][0]
+        }
+        if 'dest_loss%' in r.keys():
+          rec['dest_loss%'] = r['dest_loss%'][i]
+        elif 'dest_change' in r.keys():
+          rec['dest_change'] = r['dest_change'][i]
 
-          for src_site in r['src_sites']:
-              rec = {
-                  'from': r['from'],
-                  'to': r['to'],
-                  # 'ipv6': r['ipv6'],
-                  'src_site': src_site,
-                  'dest_site': r['site'],
-                  'id': r['id'],
-                  'tag': r['tag'][0]
-              }
-              data.append(rec)
+        if 'ipv6' in r.keys():
+          rec['ipv6'] = r['ipv6']
+          
+        data.append(rec)
 
-      return pd.DataFrame(data)
+      for i, src_site in enumerate(r['src_sites']):
+        rec = {
+          'from': r['from'],
+          'to': r['to'],
+          'src_site': src_site,
+          'dest_site': r['site'],
+          'id': r['id'],
+          'tag': r['tag'][0]
+        }
+        if 'src_loss%' in r.keys():
+          rec['src_loss%'] = r['src_loss%'][i]
+        elif 'src_change' in r.keys():
+          rec['src_change'] = r['src_change'][i]
+
+        if 'ipv6' in r.keys():
+          rec['ipv6'] = r['ipv6']
+
+        data.append(rec)
+
+    df = pd.DataFrame(data)
+
+    return df
 
 
   def getAllAlarms(self, dateFrom, dateTo):
-    data = self.queryAlarms(dateFrom, dateTo)
+    data = qrs.queryAlarms(dateFrom, dateTo)
+    if 'indexing' in data.keys(): del data['indexing']
     frames, pivotFrames = self.unpackAlarms(data)
     return [frames, pivotFrames]
 
@@ -280,13 +181,12 @@ class Alarms(object):
             if 'from' in df.columns.tolist() and event != 'large clock correction':
 
               if dateFrom >= df[~df['from'].isnull()]['from'].min():
-                  frames[event] = df
-                  pdf = pq.readFile(f"parquet/pivot/{os.path.basename(f)}")
-                  pivotFrames[event] = pdf
-
                   frames[event] = df[(df['to']>=dateFrom) & (df['to'] <= dateTo)]
                   pdf = pq.readFile(f"parquet/pivot/{os.path.basename(f)}")
-                  pivotFrames[event] = pdf[(pdf['to'] >= dateFrom) & (pdf['to'] <= dateTo)]
+
+                  pdf = pdf[(pdf['to'] >= dateFrom) & (pdf['to'] <= dateTo)]
+                  pivotFrames[event] = pdf
+
               else:
                   isTooOld = True
 
@@ -324,11 +224,6 @@ class Alarms(object):
     print()
 
     alarmsListed = {}
-
-    if 'path changed' in pivotFrames.keys() and 'path changed between sites' in pivotFrames.keys():
-      pivotFrames.pop('path changed')
-      pivotFrames['path changed'] = pivotFrames['path changed between sites']
-      pivotFrames.pop('path changed between sites')
 
     for event, pdf in pivotFrames.items():
       if not event == currEvent:
@@ -374,13 +269,9 @@ class Alarms(object):
       return dd
 
 
+  # Format, hide or edit anything displayed in the datatables
   def formatDfValues(self, df, event):
     try:
-        columns = df.columns.tolist()
-
-        if event in ['bandwidth decreased from/to multiple sites', 'bandwidth increased from/to multiple sites']:
-            columns = [el for el in columns if el not in ['src_sites', 'dest_sites']]
-
         sign = {'bandwidth increased from/to multiple sites': '+',
                 'bandwidth decreased from/to multiple sites': ''}
 
@@ -395,29 +286,36 @@ class Alarms(object):
           df = self.replaceCol('cannotBeReachedFrom', df, '\n')
 
         if 'dest_change' in df.columns:
-            df['dest_change'] = df[['dest_sites', 'dest_change']].apply(
-                lambda x: self.list2str(x, sign[event]), axis=1)
+            df['dest_change'] = df[['dest_sites', 'dest_change']].apply(lambda x: self.list2str(x, sign[event]), axis=1)
+            df.drop('dest_change', axis=1, inplace=True)
+            df.drop('dest_sites', axis=1, inplace=True)
         if 'src_change' in df.columns:
-            df['src_change'] = df[['src_sites', 'src_change']].apply(
-                lambda x: self.list2str(x, sign[event]), axis=1)
+            df['src_change'] = df[['src_sites', 'src_change']].apply(lambda x: self.list2str(x, sign[event]), axis=1)
+            df.drop('src_change', axis=1, inplace=True)
+            df.drop('src_sites', axis=1, inplace=True)
 
         if 'dest_loss%' in df.columns:
-            df['to_dest_loss'] = df[['dest_sites', 'dest_loss%']].apply(
-                lambda x: self.list2str(x, ''), axis=1)
+            df['to_dest_loss'] = df[['dest_sites', 'dest_loss%']].apply(lambda x: self.list2str(x, ''), axis=1)
+            df.drop('dest_loss%', axis=1, inplace=True)
+            df.drop('dest_sites', axis=1, inplace=True)
         if 'src_loss%' in df.columns:
-            df['from_src_loss'] = df[['src_sites', 'src_loss%']].apply(
-                lambda x: self.list2str(x, ''), axis=1)
+            df['from_src_loss'] = df[['src_sites', 'src_loss%']].apply(lambda x: self.list2str(x, ''), axis=1)
+            df.drop('src_loss%', axis=1, inplace=True)
+            df.drop('src_sites', axis=1, inplace=True)
 
         if 'src_sites' in df.columns:
             df = self.replaceCol('src_sites', df, '\n')
         if 'dest_sites' in df.columns:
             df = self.replaceCol('dest_sites', df, '\n')
 
+        if 'alarms_id' in df.columns:
+            df.drop('alarms_id', axis=1, inplace=True)
+
     except Exception as e:
         print('Exception ------- ', event)
         print(e, traceback.format_exc())
 
-    return df[columns]
+    return df
 
   
   @staticmethod

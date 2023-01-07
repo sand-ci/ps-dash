@@ -1,10 +1,131 @@
 import pandas as pd
 from elasticsearch.helpers import scan
+from datetime import datetime
+import traceback
 
 import utils.helpers as hp
 
 import urllib3
 urllib3.disable_warnings()
+
+
+def queryPathChanged(dateFrom, dateTo):
+    start = datetime.strptime(dateFrom, '%Y-%m-%d %H:%M')
+    end = datetime.strptime(dateTo, '%Y-%m-%d %H:%M')
+    if (end - start).days < 2:
+      dateFrom, dateTo = hp.getPriorNhPeriod(dateTo)
+
+    q = {
+        "_source": [
+            "from_date",
+            "to_date",
+            "src",
+            "dest",
+            "src_site",
+            "dest_site",
+            "diff"
+        ],
+        "query": {
+            "bool": {
+                "must": [
+                    {
+                        "range": {
+                            "from_date.keyword": {
+                                "gte": dateFrom
+                            }
+                        }
+                    },
+                    {
+                        "range": {
+                            "to_date.keyword": {
+                                "lte": dateTo
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    }
+    # print(str(q).replace("\'", "\""))
+    result = scan(client=hp.es, index='ps_trace_changes', query=q)
+    data = []
+
+    for item in result:
+      temp = item['_source']
+      temp['tag'] = [temp['src_site'], temp['dest_site']]
+      temp['from'] = temp['from_date']
+      temp['to'] = temp['to_date']
+      del temp['from_date']
+      del temp['to_date']
+      data.append(temp)
+
+    return data
+
+
+
+def queryAlarms(dateFrom, dateTo):
+  period = hp.GetTimeRanges(dateFrom, dateTo)
+  q = {
+        "query": {
+            "bool": {
+                "must": [
+                    {
+                        "range": {
+                            "created_at": {
+                                "from": period[0],
+                                "to": period[1]
+                            }
+                        }
+                    },
+                    {
+                        "term": {
+                            "category": {
+                                "value": "Networking",
+                                "boost": 1.0
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+        }
+
+  try:
+    result = scan(client=hp.es, index='aaas_alarms', query=q)
+    data = {}
+
+    for item in result:
+        event = item['_source']['event']
+        # if event != 'path changed':
+        temp = []
+        if event in data.keys():
+            temp = data[event]
+
+        if 'source' in item['_source'].keys():
+          desc = item['_source']['source']
+          if 'tags' in item['_source'].keys():
+            tags = item['_source']['tags']
+            desc['tag'] = tags
+
+          if 'to' not in desc.keys():
+            desc['to'] = datetime.fromtimestamp(
+                item['_source']['created_at']/1000.0)
+
+          if 'from' in desc.keys() and 'to' in desc.keys():
+            desc['from'] = desc['from'].replace('T', ' ')
+            desc['to'] = desc['to'].replace('T', ' ')
+          temp.append(desc)
+
+          data[event] = temp
+
+    # path changed details resides in a separate index
+    pathdf = queryPathChanged(dateFrom, dateTo)
+    data['path changed between sites'] = pathdf
+    return data
+  except Exception as e:
+    print('Exception:', e)
+    print(traceback.format_exc())
+
 
 
 def getASNInfo(ids):
@@ -51,7 +172,10 @@ def getAlarm(id):
   for res in results['hits']['hits']:
     data.append(res['_source'])
 
-  if len(data) == 1:
+  print(len(data))
+  print(data)
+  for d in data: print(d)
+  if len(data) >0:
     return data[0]
 
 
@@ -71,68 +195,6 @@ def getCategory(event):
     print(res['_source'])
     return res['_source']
 
-
-def queryAlarms(self, dateFrom, dateTo):
-    period = hp.GetTimeRanges(dateFrom, dateTo)
-    q = {
-        "query": {
-            "bool": {
-                "must": [
-                    {
-                        "range": {
-                            "created_at": {
-                                "from": period[0],
-                                "to": period[1]
-                            }
-                        }
-                    },
-                    {
-                        "term": {
-                            "category": {
-                                "value": "Networking",
-                                "boost": 1.0
-                            }
-                        }
-                    }
-                ]
-            }
-        }
-    }
-
-    try:
-      result = scan(client=hp.es, index='aaas_alarms', query=q)
-      data = {}
-
-      for item in result:
-          event = item['_source']['event']
-          if event != 'path changed':
-            temp = []
-            if event in data.keys():
-                temp = data[event]
-
-            desc = item['_source']['source']
-            if 'tags' in item['_source'].keys():
-              tags = item['_source']['tags']
-              desc['tag'] = tags
-
-            if 'to' not in desc.keys():
-              desc['to'] = datetime.fromtimestamp(
-                  item['_source']['created_at']/1000.0)
-
-            if 'from' in desc.keys() and 'to' in desc.keys():
-              desc['from'] = desc['from'].replace('T', ' ')
-              desc['to'] = desc['to'].replace('T', ' ')
-            temp.append(desc)
-
-            data[event] = temp
-
-      # path changed details resides in a separate index
-      pathdf = self.queryPathChanged(dateFrom, dateTo)
-      data['path changed between sites'] = pathdf
-      return data
-    except Exception as e:
-      print('Exception:', event)
-      print(e, traceback.format_exc())
 
 
 def queryTraceChanges(fromDate, toDate):
