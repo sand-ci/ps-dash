@@ -309,12 +309,17 @@ class Alarms(object):
         if 'dest_sites' in df.columns:
             df = self.replaceCol('dest_sites', df, '\n')
 
+
         if 'alarms_id' in df.columns:
             df.drop('alarms_id', axis=1, inplace=True)
+        if 'tag' in df.columns:
+            df.drop('tag', axis=1, inplace=True)
+        if 'id' in df.columns:
+            df.drop('id', axis=1, inplace=True)
 
         df.rename(columns={'alarm_id': 'alarm_link'}, inplace=True)
-        df.drop(columns=['tag', 'id'], inplace=True)
         df = df[['from','to'] + [col for col in df.columns if not col in ['from', 'to']]]
+        
         df = self.createAlarmURL(df, event)
     except Exception as e:
         print('Exception ------- ', event)

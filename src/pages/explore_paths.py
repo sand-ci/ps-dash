@@ -163,8 +163,7 @@ def update_output(start_date, end_date, sites, sitesState, eventsState):
         df = df[df['tag'].isin(sitesState)] if sitesState is not None and len(
             sitesState) > 0 else df
         if len(df) > 0:
-            dataTables.append(generate_tables(
-                frames[event], df, event, alarmsInst))
+            dataTables.append(generate_tables(frames[event], df, event, alarmsInst))
     dataTables = html.Div(dataTables)
 
 
@@ -193,32 +192,14 @@ def list2str(vals, sign):
 def generate_tables(frame, pivotFrames, event, alarmsInst):
     ids = pivotFrames['id'].values
     dfr = frame[frame.index.isin(ids)]
-    dfr = alarmsInst.formatDfValues(
-        dfr, event).sort_values('to', ascending=False)
-
-    columns = dfr.columns.tolist()
-    columns.remove('tag')
-    columns.remove('id')
-    if event in ['bandwidth decreased from/to multiple sites',
-                 'bandwidth increased from/to multiple sites',
-                 'high packet loss on multiple links']:
-        columns = [el for el in columns if el not in ['src_sites', 'dest_sites',
-                                                      'src_change', 'dest_change', 'src_loss%', 'dest_loss%', 'tag_str']]
-
-    # create clickable cells leading to alarm pages
-    if 'alarm_id' in columns:
-        page = 'paths/' if event == 'path changed' else 'throughput/'
-        url = f'{request.host_url}{page}'
-        dfr['alarm_id'] = dfr['alarm_id'].apply(
-            lambda id: f"<a href='{url}{id}' target='_blank'>VIEW</a>")
+    dfr = alarmsInst.formatDfValues(dfr, event).sort_values('to', ascending=False)
 
     element = html.Div([
         html.Br(),
         html.H3(event.upper()),
         dash_table.DataTable(
-            data=dfr[columns].to_dict('records'),
-            columns=[{"name": i, "id": i, "presentation": "markdown"}
-                     for i in columns],
+            data=dfr.to_dict('records'),
+            columns=[{"name": i, "id": i, "presentation": "markdown"} for i in dfr.columns],
             markdown_options={"html": True},
             id=f'paths-search-tbl-{event}',
             page_current=0,
