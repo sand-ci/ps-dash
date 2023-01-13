@@ -57,6 +57,7 @@ class Alarms(object):
             # df = df.drop('tags', axis=1)
             df['site'] = df['tag'].apply(lambda x: x[1] if len(x) > 1 else x[0])
             df['tag'] = df['site']
+            df = df.round(2)
             # df['tags'] = df['tag']
 
           elif event in ['high packet loss',
@@ -178,7 +179,7 @@ class Alarms(object):
             event = self.eventUF(event)
             df = pq.readFile(f)
 
-            if 'from' in df.columns.tolist() and event != 'large clock correction':
+            if 'from' in df.columns.tolist():
 
               if dateFrom >= df[~df['from'].isnull()]['from'].min():
                   frames[event] = df[(df['to']>=dateFrom) & (df['to'] <= dateTo)]
