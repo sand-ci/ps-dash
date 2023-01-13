@@ -48,11 +48,15 @@ def timer(func):
     return wrapper_timer
 
 
-def getPriorNhPeriod(end, days=1):
+def getPriorNhPeriod(end, daysBefore=1, midPoint=True):
+    daysAfter = daysBefore
+    if not midPoint:
+        daysAfter = 0
+
     fmt = '%Y-%m-%d %H:%M'
     endT = datetime.strptime(end, fmt)
-    start = datetime.strftime(endT - timedelta(days), fmt)
-    end = datetime.strftime(endT + timedelta(days), fmt)
+    start = datetime.strftime(endT - timedelta(daysBefore), fmt)
+    end = datetime.strftime(endT + timedelta(daysAfter), fmt)
     return start, end
 
 
