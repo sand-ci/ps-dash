@@ -85,7 +85,7 @@ def layout(q=None, **other_unknown_query_strings):
           src_sites = str(list(s for s in set(alrmContent["src_sites"]))).replace('\'', '"').replace('[', '').replace(']', '').replace(',', ' OR')
           query = f'dest_host: {alrmContent["host"]} and src_site:({src_sites})'
           print('src_sites                 ', src_sites)
-          url = f'https://atlas-kibana.mwt2.org:5601/s/networking/app/dashboards?auth_provider_hint=anonymous1#/view/ee5a6310-8c40-11ed-8156-b9b28813464d?embed=true&_g=(filters%3A!()%2CrefreshInterval%3A(pause%3A!t%2Cvalue%3A0)%2Ctime%3A{timeRange})&show-query-input=true&show-time-filter=true&_a=(query:(language:kuery,query:\'{query}\'))'
+          url = f'https://atlas-kibana.mwt2.org:5601/s/networking/app/dashboards?auth_provider_hint=anonymous1#/view/920cd1f0-8c41-11ed-8156-b9b28813464d?embed=true&_g=(filters%3A!()%2CrefreshInterval%3A(pause%3A!t%2Cvalue%3A0)%2Ctime%3A{timeRange})&show-query-input=true&show-time-filter=true&_a=(query:(language:kuery,query:\'{query}\'))'
           kibanaIframe.append(dbc.Row([html.Iframe(src=url, style={"height": "600px"})], className="boxwithshadow pair-details g-0"))
       else:
         kibanaIframe = dbc.Row([
