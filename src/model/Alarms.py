@@ -3,7 +3,7 @@ import os
 from elasticsearch.helpers import scan
 import pandas as pd
 import traceback
-
+from flask import request
 
 import utils.helpers as hp
 from utils.helpers import timer
@@ -312,11 +312,35 @@ class Alarms(object):
         if 'alarms_id' in df.columns:
             df.drop('alarms_id', axis=1, inplace=True)
 
+        df.rename(columns={'alarm_id': 'alarm_link'}, inplace=True)
+        df.drop(columns=['tag', 'id'], inplace=True)
+        df = df[['from','to'] + [col for col in df.columns if not col in ['from', 'to']]]
+        df = self.createAlarmURL(df, event)
     except Exception as e:
         print('Exception ------- ', event)
         print(e, traceback.format_exc())
 
     return df
+
+  @staticmethod
+  # Create dynamically the URLs leading to a page for a specific alarm
+  def createAlarmURL(df, event):
+    if event.startswith('bandwidth'):
+          page = 'throughput/'
+    elif event == 'path changed':
+        page = 'paths/'
+    elif event in ['firewall issue', 'complete packet loss', 'bandwidth decreased from/to multiple sites',
+                    'high packet loss on multiple links', 'high packet loss']:
+        page = 'loss-delay/'
+
+    # create clickable cells leading to alarm pages
+    if 'alarm_link' in df.columns:
+        url = f'{request.host_url}{page}'
+        df['alarm_link'] = df['alarm_link'].apply(
+            lambda id: f"<a href='{url}{id}' target='_blank'>VIEW</a>" if id else '-')
+            
+    return df
+
 
   
   @staticmethod

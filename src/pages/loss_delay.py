@@ -57,7 +57,7 @@ def layout(q=None, **other_unknown_query_strings):
         query = f'dest_host: {alrmContent["host"]}'
 
 
-      dates = hp.getPriorNhPeriod(alrmContent['to'], before=3, midPoint=False)
+      dates = hp.getPriorNhPeriod(alrmContent['to'], daysBefore=3, midPoint=False)
       dates = [dt.replace(' ', 'T')+':00.000Z' for dt in dates]
       timeRange = f"(from:'{dates[0]}',to:'{dates[1]}')"
 

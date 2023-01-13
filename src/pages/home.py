@@ -207,7 +207,6 @@ def SitesOverviewPlots(site_name, direction, metaDf, measures):
 
     return fig
 
-import time 
 
 @timer
 def groupAlarms(pivotFrames, metaDf):
@@ -247,8 +246,8 @@ def generate_tables(site):
                     html.H3(event.upper()),
                     dash_table.DataTable(
                         data=dfr.to_dict('records'),
-                        columns=[{"name": i, "id": i}
-                                for i in dfr.columns],
+                        columns=[{"name": i, "id": i, "presentation": "markdown"} for i in dfr.columns],
+                        markdown_options={"html": True},
                         id='tbl',
                         page_size=20,
                         style_cell={

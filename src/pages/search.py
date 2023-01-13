@@ -2,7 +2,6 @@ import dash
 from dash import Dash, dash_table, dcc, html
 import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, State
-from flask import request
 
 
 import plotly.graph_objects as go
@@ -201,34 +200,19 @@ def generate_tables(frame, unpacked, event, alarmsInst):
     dfr = frame[frame.index.isin(ids)]
     dfr = alarmsInst.formatDfValues(dfr, event).sort_values('to', ascending=False)
 
-    if event.startswith('bandwidth'):
-        page = 'throughput/'
-    elif event == 'path changed':
-        page = 'paths/'
-    elif event in ['firewall issue', 'complete packet loss', 'bandwidth decreased from/to multiple sites', 'high packet loss on multiple links', 'high packet loss']:
-        page = 'loss-delay/'
-
-    columns = dfr.columns.tolist()
-    columns.remove('tag')
-    columns.remove('id')
-
-    # create clickable cells leading to alarm pages
-    if 'alarm_id' in columns:
-        url = f'{request.host_url}{page}'
-        dfr['alarm_id'] = dfr['alarm_id'].apply(lambda id: f"<a href='{url}{id}' target='_blank'>VIEW</a>" if id else '-')
-
     element = html.Div([
                 html.Br(),
                 html.H3(event.upper()),
                 dash_table.DataTable(
-                    data=dfr[columns].to_dict('records'),
-                    columns=[{"name": i, "id": i, "presentation": "markdown"} for i in columns],
+                    data=dfr.to_dict('records'),
+                    columns=[{"name": i, "id": i, "presentation": "markdown"} for i in dfr.columns],
                     markdown_options={"html": True},
                     id=f'search-tbl-{event}',
                     page_current=0,
-                    page_size=20,
+                    page_size=10,
                     style_cell={
                         'padding': '2px',
+                        'font-size': '13px',
                         'whiteSpace': 'pre-line'
                         },
                     style_header={
