@@ -26,7 +26,7 @@ def title():
 
 
 def description(q=None):
-    return f"Search & explore the Networking alarms"
+    return f"Search & Explore the Networking Alarms"
 
 
 
@@ -58,7 +58,7 @@ def layout(**other_unknown_query_strings):
             dbc.Col([
                 dbc.Row([
                     dbc.Col([
-                        html.H1(f"Search & explore the Networking alarms", className="l-h-3 pl-2"),
+                        html.H1(f"Search & Explore the Networking Alarms", className="l-h-3 pl-2"),
                     ], width=10, align="center", className="text-left pair-details rounded-border-1")
                 ], justify="start", align="center"),
                 html.Br(),
@@ -192,24 +192,6 @@ def update_output(start_date, end_date, sites, all, events, allevents, sitesStat
 
 
     return [sdropdown_items, edropdown_items, dcc.Graph(figure=fig), dataTables]
-   
-
-
-def list2rows(df):
-    s = df.apply(lambda x: pd.Series(x['tag']),axis=1).stack().reset_index(level=1, drop=True)
-    s.name = 'tag'
-    df = df.drop('tag', axis=1).join(s)
-
-    return df
-
-
-def list2str(vals, sign):
-    values = vals.values
-    temp = ''
-    for i, s in enumerate(values[0]):
-        temp += f'{s}: {sign}{values[1][i]}% \n'
-
-    return temp
 
 
 
