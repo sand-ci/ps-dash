@@ -115,7 +115,7 @@ def layout(q=None, **other_unknown_query_strings):
               ], style={"padding": "0.5% 1.5%"}, className='g-0'),
             dbc.Row(
                 kibanaIframe, style={"padding": "0.5% 1.5%"}, className='g-0')
-            ])
+      ], className='mb-5')
 
 
 
