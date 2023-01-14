@@ -18,7 +18,7 @@ Currently pSDash provides information about:
 * Divergence from the usual path (based on the AS numbers)
 * And more
 
-[Brief description of the alarms](https://docs.google.com/presentation/d/1QZseDVnhN8ghn6yaSQmPbMzTi53jwUFTr818V_hUjO8/edit#slide=id.gff94f0d11a_0_41)
+[Brief description of the rules and thresholds of the alarms](https://docs.google.com/presentation/d/1QZseDVnhN8ghn6yaSQmPbMzTi53jwUFTr818V_hUjO8/edit#slide=id.gff94f0d11a_0_41)
 
 
 <!-- CONTACT -->
