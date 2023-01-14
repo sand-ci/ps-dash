@@ -38,13 +38,14 @@ Project Link: [https://ps-dash.uc.ssl-hep.org/](https://ps-dash.uc.ssl-hep.org/)
 <img src="/images/2.png" alt="Alt text" title="Optional title">
 
 
-### Filter alarms based on events/sites
+### Page focused on filtering alarms based on events/sites
 <img src="/images/3.png" alt="Alt text" title="Optional title">
 
 
+### View of a single alarm of type "Path changed" where the focus is on the ASN which was found unusual for the traceroute paths (pair-wise)
 <img src="/images/4.png" alt="Alt text" title="Optional title">
 
-### View of a single alarm of type "Path changed" where the focus is on the ASN which was found unusual for the traceroute paths (pair-wise)
+### Description of how the path changed relative to two specific nodes
 <img src="/images/5.png" alt="Alt text" title="Optional title">
 
 ### View of a bandwidth alarm affecting multiple sites
