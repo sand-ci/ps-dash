@@ -9,8 +9,6 @@ from plotly.subplots import make_subplots
 
 import pandas as pd
 
-
-from model.Updater import ParquetUpdater
 from model.Alarms import Alarms
 import utils.helpers as hp
 from utils.helpers import timer
@@ -209,25 +207,31 @@ def SitesOverviewPlots(site_name, direction, metaDf, measures):
 
 
 @timer
-def groupAlarms(pivotFrames, metaDf):
-  nodes = metaDf[~(metaDf['site'].isnull()) & ~(
-      metaDf['site'] == '') & ~(metaDf['lat'] == '') & ~(metaDf['lat'].isnull())]
-  alarmCnt = []
+def groupAlarms(pivotFrames, metaDf, dateFrom):
+    nodes = metaDf[~(metaDf['site'].isnull()) & ~(
+        metaDf['site'] == '') & ~(metaDf['lat'] == '') & ~(metaDf['lat'].isnull())]
+    alarmCnt = []
 
-  for site, lat, lon in nodes[['site', 'lat', 'lon']].drop_duplicates().values.tolist():
-    for e, df in pivotFrames.items():
-      sdf = df[(df['tag'] == site) & ((df['to'] >= dateFrom) | (df['from'] >= dateFrom))]
-      if not sdf.empty:
-        entry = {"event": e, "site": site, 'cnt': len(sdf),
-                 "lat": lat, "lon": lon}
-        alarmCnt.append(entry)
+    for site, lat, lon in nodes[['site', 'lat', 'lon']].drop_duplicates().values.tolist():
+        for e, df in pivotFrames.items():
+            sdf = df[(df['tag'] == site) & ((df['to'] >= dateFrom) | (df['from'] >= dateFrom))]
+            if not sdf.empty:
+                entry = {"event": e, "site": site, 'cnt': len(sdf),
+                        "lat": lat, "lon": lon}
+                alarmCnt.append(entry)
 
-  return pd.DataFrame(alarmCnt)
+    return pd.DataFrame(alarmCnt)
 
 
 @timer
 # '''Takes selected site from the Geo map and generates a Dash datatable'''
 def generate_tables(site):
+    global dateFrom
+    global dateTo
+    global frames
+    global pivotFrames
+    global alarmCnt
+
     out = []
     alarms4Site = alarmCnt[alarmCnt['site'] == site]
 
@@ -278,24 +282,36 @@ def generate_tables(site):
 
 dash.register_page(__name__, path='/')
 
-# cache the data needed for the overview charts. Run the code on the background every 2 min and store the data in /parquet.
-ParquetUpdater()
 pq = Parquet()
-
-
-dateFrom, dateTo = hp.defaultTimeRange(1)
-# dateFrom, dateTo = ['2022-12-11 09:40', '2022-12-11 21:40']
 alarmsInst = Alarms()
+dateFrom, dateTo = hp.defaultTimeRange(1)
 frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
 metaDf = qrs.getMetaData()
-
-alarmCnt = groupAlarms(pivotFrames, metaDf)
+alarmCnt = groupAlarms(pivotFrames, metaDf, dateFrom)
 eventCnt = countDistEvents(alarmCnt)
-print(f'Number of alarms: {len(alarmCnt)}')
-print(f'Alarm types: {pivotFrames.keys()}')
 
 
-layout = html.Div(
+def layout(**other_unknown_query_strings):
+    global dateFrom
+    global dateTo
+    global frames
+    global pivotFrames
+    global eventCnt
+    global alarmCnt
+    global metaDf
+
+    dateFrom, dateTo = hp.defaultTimeRange(1)
+    print("Overview for period:", dateFrom," - ", dateTo)
+    # dateFrom, dateTo = ['2022-12-11 09:40', '2022-12-11 21:40']
+    frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
+    metaDf = qrs.getMetaData()
+    alarmCnt = groupAlarms(pivotFrames, metaDf, dateFrom)
+    eventCnt = countDistEvents(alarmCnt)
+
+    print(f'Number of alarms: {len(alarmCnt)}')
+    print(f'Alarm types: {pivotFrames.keys()}')
+
+    return html.Div(
             dbc.Row([
                 dbc.Row([
                     dbc.Col(id='selected-site', className='cls-selected-site', align="start"),
@@ -347,6 +363,9 @@ layout = html.Div(
     Input('site-map', 'clickData')
 )
 def display_output(value):
+    global metaDf
+    global eventCnt
+
     if value is not None:
         location = value['points'][0]['customdata'][0]
     else:

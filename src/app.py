@@ -1,7 +1,10 @@
 import dash
 from dash import Dash, dcc, html
 import dash_bootstrap_components as dbc
+from model.Updater import ParquetUpdater
 
+# cache the data needed for the overview charts. Run the code on the background every 2 min and store the data in /parquet.
+ParquetUpdater()
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP]
 
@@ -52,6 +55,9 @@ app.layout = html.Div([
     #     , color='#00245A'
     # )
 ])
+
+
+
 
 
 if __name__ == '__main__':
