@@ -171,12 +171,10 @@ def update_output(start_date, end_date, sites, all, events, allevents, sitesStat
         edropdown_items.append({"label": e, "value": e})
 
 
-    fig = go.Figure(data=px.sunburst(
-        graphData, path=['event', 'site'],
-        values='cnt',
-        color='event',
-        color_discrete_map=colorMap(pivotFrames.keys())
-        ))
+    fig = px.treemap(graphData, path=[px.Constant("All alarms"), 'event', 'site'], values='cnt',
+                     color='cnt',
+                     color_continuous_scale=px.colors.sequential.RdBu_r,
+                     )
     fig.update_layout(margin=dict(l=20, r=20, t=20, b=20))
 
     dataTables = []
