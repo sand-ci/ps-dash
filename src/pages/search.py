@@ -53,7 +53,7 @@ def layout(**other_unknown_query_strings):
                 dcc.Loading(
                   html.Div(id="alarms-sunburst"),
                 style={'height':'0.5rem'}, color='#00245A'),
-            align="start", width='5', className="mr-1"),
+            align="start", width='7', className="mr-2"),
             dbc.Col([
                 dbc.Row([
                     dbc.Col([

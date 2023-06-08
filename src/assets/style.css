@@ -31,6 +31,7 @@ body{
     background-color: #3a475a;
 }
 
+
 .nav-item {
     background-color: #00245a;
     margin-bottom: 0;
@@ -40,6 +41,14 @@ body{
 
 .nav-item .nav-link {
     color: #fff;
+}
+
+.nav-fill {
+    background-color: #00245a;
+}
+
+.nav-item:hover {
+    background-color: #414f6e;
 }
 
 .external-links a {
@@ -353,6 +362,11 @@ body{
 
 .custom-tab:last-of-type {
     border: 0px !important;
+}
+
+.load-pairs-button {
+    font-family: sans-serif 'Courier New', Courier, monospace !important;
+    font-size: 1.5em;
 }
 
 .collapse-button {

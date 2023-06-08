@@ -37,10 +37,10 @@ class Alarms(object):
 
           if event == 'destination cannot be reached from multiple':
             df = self.one2manyUnfold(odf=df,
-                                                      fld='site',
-                                                      fldNewName='dest_site',
-                                                      listSites='cannotBeReachedFrom',
-                                                      listedNewName='src_site')
+                                    fld='site',
+                                    fldNewName='dest_site',
+                                    listSites='cannotBeReachedFrom',
+                                    listedNewName='src_site')
             df['tag'] = df['site']
           elif event == 'firewall issue':
             df = self.one2manyUnfold(odf=df,

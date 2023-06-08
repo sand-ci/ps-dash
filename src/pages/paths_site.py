@@ -1,7 +1,6 @@
 import dash
-from dash import  dcc, html
+from dash import Dash, dcc, html, Input, Output, State, Patch, MATCH
 import dash_bootstrap_components as dbc
-from dash.dependencies import Input, Output, State, MATCH
 import plotly.graph_objects as go
 
 from elasticsearch.helpers import scan
@@ -180,6 +179,7 @@ def layout(q=None, **other_unknown_query_strings):
             dcc.Store(id='site-local-store', data=[{'from': dateFrom, 'to': dateTo}, 
                       chdf.to_dict(), posDf.to_dict(), baseline.to_dict(), altPaths.to_dict(),
                 ]),
+            dcc.Store(id='site-local-store-pairs', data=[site, allPairs.to_dict()]),
             dbc.Row([
               dbc.Row([
                 dbc.Col([
@@ -213,8 +213,29 @@ def layout(q=None, **other_unknown_query_strings):
                 ], className="boxwithshadow alarm-header pair-details", justify="between", align="center"),
               ], style={"padding": "0.5% 1.5%"}, className='g-0'),
             dbc.Row([
+                
               dbc.Row([
-                  buildSiteBox(site, allPairs)
+                dbc.Row([
+                  dbc.Col([
+                    dbc.Row([
+                      dbc.Col([
+                        html.Button('Get next 10 pairs', id='next-10-btn',
+                                    n_clicks=0, className="load-pairs-button",),
+                        ],
+                      ),
+                      dbc.Col([
+                          html.Button('Get all', id='all-btn',
+                                      n_clicks=0, className="load-pairs-button",),
+                      ], width="auto")
+                      ], justify='end', align='end'),
+                  ], width={"size": "auto"}),
+
+                  dbc.Col(html.P('Below is a list of site pairs which reported a changed path for the specified period', className='subtitle'),
+                            width={"size": "auto"}, align="center"),
+                ], justify="start", align='end', className="p-4"),
+          
+                html.Div(id="site-pairs-div"),
+
               ], className="boxwithshadow")
             ], style={"padding": "0.5% 1.5%"}, className='g-0'),
           ])
@@ -226,12 +247,44 @@ def layout(q=None, **other_unknown_query_strings):
             ], style={"padding": "0.5% 1.5%"}, className='g-0')
 
 
+@dash.callback(
+    [Output('site-pairs-div', 'children'),
+     Output('next-10-btn', 'disabled')],
+    [Input('next-10-btn', 'n_clicks'),
+     Input('all-btn', 'n_clicks'),
+     Input('site-local-store-pairs', 'data')])
+def load_site_pairs(next10_clicks, load_all_clicks, data):
+    page_limit = 10
+    allPairs = pd.DataFrame(data[1])
+    site = data[0]
+    pages = [allPairs.iloc[i:i+page_limit] for i in range(0, len(allPairs), page_limit)]
+
+    if load_all_clicks == 0:
+      # adds dynamically new set of pairs on click
+      patched_children = Patch()
+      patched_children.append(html.Div([
+          html.Div(id={
+              'type': 'output-div-pairs',
+              'index': next10_clicks
+          }, children=[buildSiteBox(site, pages[next10_clicks])]
+          )
+      ]))
+      return patched_children, False
+
+    else:
+       return html.Div([
+           html.Div(id={
+               'type': 'output-div-pairs',
+               'index': next10_clicks
+           }, children=[buildSiteBox(site, allPairs)]
+           )
+       ]), True
+       
 
 @timer
 def buildSiteBox(site, allPairs):
     if site:
-      sitePairs = allPairs['spair'].values
-      nodePairs = allPairs['pair'].values
+      nodePairs = allPairs['pair'].to_dict()
 
       return html.Div([
                 dbc.Row(
@@ -239,7 +292,7 @@ def buildSiteBox(site, allPairs):
                     html.Div(id=f'site-pair-section{site+str(i)}',
                     children=[
                         dbc.Button(
-                            sitePairs[i],
+                            allPairs[allPairs.index==i]['spair'].values[0],
                             value=pair,
                             id={
                                 'type': 'site-collapse-button',
@@ -258,9 +311,9 @@ def buildSiteBox(site, allPairs):
                                 is_open=False, className="collaps-container rounded-border-1"
                         ), style={'height':'0.5rem'}, color='#e9e9e9'),
                     ]
-                    ) for i, pair in enumerate(nodePairs)
-                ])
-            ], className="p-4")
+                    ) for i, pair in nodePairs.items()
+                ]),
+            ], className="p-0")
 
 
 
@@ -279,7 +332,7 @@ def buildSiteBox(site, allPairs):
 )
 def toggle_collapse(n, pair, store, is_open):
     data = ''
-    period, chdf, posDf, baseline, altPaths, pivotFrames = store[0], pd.DataFrame(store[1]), pd.DataFrame(store[2]),pd.DataFrame(store[3]), pd.DataFrame(store[4]), store[4]
+    period, chdf, posDf, baseline, altPaths, pivotFrames = store[0], pd.DataFrame(store[1]), pd.DataFrame(store[2]), pd.DataFrame(store[3]), pd.DataFrame(store[4]), store[4]
 
     if n:
       if is_open==False:
