@@ -225,7 +225,7 @@ def addNetworkOwners(df, labels):
   customdata = []
   for l in labels:
     if l in owners.keys():
-      customdata.append(owners[l])
+      customdata.append(f'<b>{l}</b>: {owners[l]}')
     else:
       customdata.append(l)
 
