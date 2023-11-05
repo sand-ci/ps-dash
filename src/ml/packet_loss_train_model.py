@@ -29,8 +29,8 @@ def packet_loss_train_model(plsDf_onehot):
     confusion_matrix_data = confusion_matrix(y_test, y_pred, labels=model.classes_)
     print(confusion_matrix_data, "\n")
     # labels = ['0','1']
-    disp = ConfusionMatrixDisplay(confusion_matrix=confusion_matrix_data, display_labels=model.classes_)
-    disp = disp.plot(cmap=plt.cm.YlGnBu, values_format='g')
+    # disp = ConfusionMatrixDisplay(confusion_matrix=confusion_matrix_data, display_labels=model.classes_)
+    # disp = disp.plot(cmap=plt.cm.YlGnBu, values_format='g')
     # plt.show()
 
     del X_train, X_test, y_train, y_test

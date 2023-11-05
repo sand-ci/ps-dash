@@ -18,7 +18,7 @@ def preprocess(rawDf_custom):
     #Creating timestamps instead of dates
     rawDf_custom['dt'] = (pd.to_datetime(rawDf_custom['dt']).astype('int64')/ 10**9).astype('int64')
 
-    rawDf_custom = rawDf_custom.drop(['host_dest','site_dest','host_src','site_src','hash','src','dest','pair'], axis=1)
+    rawDf_custom = rawDf_custom.drop(['hash','src','dest'], axis=1)
 
     #onehot encoding the dataset
     rawDf_onehot = pd.get_dummies(rawDf_custom,dtype=int)
@@ -61,8 +61,8 @@ def trainMLmodel(rawDf):
     print(classification_report(y_test, y_pred))
     confusion_matrix_data = confusion_matrix(y_test, y_pred, labels = model.classes_)
     print(confusion_matrix_data, "\n")
-    disp = ConfusionMatrixDisplay(confusion_matrix = confusion_matrix_data, display_labels = model.classes_)
-    disp = disp.plot(cmap=plt.cm.YlGnBu,values_format='g')
+    # disp = ConfusionMatrixDisplay(confusion_matrix = confusion_matrix_data, display_labels = model.classes_)
+    # disp = disp.plot(cmap=plt.cm.YlGnBu,values_format='g')
     # plt.show()
 
     #preparing final datasets for further analysis

@@ -63,7 +63,7 @@ def layout(**other_unknown_query_strings):
                 html.H4('Note: choose a period of time between two and six month for the best analysis', style={"padding-top":"1%"}),
                 dcc.DatePickerRange(
                     id='date-picker-range-pl',
-                    month_format='M-D-Y',
+                    month_format='YYYY-MMM-DD',
                     min_date_allowed=date(2022, 8, 1),
                     initial_visible_month=now[0],
                     start_date=now[0],
@@ -248,8 +248,8 @@ def colorMap(eventTypes):
 def update_output(start_date, end_date, sitesState):
 
     if start_date and end_date:
-        period = [f'{start_date} 00:01', f'{end_date} 23:59']
-    else: period = hp.defaultTimeRange(days=60, datesOnly=True)
+        start_date, end_date = [f'{start_date} 00:01', f'{end_date} 23:59']
+    else: start_date, end_date = hp.defaultTimeRange(days=60, datesOnly=True)
 
     # query for the dataset
     plsDf = createPcktDataset(start_date, end_date)
@@ -348,8 +348,9 @@ def update_output(start_date, end_date, sitesState):
     State("sites-dropdown-pl", "value"))
 def update_analysis(start_date, end_date, sites, allsites, sitesState):
 
-    # start_date = datetime(2023, 1, 1)
-    # end_date = datetime(2023, 5, 31)
+    start_date, end_date = [f'{start_date} 00:01', f'{end_date} 23:59']
+    start_date = datetime.strptime(start_date, '%Y-%m-%d %H:%M')
+    end_date = datetime.strptime(end_date, '%Y-%m-%d %H:%M')
 
     # creating a global layout for the plots
     global layout, layout_mean
