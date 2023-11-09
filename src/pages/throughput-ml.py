@@ -42,7 +42,7 @@ def layout(**other_unknown_query_strings):
     return \
     dbc.Nav(
             [
-                dbc.NavItem(dbc.NavLink("bandwidth alarms", href="/ml-alarms/throughput", id='')),
+                dbc.NavItem(dbc.NavLink("bandwidth alarms", href="/ml-alarms/throughput", id='', style={'background-color': '#404f6e', 'pointer-events': 'none'})),
                 html.Div(style={'padding-left': '10px', 'background-color': 'white'}),
                 dbc.NavItem(dbc.NavLink("packet loss alarms", href="/ml-alarms/packet-loss", id='')),
             ], fill=True, justified=True, id='navbar',style={'margin-left': '10px', 'margin-right': '10px'}
@@ -69,6 +69,17 @@ def layout(**other_unknown_query_strings):
                 html.P()
             ]),
             html.Br(),
+            dbc.Row([
+                html.Details([
+                    html.Summary('Advanced settings', style={'font-size': '1.5rem'}),
+                    html.H4('Choose the sensitivity for the alarms creation algorithm (default = 5):', style={"padding-top":"1%"}),
+                    dbc.Col([
+                        dcc.Dropdown(options=[2, 3, 4, 5], value=5,
+                                     multi=False, clearable=False, id='sens-dropdown-thrpt',
+                                     placeholder="Choose a sensitivity value", style={'width': '130px'}),
+                    ], width=2),
+                ]),
+            ]),
         html.Br(),
             dbc.Row([
                 html.H1(f"List of alarms for the period selected", className="text-center", style={"padding-top": "1%"}),
@@ -106,7 +117,7 @@ def layout(**other_unknown_query_strings):
                 html.H4('You can select a single site from the list above and see the more detailed analysis for it.',
                         style={"padding-bottom": "1%"}),
                 dbc.Col([
-                    dcc.Dropdown(multi=False, id='sites-dropdown-thrpt', placeholder="Choose a specific site for analysis"),
+                    dcc.Dropdown(multi=False, id='sites-dropdown-thrpt', placeholder="Choose a specific site for analysis", style={'font-size': '12px'}),
                 ], width=5),
             ]),
         html.Br(),
@@ -190,10 +201,10 @@ def layout(**other_unknown_query_strings):
                         style={"padding-bottom": "1%"}),
             ]),
             dbc.Col([
-                dcc.Dropdown(multi=False, id='sites-dropdown-thrpt-src', placeholder="Choose a source site for analysis"),
+                dcc.Dropdown(multi=False, id='sites-dropdown-thrpt-src', placeholder="Choose a source site for analysis", style={'font-size': '12px'}),
             ], width=5),
             dbc.Col([
-                dcc.Dropdown(multi=False, id='sites-dropdown-thrpt-dest', placeholder="Choose a destination site for analysis"),
+                dcc.Dropdown(multi=False, id='sites-dropdown-thrpt-dest', placeholder="Choose a destination site for analysis", disabled=True, style={'font-size': '12px'}),
             ], width=5, style={"padding-left": "1%"}),
             html.Br(),
             dbc.Row([
@@ -237,28 +248,36 @@ def colorMap(eventTypes):
         # the list of all the major alarms
         Output(component_id="results-list-thrpt", component_property="data"),
         Output(component_id="results-list-thrpt", component_property='columns'),
+        Output(component_id="results-list-thrpt", component_property='style_cell'),
 
         # the list of all the sites (which can be both a source and dest) to use later for plotting
         Output("sites-dropdown-thrpt", "options"),
         # the list of all the source sites to use later for plotting
         Output("sites-dropdown-thrpt-src", "options"),
         # the list of all the dest sites to use later for plotting
-        Output("sites-dropdown-thrpt-dest", "options"),
+        # Output("sites-dropdown-thrpt-dest", "options"),
+
+        # set the default value for the dropdown as a first site with a major alarm
+        Output("sites-dropdown-thrpt", "value"),
     ],
     [
+      # date period chosen by user
       Input('date-picker-range-thrpt', 'start_date'),
       Input('date-picker-range-thrpt', 'end_date'),
+
+      # sensitivity chosen by user (default 5)
+      Input('sens-dropdown-thrpt', 'value'),
     ],
     State("sites-dropdown-thrpt", "value"))
-def update_output(start_date, end_date, sitesState):
+def update_output(start_date, end_date, sensitivity, sitesState):
 
     if start_date and end_date:
         start_date, end_date = [f'{start_date} 00:01', f'{end_date} 23:59']
     else: start_date, end_date = hp.defaultTimeRange(days=90, datesOnly=True)
 
     # query for the dataset
-    rawDf = createThrptDataset(start_date, end_date)
-    # rawDf = pd.read_csv('rawDf_jan_may.csv')
+    # rawDf = createThrptDataset(start_date, end_date)
+    rawDf = pd.read_csv('rawDf_sep_oct.csv')
 
     # train the ML model on the loaded dataset and return the dataset with original alarms and the ML alarms
     global rawDf_onehot_plot, df_to_plot
@@ -271,6 +290,7 @@ def update_output(start_date, end_date, sitesState):
     sdropdown_items = src_sites
 
     # create a list with all sites as destinations
+    global dest_sites
     dest_sites = rawDf_onehot_plot.loc[:, rawDf_onehot_plot.columns.str.startswith("dest_site")].columns.values.tolist()
     commonprefix = 'dest_site_'
     dest_sites = [x[len(commonprefix):] for x in dest_sites]
@@ -293,7 +313,8 @@ def update_output(start_date, end_date, sitesState):
             alarm_nums_mean = alarm_nums.mean()
 
             for date, alarm_num in alarm_nums.items():
-                if alarm_num > alarm_nums_mean * 5:
+                # use the sensitivity chosen by user (default 5)
+                if alarm_num > alarm_nums_mean * sensitivity:
                     # print(site_name, 'alarm mean:', alarm_nums_mean)
                     # print(alarm_num, 'alarms on', site_name, date)
                     in_a_row += 1
@@ -319,11 +340,23 @@ def update_output(start_date, end_date, sitesState):
     # making a pretty df and preparing it for converting to a plotly DataTable
     data = pd.DataFrame(alarms_list).fillna(value='-')
     data_dict = data.to_dict('records')
-    columns = [{"name": str(i), "id": str(i)} for i in data]
+    columns = []
+    cell_style = {'padding-right': '10px', 'padding-left': '10px', 'padding-bottom': '10px', 'padding-top': '10px',
+                  'border-top': '1px solid grey', 'border-bottom': '1px solid grey'}
+    for i in data:
+        columns.append({"name": "day-" + str(i), "id": str(i)} if i != 0 else {"name": str("site-name"), "id": str(i)})
+    if data.empty:
+        columns.append({"name": "No alarms for the time period selected. Try choosing a longer period"
+                                " or decreasing the sensitivity in the advanced settings tab.", "id": '0'})
+        cell_style.update({'text-align': 'center'})
 
     # sort the sites list
     src_dest_sites.sort()
-    return [data_dict, columns, src_dest_sites, sdropdown_items, dest_dropdown_items]
+
+    # return the first site with a major alarm as the default value for the dropdown
+    try: default_site = data[0][0]
+    except: default_site = None
+    return [data_dict, columns, cell_style, src_dest_sites, sdropdown_items, default_site]
 
 # a callback for the second section of a page with all the automatic plots for the chosen site
 @dash.callback(
@@ -338,11 +371,12 @@ def update_output(start_date, end_date, sitesState):
     [
       Input('date-picker-range-thrpt', 'start_date'),
       Input('date-picker-range-thrpt', 'end_date'),
-      Input("sites-dropdown-thrpt", "search_value"),
       Input("sites-dropdown-thrpt", "value"),
+      Input("sites-dropdown-thrpt-src", "options"),
+      # Input("sites-dropdown-thrpt-dest", "options"),
     ],
     State("sites-dropdown-thrpt", "value"))
-def update_analysis(start_date, end_date, sites, allsites, sitesState):
+def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
     start_date, end_date = [f'{start_date} 00:01', f'{end_date} 23:59']
     start_date = datetime.strptime(start_date, '%Y-%m-%d %H:%M')
     end_date = datetime.strptime(end_date, '%Y-%m-%d %H:%M')
@@ -363,9 +397,9 @@ def update_analysis(start_date, end_date, sites, allsites, sitesState):
     layout_mean = layout.copy()
     layout_mean.pop('showlegend','legend')
 
-    # creating the first plot
+    # creating plots for the site both as a source and dest
     plotly_fig = {}
-    if (sitesState is not None and len(sitesState) > 0):
+    if (sitesState is not None and len(sitesState) > 0) & (allsites in src_sites) & (allsites in dest_sites):
         rawDf_onehot_site_plot = rawDf_onehot_plot.loc[
             (rawDf_onehot_plot['src_site_' + allsites] == 1) | (rawDf_onehot_plot['dest_site_' + allsites] == 1)]
         df_to_plot_site = df_to_plot.loc[
@@ -379,7 +413,7 @@ def update_analysis(start_date, end_date, sites, allsites, sitesState):
         plt.plot(rawDf_onehot_site_plot['dt'], rawDf_onehot_site_plot['value'], 'o', color='lightblue',
                  label="all throughput measurements")
         plt.plot(rawDf_onehot_site_plot.loc[rawDf_onehot_site_plot['alarm_created'] == 1, 'dt'],
-                 rawDf_onehot_site_plot.loc[rawDf_onehot_site_plot['alarm_created'] == 1, 'value'], 'go',
+                 rawDf_onehot_site_plot.loc[rawDf_onehot_site_plot['alarm_created'] == 1, 'value'], 'go', markersize=8.5,
                  label="alarms using alarms system")
         plt.plot(df_to_plot_site.loc[df_to_plot_site['alarm_created'] == 1, 'dt'],
                  df_to_plot_site.loc[df_to_plot_site['alarm_created'] == 1, 'value'], 'ro', label="alarms using ML")
@@ -391,8 +425,13 @@ def update_analysis(start_date, end_date, sites, allsites, sitesState):
         plotly_fig = mpl_to_plotly(fig)
         plotly_fig.update_layout(layout)
 
+        plotly_fig = dcc.Graph(figure=plotly_fig)
+    elif (sitesState is not None and len(sitesState) > 0):
+        plotly_fig = html.H4('Measurements for this site are present as a source or destination ONLY',
+                                 style={"padding-bottom": "1%", "padding-top": "1%"})
+
     plotly_fig_mean = {}
-    if (sitesState is not None and len(sitesState) > 0):
+    if (sitesState is not None and len(sitesState) > 0) & (allsites in src_sites) & (allsites in dest_sites):
         fig_mean = plt.figure(figsize=(14, 4))
         plt.title('Bandwidth decreased alarms aggregated by days for the ' + allsites + ' site')
         plt.xlabel('timestamp')
@@ -402,8 +441,14 @@ def update_analysis(start_date, end_date, sites, allsites, sitesState):
         plotly_fig_mean = mpl_to_plotly(fig_mean)
         plotly_fig_mean.update_layout(layout_mean)
 
+        plotly_fig_mean = dcc.Graph(figure=plotly_fig_mean)
+    elif (sitesState is not None and len(sitesState) > 0):
+        plotly_fig_mean = html.H4('Measurements for this site are present as a source or destination ONLY',
+                                 style={"padding-bottom": "1%", "padding-top": "1%"})
+
+    # creating plots for the site as a source only
     plotly_fig_src = {}
-    if (sitesState is not None and len(sitesState) > 0):
+    if (sitesState is not None and len(sitesState) > 0) & (allsites in src_sites):
         rawDf_onehot_site_plot = rawDf_onehot_plot.loc[(rawDf_onehot_plot['src_site_' + allsites] == 1)]
         df_to_plot_site = df_to_plot.loc[(df_to_plot['src_site_' + allsites] == 1)]
 
@@ -415,7 +460,7 @@ def update_analysis(start_date, end_date, sites, allsites, sitesState):
         plt.plot(rawDf_onehot_site_plot['dt'], rawDf_onehot_site_plot['value'], 'o', color='lightblue',
                  label="all throughput measurements")
         plt.plot(rawDf_onehot_site_plot.loc[rawDf_onehot_site_plot['alarm_created'] == 1, 'dt'],
-                 rawDf_onehot_site_plot.loc[rawDf_onehot_site_plot['alarm_created'] == 1, 'value'], 'go',
+                 rawDf_onehot_site_plot.loc[rawDf_onehot_site_plot['alarm_created'] == 1, 'value'], 'go', markersize=8.5,
                  label="alarms using alarms system")
         plt.plot(df_to_plot_site.loc[df_to_plot_site['alarm_created'] == 1, 'dt'],
                  df_to_plot_site.loc[df_to_plot_site['alarm_created'] == 1, 'value'], 'ro', label="alarms using ML")
@@ -427,8 +472,13 @@ def update_analysis(start_date, end_date, sites, allsites, sitesState):
         plotly_fig_src = mpl_to_plotly(fig_src)
         plotly_fig_src.update_layout(layout)
 
+        plotly_fig_src = dcc.Graph(figure=plotly_fig_src)
+    elif (sitesState is not None and len(sitesState) > 0):
+        plotly_fig_src = html.H4('No measurements for this site as a source',
+                                      style={"padding-bottom": "1%", "padding-top": "1%"})
+
     plotly_fig_mean_src = {}
-    if (sitesState is not None and len(sitesState) > 0):
+    if (sitesState is not None and len(sitesState) > 0) & (allsites in src_sites):
         fig_mean = plt.figure(figsize=(14, 4))
         plt.title('Bandwidth decreased alarms aggregated by days for the ' + allsites + ' site')
         plt.xlabel('timestamp')
@@ -438,8 +488,14 @@ def update_analysis(start_date, end_date, sites, allsites, sitesState):
         plotly_fig_mean_src = mpl_to_plotly(fig_mean)
         plotly_fig_mean_src.update_layout(layout_mean)
 
+        plotly_fig_mean_src = dcc.Graph(figure=plotly_fig_mean_src)
+    elif (sitesState is not None and len(sitesState) > 0):
+        plotly_fig_mean_src = html.H4('No measurements for this site as a source',
+                                      style={"padding-bottom": "1%", "padding-top": "1%"})
+
+    # creating plots for the site as a dest only
     plotly_fig_dest = {}
-    if (sitesState is not None and len(sitesState) > 0):
+    if (sitesState is not None and len(sitesState) > 0) & (allsites in dest_sites):
 
         rawDf_onehot_site_plot = rawDf_onehot_plot.loc[(rawDf_onehot_plot['dest_site_' + allsites] == 1)]
         df_to_plot_site = df_to_plot.loc[(df_to_plot['dest_site_' + allsites] == 1)]
@@ -453,7 +509,7 @@ def update_analysis(start_date, end_date, sites, allsites, sitesState):
         plt.plot(rawDf_onehot_site_plot['dt'], rawDf_onehot_site_plot['value'], 'o', color='lightblue',
                  label="all throughput measurements")
         plt.plot(rawDf_onehot_site_plot.loc[rawDf_onehot_site_plot['alarm_created'] == 1, 'dt'],
-                 rawDf_onehot_site_plot.loc[rawDf_onehot_site_plot['alarm_created'] == 1, 'value'], 'go',
+                 rawDf_onehot_site_plot.loc[rawDf_onehot_site_plot['alarm_created'] == 1, 'value'], 'go', markersize=8.5,
                  label="alarms using alarms system")
         plt.plot(df_to_plot_site.loc[df_to_plot_site['alarm_created'] == 1, 'dt'],
                  df_to_plot_site.loc[df_to_plot_site['alarm_created'] == 1, 'value'], 'ro', label="alarms using ML")
@@ -465,8 +521,13 @@ def update_analysis(start_date, end_date, sites, allsites, sitesState):
         plotly_fig_dest = mpl_to_plotly(fig_dest)
         plotly_fig_dest.update_layout(layout)
 
+        plotly_fig_dest = dcc.Graph(figure=plotly_fig_dest)
+    elif (sitesState is not None and len(sitesState) > 0):
+        plotly_fig_dest = html.H4('No measurements for this site as a destination',
+                                      style={"padding-bottom": "1%", "padding-top": "1%"})
+
     plotly_fig_mean_dest = {}
-    if (sitesState is not None and len(sitesState) > 0):
+    if (sitesState is not None and len(sitesState) > 0) & (allsites in dest_sites):
         fig_mean = plt.figure(figsize=(14, 4))
         plt.title('Bandwidth decreased alarms aggregated by days for the ' + allsites + ' site')
         plt.xlabel('timestamp')
@@ -476,15 +537,23 @@ def update_analysis(start_date, end_date, sites, allsites, sitesState):
         plotly_fig_mean_dest = mpl_to_plotly(fig_mean)
         plotly_fig_mean_dest.update_layout(layout_mean)
 
-    return [dcc.Graph(figure=plotly_fig),
-            dcc.Graph(figure=plotly_fig_src),dcc.Graph(figure=plotly_fig_dest), dcc.Graph(figure=plotly_fig_mean),
-            dcc.Graph(figure=plotly_fig_mean_src), dcc.Graph(figure=plotly_fig_mean_dest)]
+        plotly_fig_mean_dest = dcc.Graph(figure=plotly_fig_mean_dest)
+    elif (sitesState is not None and len(sitesState) > 0):
+        plotly_fig_mean_dest = html.H4('No measurements for this site as a destination',
+                                      style={"padding-bottom": "1%", "padding-top": "1%"})
+
+    return [plotly_fig,
+            plotly_fig_src,plotly_fig_dest, plotly_fig_mean,
+            plotly_fig_mean_src, plotly_fig_mean_dest]
 
 # a callback for the third section of a page with two plots for a chosen destination-source pair
 @dash.callback(
     [
         Output('results-table-thrpt-dest-src', 'children'),
         Output('results-table-thrpt-mean-dest-src', 'children'),
+
+        # make the destination dropdown inactive if the source dropdown isn't chosen
+        Output("sites-dropdown-thrpt-dest", "disabled"),
     ],
     [
         Input("sites-dropdown-thrpt-src", "value"),
@@ -509,7 +578,7 @@ def update_output(src_site, dest_site, sites_src_State, sites_dest_State):
         plt.plot(rawDf_onehot_site_plot['dt'], rawDf_onehot_site_plot['value'], 'o', color='lightblue',
                  label="all throughput measurements")
         plt.plot(rawDf_onehot_site_plot.loc[rawDf_onehot_site_plot['alarm_created'] == 1, 'dt'],
-                 rawDf_onehot_site_plot.loc[rawDf_onehot_site_plot['alarm_created'] == 1, 'value'], 'go',
+                 rawDf_onehot_site_plot.loc[rawDf_onehot_site_plot['alarm_created'] == 1, 'value'], 'go', markersize=8.5,
                  label="alarms using alarms system")
         plt.plot(df_to_plot_site.loc[df_to_plot_site['alarm_created'] == 1, 'dt'],
                  df_to_plot_site.loc[df_to_plot_site['alarm_created'] == 1, 'value'], 'ro', label="alarms using ML")
@@ -531,4 +600,27 @@ def update_output(src_site, dest_site, sites_src_State, sites_dest_State):
         plotly_fig_mean_src_dest = mpl_to_plotly(fig_mean)
         plotly_fig_mean_src_dest.update_layout(layout_mean)
 
-    return [dcc.Graph(figure=plotly_fig_scr_dest),dcc.Graph(figure=plotly_fig_mean_src_dest)]
+    return [dcc.Graph(figure=plotly_fig_scr_dest),dcc.Graph(figure=plotly_fig_mean_src_dest),
+            False if (sites_src_State is not None and len(sites_src_State) > 0) else True]
+
+# a callback for the third section of a page. Filters out the dest sites with measurements to the source site selected
+@dash.callback(
+    [
+        Output("sites-dropdown-thrpt-dest", "options"),
+    ],
+    [
+        Input("sites-dropdown-thrpt-src", "value"),
+    ],
+    State("sites-dropdown-thrpt-src", "value"),
+    State("sites-dropdown-thrpt-dest", "value"))
+def update_output(src_site, sites_src_State, sites_dest_State):
+    dest_dropdown_items = ['None']
+    if (sites_src_State is not None and len(sites_src_State) > 0):
+        is_src = df_to_plot.loc[(df_to_plot['src_site_' + src_site] == 1)]
+        is_src_sites = is_src.drop(['from', 'to', 'dt', 'ipv6', 'value', 'doc_count', 'ipv_ipv4', 'ipv_ipv6'], axis=1).sum(
+            axis=0)
+        is_src_sites = is_src_sites[is_src_sites.values != 0]
+        commonprefix = 'dest_site_'
+        dest_dropdown_items = [x[len(commonprefix):] for x, y in is_src_sites.items() if x.startswith(commonprefix)]
+
+    return [dest_dropdown_items]
