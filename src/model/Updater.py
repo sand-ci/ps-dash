@@ -11,7 +11,8 @@ from utils.helpers import timer
 import model.queries as qrs
 import pandas as pd
 
-
+from ml.create_thrpt_dataset import createThrptDataset
+from ml.create_packet_loss_dataset import createPcktDataset
 
 class ParquetUpdater(object):
     
@@ -20,6 +21,7 @@ class ParquetUpdater(object):
         self.createLocation('parquet/raw/')
         self.createLocation('parquet/frames/')
         self.createLocation('parquet/pivot/')
+        self.createLocation('parquet/ml-datasets/')
         self.pq = Parquet()
         self.cacheIndexData()
         self.storeAlarms()
@@ -28,6 +30,10 @@ class ParquetUpdater(object):
             Scheduler(3600, self.cacheIndexData)
             Scheduler(1800, self.storeAlarms)
             Scheduler(1800, self.storePathChangeDescDf)
+
+            # Store the data for the Major Alarms analysis
+            Scheduler(int(60*60*12), self.storeThroughputData)
+            Scheduler(int(60*60*12), self.storePacketLossData)
         except Exception as e:
             print(traceback.format_exc())
 
@@ -157,6 +163,30 @@ class ParquetUpdater(object):
         else:
             print(location, "doesn't exists. Creating...")
             os.mkdir(location)
+
+    def storeThroughputData(self):
+        location = 'parquet/ml-datasets/'
+
+        now = hp.defaultTimeRange(days=90, datesOnly=True)
+        start_date = now[0]
+        end_date = now[1]
+        start_date, end_date = [f'{start_date} 00:01', f'{end_date} 23:59']
+
+        rawDf = createThrptDataset(start_date, end_date)
+
+        self.pq.writeToFile(rawDf, f'{location}rawDf.parquet')
+
+    def storePacketLossData(self):
+        location = 'parquet/ml-datasets/'
+
+        now = hp.defaultTimeRange(days=90, datesOnly=True)
+        start_date = now[0]
+        end_date = now[1]
+        start_date, end_date = [f'{start_date} 00:01', f'{end_date} 23:59']
+
+        plsDf = createPcktDataset(start_date, end_date)
+
+        self.pq.writeToFile(plsDf, f'{location}plsDf.parquet')
 
 
 
