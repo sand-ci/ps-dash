@@ -26,6 +26,8 @@ class ParquetUpdater(object):
         self.cacheIndexData()
         self.storeAlarms()
         self.storePathChangeDescDf()
+        self.storeThroughputData
+        self.storePacketLossData
         try:
             Scheduler(3600, self.cacheIndexData)
             Scheduler(1800, self.storeAlarms)
