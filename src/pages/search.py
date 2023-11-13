@@ -35,12 +35,6 @@ dash.register_page(
     title=title,
     description=description,
 )
-        
-
-def convertTime(ts):
-    stripped = datetime.strptime(ts, '%Y-%m-%d %H:%M')
-    return int((stripped - datetime(1970, 1, 1)).total_seconds()*1000)
-
 
 
 def layout(**other_unknown_query_strings):
@@ -141,11 +135,11 @@ def colorMap(eventTypes):
 def update_output(start_date, end_date, sites, all, events, allevents, sitesState, eventsState ):
 
     if start_date and end_date:
-        period = [f'{start_date} 00:01', f'{end_date} 23:59']
-    else: period = hp.defaultTimeRange(1)
+        start_date, end_date = [f'{start_date}T00:01:00.000Z', f'{end_date}T23:59:59.000Z']
+    else: start_date, end_date = hp.defaultTimeRange(1)
 
     alarmsInst = Alarms()
-    frames, pivotFrames = alarmsInst.loadData(period[0], period[1])
+    frames, pivotFrames = alarmsInst.loadData(start_date, end_date)
 
     scntdf = pd.DataFrame()
     for e, df in pivotFrames.items():

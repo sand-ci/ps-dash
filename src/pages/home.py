@@ -83,8 +83,7 @@ def SitesOverviewPlots(site_name, direction, metaDf, measures):
     units = {
         'ps_packetloss': 'packets',
         'ps_throughput': 'MBps',
-        'ps_owd': 'ms',
-        'ps_retransmits': 'packets'
+        'ps_owd': 'ms'
         }
 
     colors = ['#720026', '#e4ac05', '#00bcd4', '#1768AC', '#ffa822', '#134e6f', '#ff6150', '#1ac0c6', '#492b7c', '#9467bd',
@@ -103,14 +102,13 @@ def SitesOverviewPlots(site_name, direction, metaDf, measures):
     measures.loc[measures['idx']=='ps_throughput', 'value'] = measures[measures['idx']=='ps_throughput']['value'].apply(lambda x: round(x/1e+6, 2))
     
     fig = go.Figure()
-    fig = make_subplots(rows=2, cols=2, subplot_titles=("Packet loss", "Throughput", 'One-way delay', 'Retransmits'))
+    fig = make_subplots(rows=2, cols=2, subplot_titles=("Packet loss", "Throughput", 'One-way delay'))
     for i, ip in enumerate(ips):
 
         # The following code sets the visibility to True only for the first occurence of an IP
         visible = {'ps_packetloss': False, 
                 'ps_throughput': False,
-                'ps_owd': False,
-                'ps_retransmits': False}
+                'ps_owd': False}
 
         if ip in measures[measures['idx']=='ps_packetloss'][direction].unique():
             visible['ps_packetloss'] = True
@@ -118,8 +116,6 @@ def SitesOverviewPlots(site_name, direction, metaDf, measures):
             visible['ps_throughput'] = True
         elif ip in measures[measures['idx']=='ps_owd'][direction].unique():
             visible['ps_owd'] = True
-        elif ip in measures[measures['idx']=='ps_retransmits'][direction].unique():
-            visible['ps_retransmits'] = True
 
 
         fig.add_trace(
@@ -164,21 +160,6 @@ def SitesOverviewPlots(site_name, direction, metaDf, measures):
             row=2, col=1
         )
 
-        fig.add_trace(
-            go.Scattergl(
-                x=measures[(measures[direction]==ip) & (measures['idx']=='ps_retransmits')]['dt'],
-                y=measures[(measures[direction]==ip) & (measures['idx']=='ps_retransmits')]['value'],
-                mode='markers',
-                marker=dict(
-                    color=colors[i]),
-                name=ip,
-                yaxis="y1",
-                legendgroup=ip,
-                showlegend = visible['ps_retransmits'],
-                ),
-            row=2, col=2
-        )
-
 
     fig.update_layout(
             showlegend=True,
@@ -198,7 +179,6 @@ def SitesOverviewPlots(site_name, direction, metaDf, measures):
     fig.update_yaxes(title_text=units['ps_packetloss'], row=1, col=1)
     fig.update_yaxes(title_text=units['ps_throughput'], row=1, col=2)
     fig.update_yaxes(title_text=units['ps_owd'], row=2, col=1)
-    fig.update_yaxes(title_text=units['ps_retransmits'], row=2, col=2)
 
     fig.layout.template = 'plotly_white'
     # py.offline.plot(fig)

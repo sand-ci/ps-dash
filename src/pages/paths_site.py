@@ -36,22 +36,22 @@ dash.register_page(
 
 
 @timer
-def getStats(fromDate, toDate, site):
+def getStats(dateFrom, dateTo, site):
     q = {
         "query": {
             "bool": {
             "must": [
                 {
                 "range": {
-                    "from_date.keyword": {
-                    "gte": fromDate
+                    "from_date": {
+                    "gte": dateFrom
                     }
                 }
                 },
                 {
                 "range": {
-                    "to_date.keyword": {
-                    "lte": toDate
+                    "to_date": {
+                    "lte": dateTo
                     }
                 }
                 },
@@ -77,7 +77,7 @@ def getStats(fromDate, toDate, site):
         }
 
     # print(str(q).replace("\'", "\""))
-    result = scan(client=hp.es,index='ps_trace_changes',query=q)
+    result = scan(client=hp.es,index='ps_traces_changes',query=q)
     data, positions, baseline, altPaths = [],[],[],[]
     positions = []
     for item in result:

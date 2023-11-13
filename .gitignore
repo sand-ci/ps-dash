@@ -129,3 +129,10 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+<<<<<<< Updated upstream
+=======
+
+# preloaded datasets
+src/parquet/
+src/*.ipynb
+>>>>>>> Stashed changes

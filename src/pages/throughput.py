@@ -43,7 +43,7 @@ dash.register_page(
 
 
 def convertTime(ts):
-    stripped = datetime.strptime(ts, '%Y-%m-%d %H:%M')
+    stripped = datetime.strptime(ts, '%Y-%m-%dT%H:%M:%S.000Z')
     return int((stripped - datetime(1970, 1, 1)).total_seconds()*1000)
 
 
@@ -101,10 +101,6 @@ def getRawDataFromES(src, dest, ipv6, dateFrom, dateTo):
     df['dt'] = pd.to_datetime(df['timestamp'], unit='ms')
 
     return df
-
-
-@timer
-
 
 
 @timer

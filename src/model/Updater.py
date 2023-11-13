@@ -34,7 +34,7 @@ class ParquetUpdater(object):
     @timer
     def queryData(self, idx, dateFrom, dateTo):
         intv = int(hp.CalcMinutes4Period(dateFrom, dateTo)/30)
-        if idx in ['ps_throughput','ps_retransmits']:
+        if idx in ['ps_throughput']:
             dateFrom, dateTo = hp.defaultTimeRange(21)
             intv = 42  # 12 hour bins
 
@@ -51,7 +51,7 @@ class ParquetUpdater(object):
     def cacheIndexData(self):
         location = 'parquet/raw/'
         dateFrom, dateTo = hp.defaultTimeRange(1)
-        INDICES = ['ps_packetloss', 'ps_owd', 'ps_retransmits', 'ps_throughput']
+        INDICES = ['ps_packetloss', 'ps_owd', 'ps_throughput']
         measures = pd.DataFrame()
         for idx in INDICES:
             df = pd.DataFrame(self.queryData(idx, dateFrom, dateTo))
@@ -80,7 +80,7 @@ class ParquetUpdater(object):
     @timer
     def storeAlarms(self):
         dateFrom, dateTo = hp.defaultTimeRange(60)
-        print("Update data. Get all alrms for the past 60 days...", dateFrom, dateTo)
+        print("Update data. Get all alarms for the past 60 days...", dateFrom, dateTo)
         oa = Alarms()
         frames, pivotFrames = oa.getAllAlarms(dateFrom, dateTo)
         
@@ -114,9 +114,11 @@ class ParquetUpdater(object):
                     for newASN in atPos:
                         if newASN not in [0, -1]:
                             if P < 1:
+                                if str(newASN) in owners.keys():
+                                    owner = owners[str(newASN)]
                                 howPathChanged.append({'diff': diff,
                                             'diffOwner': owners[str(diff)], 'atPos': pos,
-                                            'jumpedFrom': newASN, 'jumpedFromOwner': owners[str(newASN)]})
+                                            'jumpedFrom': newASN, 'jumpedFromOwner': owner})
                 # the following check is covering the cases when the change happened at the very end of the path
                 # i.e. the only ASN that appears at that position is the diff detected
                 if len(atPos) == 0:
@@ -134,20 +136,20 @@ class ParquetUpdater(object):
     def storePathChangeDescDf(self):
         dateFrom, dateTo = hp.defaultTimeRange(days=3)
         chdf, posDf, baseline = qrs.queryTraceChanges(dateFrom, dateTo)[:3]
-        posDf['asn'] = posDf['asn'].astype(int)
 
         df = pd.DataFrame()
-        for p in posDf['pair'].unique():
-            # print(p)
-            temp = self.descChange(chdf[chdf['pair'] == p], posDf[posDf['pair'] == p])
-            temp['src_site'] = baseline[baseline['pair'] == p]['src_site'].values[0]
-            temp['dest_site'] = baseline[baseline['pair'] == p]['dest_site'].values[0]
-            temp['count'] = len(chdf[chdf['pair'] == p])
-            df = pd.concat([df, temp])
+        if len(chdf) > 0:
+            for p in posDf['pair'].unique():
+                # print(p)
+                temp = self.descChange(chdf[chdf['pair'] == p], posDf[posDf['pair'] == p])
+                temp['src_site'] = baseline[baseline['pair'] == p]['src_site'].values[0]
+                temp['dest_site'] = baseline[baseline['pair'] == p]['dest_site'].values[0]
+                temp['count'] = len(chdf[chdf['pair'] == p])
+                df = pd.concat([df, temp])
 
-        df['jumpedFrom'] = df['jumpedFrom'].astype(int)
-        df['diff'] = df['diff'].astype(int)
-        self.pq.writeToFile(df, f"parquet/frames/prev_next_asn")
+            df['jumpedFrom'] = df['jumpedFrom'].astype(int)
+            df['diff'] = df['diff'].astype(int)
+            self.pq.writeToFile(df, f"parquet/frames/prev_next_asn")
 
 
     @staticmethod
