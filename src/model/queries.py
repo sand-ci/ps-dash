@@ -1,99 +1,107 @@
-import pandas as pd
 from elasticsearch.helpers import scan
 from datetime import datetime
-import traceback
+import pandas as pd
 
 import utils.helpers as hp
 
 import urllib3
+from datetime import datetime
 urllib3.disable_warnings()
 
 
-def queryThroughputIdx(dateFrom, dateTo):
-    query = {
-        "bool": {
-            "must": [
-                {
-                    "range": {
-                        "timestamp": {
-                            "gt": dateFrom,
-                            "lte": dateTo
-                        }
-                    }
-                },
-                {
-                    "term": {
-                        "src_production": True
-                    }
-                },
-                {
-                    "term": {
-                        "dest_production": True
-                    }
-                }
-            ]
-        }
-    }
 
-    aggregations = {
-        "groupby": {
-            "composite": {
-                "size": 9999,
-                "sources": [
-                    {
-                        "ipv6": {
-                            "terms": {
-                                "field": "ipv6"
-                            }
-                        }
-                    },
-                    {
-                        "src": {
-                            "terms": {
-                                "field": "src"
-                            }
-                        }
-                    },
-                    {
-                        "dest": {
-                            "terms": {
-                                "field": "dest"
-                            }
-                        }
-                    },
-                    {
-                        "src_host": {
-                            "terms": {
-                                "field": "src_host"
-                            }
-                        }
-                    },
-                    {
-                        "dest_host": {
-                            "terms": {
-                                "field": "dest_host"
-                            }
-                        }
-                    },
-                    {
-                        "src_site": {
-                            "terms": {
-                                "field": "src_site"
-                            }
-                        }
-                    },
-                    {
-                        "dest_site": {
-                            "terms": {
-                                "field": "dest_site"
-                            }
-                        }
-                    }
-                ]
-            },
-            "aggs": {
-                "throughput": {
-                    "avg": {
+def convertDate(dt):
+    return datetime.strptime(dt, "%Y-%m-%dT%H:%M:%S.000Z").strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+
+def queryThroughputIdx(dateFrom, dateTo):
+  # dateFrom = datetime.fromisoformat(dateFrom)
+  # dateTo = datetime.fromisoformat(dateTo)
+  query = {
+    "bool": {
+      "must": [
+        {
+          "range": {
+            "timestamp": {
+              "gt": dateFrom,
+              "lte": dateTo,
+              "format": "epoch_millis"
+            }
+          }
+        },
+        {
+          "term": {
+            "src_production": True
+          }
+        },
+        {
+          "term": {
+            "dest_production": True
+          }
+        }
+      ]
+    }
+  }
+
+  aggregations = {
+    "groupby": {
+      "composite": {
+        "size": 9999,
+        "sources": [
+          {
+            "ipv6": {
+              "terms": {
+                "field": "ipv6"
+              }
+            }
+          },
+          {
+            "src": {
+              "terms": {
+                "field": "src"
+              }
+            }
+          },
+          {
+            "dest": {
+              "terms": {
+                "field": "dest"
+              }
+            }
+          },
+          {
+            "src_host": {
+              "terms": {
+                "field": "src_host"
+              }
+            }
+          },
+          {
+            "dest_host": {
+              "terms": {
+                "field": "dest_host"
+              }
+            }
+          },
+          {
+            "src_site": {
+              "terms": {
+                "field": "src_site"
+              }
+            }
+          },
+          {
+            "dest_site": {
+              "terms": {
+                "field": "dest_site"
+              }
+            }
+          }
+        ]
+      },
+      "aggs": {
+        "throughput": {
+          "avg": {
                         "field": "throughput"
                     }
                 }
@@ -102,28 +110,29 @@ def queryThroughputIdx(dateFrom, dateTo):
     }
 
     #     print(idx, str(query).replace("\'", "\""))
-    aggrs = []
+  aggrs = []
 
-    aggdata = hp.es.search(index='ps_throughput', query=query, aggregations=aggregations)
-    for item in aggdata['aggregations']['groupby']['buckets']:
-        aggrs.append({'hash': str(item['key']['src'] + '-' + item['key']['dest']),
-                      'from': dateFrom, 'to': dateTo,
-                      'ipv6': item['key']['ipv6'],
-                      'src': item['key']['src'], 'dest': item['key']['dest'],
-                      'src_host': item['key']['src_host'], 'dest_host': item['key']['dest_host'],
-                      'src_site': item['key']['src_site'], 'dest_site': item['key']['dest_site'],
-                      'value': item['throughput']['value'],
-                      'doc_count': item['doc_count']
-                      })
+  aggdata = hp.es.search(index='ps_throughput', query=query, aggregations=aggregations)
+  for item in aggdata['aggregations']['groupby']['buckets']:
+      aggrs.append({'hash': str(item['key']['src'] + '-' + item['key']['dest']),
+                    'from': dateFrom, 'to': dateTo,
+                    'ipv6': item['key']['ipv6'],
+                    'src': item['key']['src'], 'dest': item['key']['dest'],
+                    'src_host': item['key']['src_host'], 'dest_host': item['key']['dest_host'],
+                    'src_site': item['key']['src_site'], 'dest_site': item['key']['dest_site'],
+                    'value': item['throughput']['value'],
+                    'doc_count': item['doc_count']
+                    })
 
-    return aggrs
+  return aggrs
 
 def queryPathChanged(dateFrom, dateTo):
-    start = datetime.strptime(dateFrom, '%Y-%m-%d %H:%M')
-    end = datetime.strptime(dateTo, '%Y-%m-%d %H:%M')
-    if (end - start).days < 2:
-      dateFrom, dateTo = hp.getPriorNhPeriod(dateTo)
-
+    print('queryPathChanged', dateFrom, dateTo)
+    # start = datetime.strptime(dateFrom, '%Y-%m-%dT%H:%M:%S.000Z')
+    # end = datetime.strptime(dateTo, '%Y-%m-%dT%H:%M:%S.000Z')
+    # if (end - start).days < 2:
+    #   dateFrom, dateTo = hp.getPriorNhPeriod(dateTo)
+    
     q = {
         "_source": [
             "from_date",
@@ -139,15 +148,17 @@ def queryPathChanged(dateFrom, dateTo):
                 "must": [
                     {
                         "range": {
-                            "from_date.keyword": {
-                                "gte": dateFrom
+                            "from_date": {
+                                "gte": dateFrom,
+                                "format": "strict_date_optional_time"
                             }
                         }
                     },
                     {
                         "range": {
-                            "to_date.keyword": {
-                                "lte": dateTo
+                            "to_date": {
+                                "lte": dateTo,
+                                "format": "strict_date_optional_time"
                             }
                         }
                     }
@@ -156,7 +167,7 @@ def queryPathChanged(dateFrom, dateTo):
         }
     }
     # print(str(q).replace("\'", "\""))
-    result = scan(client=hp.es, index='ps_trace_changes', query=q)
+    result = scan(client=hp.es, index='ps_traces_changes', query=q)
     data = []
 
     for item in result:
@@ -258,6 +269,7 @@ def getASNInfo(ids):
     return asnDict
 
 
+# TODO: start querying form ps_meta
 def getMetaData():
     meta = []
     data = scan(hp.es, index='ps_alarms_meta')
@@ -281,8 +293,6 @@ def getAlarm(id):
   for res in results['hits']['hits']:
     data.append(res['_source'])
 
-  print(len(data))
-  print(data)
   for d in data: print(d)
   if len(data) >0:
     return data[0]
@@ -305,23 +315,20 @@ def getCategory(event):
     return res['_source']
 
 
+def queryTraceChanges(dateFrom, dateTo):
+  dateFrom = convertDate(dateFrom)
+  dateTo = convertDate(dateTo)
 
-def queryTraceChanges(fromDate, toDate):
   q = {
     "query": {
       "bool": {
         "must": [
           {
             "range": {
-              "from_date.keyword": {
-                "gte": fromDate
-              }
-            }
-          },
-          {
-            "range": {
-              "to_date.keyword": {
-                "lte": toDate
+              "created_at": {
+                "gte": dateFrom,
+                "lte": dateTo,
+                "format": "strict_date_optional_time"
               }
             }
           }
@@ -331,7 +338,7 @@ def queryTraceChanges(fromDate, toDate):
   }
 
   print(str(q).replace("\'", "\""))
-  result = scan(client=hp.es,index='ps_trace_changes',query=q)
+  result = scan(client=hp.es,index='ps_traces_changes',query=q)
   data, positions, baseline, altPaths = [],[],[],[]
   positions = []
   for item in result:
@@ -432,6 +439,8 @@ def alarms(period):
 
 
 def allTestedNodes(period):
+  dateFrom = convertDate(period[0])
+  dateTo = convertDate(period[1])
   def query(direction):
       return {
     "size" : 0,
@@ -441,8 +450,9 @@ def allTestedNodes(period):
           {
             "range" : {
               "timestamp" : {
-                "gt" : period[0],
-                "lte": period[1]
+                "gt" : dateFrom,
+                "lte": dateTo,
+                "format": "strict_date_optional_time"
               }
             }
           }
@@ -520,8 +530,10 @@ def allTestedNodes(period):
 
 
 
-def queryIndex(datefrom, dateto, idx):
-  print('query ^^^^^^^^^^^^^^^^^^^',datefrom,dateto,idx)
+def queryIndex(dateFrom, dateTo, idx):
+  print('query ^^^^^^^^^^^^^^^^^^^', dateFrom, dateTo, idx)
+  dateFrom = convertDate(dateFrom)
+  dateTo = convertDate(dateTo)
   query = {
       "query": {
           "bool": {
@@ -529,8 +541,9 @@ def queryIndex(datefrom, dateto, idx):
                   {
                       "range": {
                           "timestamp": {
-                          "gte": datefrom,
-                          "lt": dateto
+                          "gte": dateFrom,
+                          "lt": dateTo,
+                          "format": "strict_date_optional_time"
                           }
                       }
                   }
@@ -542,7 +555,7 @@ def queryIndex(datefrom, dateto, idx):
       data = scan(client=hp.es,index=idx,query=query)
       ret_data = {}
       count = 0
-      last_entry = 0
+
       for item in data:
           if not count%10000: print(idx,count)
           ret_data[count] = item
@@ -556,6 +569,9 @@ def queryIndex(datefrom, dateto, idx):
 
 
 def query4Avg(idx, dateFrom, dateTo):
+  # TODO: stick to 1 date format
+  # dateFrom = convertDate(dateFrom)
+  # dateTo = convertDate(dateTo)
   val_fld = hp.getValueField(idx)
   query = {
             "size" : 0,
@@ -566,7 +582,8 @@ def query4Avg(idx, dateFrom, dateTo):
                     "range" : {
                       "timestamp" : {
                         "gt" : dateFrom,
-                        "lte": dateTo
+                        "lte": dateTo,
+                        "format": "epoch_millis"
                       }
                     }
                   },
@@ -655,5 +672,6 @@ def query4Avg(idx, dateFrom, dateTo):
                     'from': dateFrom, 'to': dateTo,
                     'doc_count': item['doc_count']
                     })
+  print(len(aggrs))
 
   return aggrs

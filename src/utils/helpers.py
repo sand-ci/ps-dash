@@ -11,7 +11,7 @@ from elasticsearch import Elasticsearch
 import getpass
 
 
-INDICES = ['ps_packetloss', 'ps_owd', 'ps_retransmits', 'ps_throughput', 'ps_trace']
+INDICES = ['ps_packetloss', 'ps_owd', 'ps_throughput', 'ps_trace']
 
 user, passwd, mapboxtoken = None, None, None
 with open("/etc/ps-dash/creds.key") as f:
@@ -53,7 +53,7 @@ def getPriorNhPeriod(end, daysBefore=1, midPoint=True):
     if not midPoint:
         daysAfter = 0
 
-    fmt = '%Y-%m-%d %H:%M'
+    fmt = '%Y-%m-%dT%H:%M:%S.000Z'
     endT = datetime.strptime(end, fmt)
     start = datetime.strftime(endT - timedelta(daysBefore), fmt)
     end = datetime.strftime(endT + timedelta(daysAfter), fmt)
@@ -63,8 +63,6 @@ def getPriorNhPeriod(end, daysBefore=1, midPoint=True):
 def getValueUnit(test_type):
     if (test_type == 'ps_packetloss'):
         return '% lost (packets) avg'
-    if (test_type == 'ps_retransmits'):
-        return 'retransmits (packets) avg'
     elif (test_type == 'ps_throughput'):
         return 'throughput (MBps) avg'
     elif (test_type == 'ps_owd'):
@@ -72,7 +70,7 @@ def getValueUnit(test_type):
 
 
 def defaultTimeRange(days=3, datesOnly=False):
-    format = '%Y-%m-%d %H:%M'
+    format = '%Y-%m-%dT%H:%M:%S.000Z'
     if datesOnly:
         format = '%Y-%m-%d'
     
@@ -91,14 +89,14 @@ def roundTime(dt=None, round_to=60*60):
     return dt + timedelta(0,rounding-seconds,-dt.microsecond)
 
 
-# Expected values: time in miliseconds or string (%Y-%m-%d %H:%M')
+# Expected values: time in miliseconds or string (%Y-%m-%dT%H:%M:%S.000Z')
 def FindPeriodDiff(dateFrom, dateTo):
     if (isinstance(dateFrom, int) and isinstance(dateTo, int)):
         d1 = datetime.fromtimestamp(dateTo/1000)
         d2 = datetime.fromtimestamp(dateFrom/1000)
         time_delta = (d1 - d2)
     else:
-        fmt = '%Y-%m-%d %H:%M'
+        fmt = '%Y-%m-%dT%H:%M:%S.000Z'
         d1 = datetime.strptime(dateFrom, fmt)
         d2 = datetime.strptime(dateTo, fmt)
         time_delta = d2-d1
@@ -107,7 +105,7 @@ def FindPeriodDiff(dateFrom, dateTo):
 
 def GetTimeRanges(dateFrom, dateTo, intv=1):
     diff = FindPeriodDiff(dateFrom, dateTo) / intv
-    t_format = "%Y-%m-%d %H:%M"
+    t_format = "%Y-%m-%dT%H:%M:%S.000Z"
     tl = []
     for i in range(intv+1):
         if (isinstance(dateFrom, int)):
@@ -137,8 +135,6 @@ def getValueField(idx):
         return 'packet_loss'
     elif idx == 'ps_owd':
         return 'delay_mean'
-    elif idx == 'ps_retransmits':
-        return 'retransmits'
     elif idx == 'ps_throughput':
         return 'throughput'
 

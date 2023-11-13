@@ -31,9 +31,6 @@ dash.register_page(
     description=description,
 )
 
-def convertTime(ts):
-    stripped = datetime.strptime(ts, '%Y-%m-%d %H:%M')
-    return int((stripped - datetime(1970, 1, 1)).total_seconds()*1000)
 
 def layout(**other_unknown_query_strings):
     now = hp.defaultTimeRange(days=90, datesOnly=True)
@@ -272,12 +269,12 @@ def colorMap(eventTypes):
 def update_output(start_date, end_date, sensitivity, sitesState):
 
     if start_date and end_date:
-        start_date, end_date = [f'{start_date} 00:01', f'{end_date} 23:59']
+        start_date, end_date = [f'{start_date}T00:01:00.000Z', f'{end_date}T23:59:59.000Z']
     else: start_date, end_date = hp.defaultTimeRange(days=90, datesOnly=True)
 
     # query for the dataset
-    # rawDf = createThrptDataset(start_date, end_date)
-    rawDf = pd.read_csv('rawDf_sep_oct.csv')
+    rawDf = createThrptDataset(start_date, end_date)
+    # rawDf = pd.read_csv('rawDf_sep_oct.csv')
 
     # train the ML model on the loaded dataset and return the dataset with original alarms and the ML alarms
     global rawDf_onehot_plot, df_to_plot

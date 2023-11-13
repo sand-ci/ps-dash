@@ -34,10 +34,6 @@ dash.register_page(
     description=description,
 )
 
-def convertTime(ts):
-    stripped = datetime.strptime(ts, '%Y-%m-%d %H:%M')
-    return int((stripped - datetime(1970, 1, 1)).total_seconds()*1000)
-
 def layout(**other_unknown_query_strings):
     now = hp.defaultTimeRange(days=60, datesOnly=True)
 
@@ -268,12 +264,12 @@ def colorMap(eventTypes):
 def update_output(start_date, end_date, sensitivity, sitesState):
 
     if start_date and end_date:
-        start_date, end_date = [f'{start_date} 00:01', f'{end_date} 23:59']
+        start_date, end_date = [f'{start_date}T00:01:00.000Z', f'{end_date}T23:59:59.000Z']
     else: start_date, end_date = hp.defaultTimeRange(days=60, datesOnly=True)
 
     # query for the dataset
-    # plsDf = createPcktDataset(start_date, end_date)
-    plsDf = pd.read_csv('plsDf_sep_oct.csv')
+    plsDf = createPcktDataset(start_date, end_date)
+    # plsDf = pd.read_csv('plsDf_sep_oct.csv')
 
     # onehot encode the whole dataset and leave only one month for further ML training
     plsDf_onehot_month = one_month_data(plsDf)
