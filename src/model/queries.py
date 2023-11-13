@@ -9,6 +9,115 @@ import urllib3
 urllib3.disable_warnings()
 
 
+def queryThroughputIdx(dateFrom, dateTo):
+    query = {
+        "bool": {
+            "must": [
+                {
+                    "range": {
+                        "timestamp": {
+                            "gt": dateFrom,
+                            "lte": dateTo
+                        }
+                    }
+                },
+                {
+                    "term": {
+                        "src_production": True
+                    }
+                },
+                {
+                    "term": {
+                        "dest_production": True
+                    }
+                }
+            ]
+        }
+    }
+
+    aggregations = {
+        "groupby": {
+            "composite": {
+                "size": 9999,
+                "sources": [
+                    {
+                        "ipv6": {
+                            "terms": {
+                                "field": "ipv6"
+                            }
+                        }
+                    },
+                    {
+                        "src": {
+                            "terms": {
+                                "field": "src"
+                            }
+                        }
+                    },
+                    {
+                        "dest": {
+                            "terms": {
+                                "field": "dest"
+                            }
+                        }
+                    },
+                    {
+                        "src_host": {
+                            "terms": {
+                                "field": "src_host"
+                            }
+                        }
+                    },
+                    {
+                        "dest_host": {
+                            "terms": {
+                                "field": "dest_host"
+                            }
+                        }
+                    },
+                    {
+                        "src_site": {
+                            "terms": {
+                                "field": "src_site"
+                            }
+                        }
+                    },
+                    {
+                        "dest_site": {
+                            "terms": {
+                                "field": "dest_site"
+                            }
+                        }
+                    }
+                ]
+            },
+            "aggs": {
+                "throughput": {
+                    "avg": {
+                        "field": "throughput"
+                    }
+                }
+            }
+        }
+    }
+
+    #     print(idx, str(query).replace("\'", "\""))
+    aggrs = []
+
+    aggdata = hp.es.search(index='ps_throughput', query=query, aggregations=aggregations)
+    for item in aggdata['aggregations']['groupby']['buckets']:
+        aggrs.append({'hash': str(item['key']['src'] + '-' + item['key']['dest']),
+                      'from': dateFrom, 'to': dateTo,
+                      'ipv6': item['key']['ipv6'],
+                      'src': item['key']['src'], 'dest': item['key']['dest'],
+                      'src_host': item['key']['src_host'], 'dest_host': item['key']['dest_host'],
+                      'src_site': item['key']['src_site'], 'dest_site': item['key']['dest_site'],
+                      'value': item['throughput']['value'],
+                      'doc_count': item['doc_count']
+                      })
+
+    return aggrs
+
 def queryPathChanged(dateFrom, dateTo):
     start = datetime.strptime(dateFrom, '%Y-%m-%d %H:%M')
     end = datetime.strptime(dateTo, '%Y-%m-%d %H:%M')
@@ -492,6 +601,34 @@ def query4Avg(idx, dateFrom, dateTo):
                           "field" : "dest"
                         }
                       }
+                    },
+                    {
+                      "src_site" : {
+                        "terms" : {
+                          "field" : "src_site"
+                        }
+                      }
+                    },
+                    {
+                      "dest_site" : {
+                        "terms" : {
+                          "field" : "dest_site"
+                        }
+                      }
+                    },
+                    {
+                      "src_host" : {
+                        "terms" : {
+                          "field" : "src_host"
+                        }
+                      }
+                    },
+                    {
+                      "dest_host" : {
+                        "terms" : {
+                          "field" : "dest_host"
+                        }
+                      }
                     }
                   ]
                 },
@@ -512,11 +649,10 @@ def query4Avg(idx, dateFrom, dateTo):
   for item in aggdata['aggregations']['groupby']['buckets']:
       aggrs.append({'pair': str(item['key']['src']+'-'+item['key']['dest']),
                     'src': item['key']['src'], 'dest': item['key']['dest'],
-                    # 'src_host': item['key']['src'], 'dest_host': item['key']['dest'],
-                    # 'src_site': item['key']['src'], 'dest_site': item['key']['dest'],
+                    'src_host': item['key']['src_host'], 'dest_host': item['key']['dest_host'],
+                    'src_site': item['key']['src_site'], 'dest_site': item['key']['dest_site'],
                     'value': item[val_fld]['value'],
-                    'from': dateFrom,
-                    'to': dateTo,
+                    'from': dateFrom, 'to': dateTo,
                     'doc_count': item['doc_count']
                     })
 
