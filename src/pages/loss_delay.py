@@ -31,11 +31,6 @@ dash.register_page(
 )
 
 
-def convertTime(ts):
-    stripped = datetime.strptime(ts, '%Y-%m-%d %H:%M')
-    return int((stripped - datetime(1970, 1, 1)).total_seconds()*1000)
-
-
 def layout(q=None, **other_unknown_query_strings):
     if q:
       alarm = qrs.getAlarm(q)
