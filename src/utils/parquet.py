@@ -3,6 +3,7 @@ import pyarrow.parquet as pq
 import dask.dataframe as dd
 import traceback
 import glob
+import pandas as pd
 
 class Parquet(object):
     
@@ -23,5 +24,8 @@ class Parquet(object):
     def readFile(filename):
         try:
             return dd.read_parquet(filename).compute()
+        except FileNotFoundError:
+            print(f"{filename} not found.")
+            return dd.from_pandas(pd.DataFrame())
         except Exception as e:
             print(traceback.format_exc())

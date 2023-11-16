@@ -11,23 +11,33 @@ from utils.helpers import timer
 import model.queries as qrs
 import pandas as pd
 
+from ml.create_thrpt_dataset import createThrptDataset
+from ml.create_packet_loss_dataset import createPcktDataset
 
-
+@timer
 class ParquetUpdater(object):
     
     def __init__(self):
-        self.createLocation('parquet/')
+        self.location = 'parquet/'
+        self.createLocation(self.location)
         self.createLocation('parquet/raw/')
         self.createLocation('parquet/frames/')
         self.createLocation('parquet/pivot/')
+        self.createLocation('parquet/ml-datasets/')
         self.pq = Parquet()
         self.cacheIndexData()
         self.storeAlarms()
         self.storePathChangeDescDf()
+        self.storeThroughputData()
+        self.storePacketLossData()
         try:
             Scheduler(3600, self.cacheIndexData)
             Scheduler(1800, self.storeAlarms)
             Scheduler(1800, self.storePathChangeDescDf)
+
+            # Store the data for the Major Alarms analysis
+            Scheduler(int(60*60*12), self.storeThroughputData)
+            Scheduler(int(60*60*12), self.storePacketLossData)
         except Exception as e:
             print(traceback.format_exc())
 
@@ -91,13 +101,6 @@ class ParquetUpdater(object):
                 self.pq.writeToFile(df, f"parquet/pivot/{filename}")
                 self.pq.writeToFile(fdf, f"parquet/frames/{filename}")
 
-    @timer
-    def storePrevNextASNData(self):
-        dateFrom, dateTo = hp.defaultTimeRange(days=2)
-        chdf, posDf, baseline = qrs.queryTraceChanges(dateFrom, dateTo)[:3]
-        df = self.df4Sanckey(chdf, posDf, baseline)
-        self.pq.writeToFile(df, f"parquet/frames/prev_next_asn")
-
 
     @staticmethod
     def descChange(chdf, posDf):
@@ -134,7 +137,7 @@ class ParquetUpdater(object):
 
     @timer
     def storePathChangeDescDf(self):
-        dateFrom, dateTo = hp.defaultTimeRange(days=3)
+        dateFrom, dateTo = hp.defaultTimeRange(days=4)
         chdf, posDf, baseline = qrs.queryTraceChanges(dateFrom, dateTo)[:3]
 
         df = pd.DataFrame()
@@ -159,6 +162,26 @@ class ParquetUpdater(object):
         else:
             print(location, "doesn't exists. Creating...")
             os.mkdir(location)
+
+    def storeThroughputData(self):
+        now = hp.defaultTimeRange(days=90, datesOnly=True)
+        start_date = now[0]
+        end_date = now[1]
+        start_date, end_date = [f'{start_date}T00:01:00.000Z', f'{end_date}T23:59:59.000Z']
+
+        rawDf = createThrptDataset(start_date, end_date)
+
+        self.pq.writeToFile(rawDf, f'{self.location}ml-datasets/rawDf.parquet')
+
+    def storePacketLossData(self):
+        now = hp.defaultTimeRange(days=90, datesOnly=True)
+        start_date = now[0]
+        end_date = now[1]
+        start_date, end_date = [f'{start_date}T00:01:00.000Z', f'{end_date}T23:59:59.000Z']
+
+        plsDf = createPcktDataset(start_date, end_date)
+
+        self.pq.writeToFile(plsDf, f'{self.location}ml-datasets/plsDf.parquet')
 
 
 

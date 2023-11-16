@@ -11,6 +11,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 import utils.helpers as hp
+from utils.parquet import Parquet
 
 import urllib3
 urllib3.disable_warnings()
@@ -203,9 +204,15 @@ def layout(**other_unknown_query_strings):
             dbc.Col([
                 dcc.Dropdown(multi=False, id='sites-dropdown-thrpt-dest', placeholder="Choose a destination site for analysis", disabled=True, style={'font-size': '12px'}),
             ], width=5, style={"padding-left": "1%"}),
+            dbc.Row([
+                dcc.Checklist(
+                    options=[{'label' : 'Filter for the destination sites with alarmed measurements present', 'value': 'True'}],
+                    id='checklist-thrpt', style={'font-size': '1.5rem', "padding-top":"1%"}
+                ),
+            ]),
             html.Br(),
             dbc.Row([
-                html.H1(f"Alarms from the chosen source-destination pair", className="text-center"),
+                html.H1(f"Measurements and alarms for the chosen source-destination pair", className="text-center"),
                 html.Hr(className="my-2"),
                 html.Br(),
                 dcc.Loading(
@@ -267,13 +274,24 @@ def colorMap(eventTypes):
     ],
     State("sites-dropdown-thrpt", "value"))
 def update_output(start_date, end_date, sensitivity, sitesState):
-
+    print('start_date', start_date, 'end_date', end_date)
     if start_date and end_date:
         start_date, end_date = [f'{start_date}T00:01:00.000Z', f'{end_date}T23:59:59.000Z']
-    else: start_date, end_date = hp.defaultTimeRange(days=90, datesOnly=True)
-
+    else:
+        start_date, end_date = hp.defaultTimeRange(days=90, datesOnly=True)
+        start_date, end_date = [f'{start_date}T00:01:00.000Z', f'{end_date}T23:59:59.000Z']
+    print('start_date', start_date, 'end_date', end_date)
+    # check if the date range is default
+    start_date_check, end_date_check = hp.defaultTimeRange(days=90, datesOnly=True)
+    start_date_check, end_date_check = [f'{start_date_check}T00:01:00.000Z', f'{end_date_check}T23:59:59.000Z']
+    print('start_date_check', start_date_check, 'end_date_check', end_date_check)
     # query for the dataset
-    rawDf = createThrptDataset(start_date, end_date)
+    if (start_date, end_date) == (start_date_check, end_date_check):
+        pq = Parquet()
+        rawDf = pq.readFile('parquet/ml-datasets/rawDf.parquet')
+    else:
+        rawDf = createThrptDataset(start_date, end_date)
+
     # rawDf = pd.read_csv('rawDf_sep_oct.csv')
 
     # train the ML model on the loaded dataset and return the dataset with original alarms and the ML alarms
@@ -343,7 +361,7 @@ def update_output(start_date, end_date, sensitivity, sitesState):
     for i in data:
         columns.append({"name": "day-" + str(i), "id": str(i)} if i != 0 else {"name": str("site-name"), "id": str(i)})
     if data.empty:
-        columns.append({"name": "No alarms for the time period selected. Try choosing a longer period"
+        columns.append({"name": "No major alarms for the time period selected. Try choosing a longer period"
                                 " or decreasing the sensitivity in the advanced settings tab.", "id": '0'})
         cell_style.update({'text-align': 'center'})
 
@@ -568,7 +586,7 @@ def update_output(src_site, dest_site, sites_src_State, sites_dest_State):
             (df_to_plot['src_site_' + src_site] == 1) & (df_to_plot['dest_site_' + dest_site] == 1)]
 
         fig = plt.figure(figsize=(14, 4))
-        plt.title('Bandwidth decreased alarms for the ' + src_site + ' and ' + dest_site + ' sites pair')
+        plt.title('Measurements and bandwidth decreased alarms for the ' + src_site + ' and ' + dest_site + ' sites pair')
         plt.xlabel('timestamp')
         plt.ylabel('throughput (Mbps)')
 
@@ -607,13 +625,17 @@ def update_output(src_site, dest_site, sites_src_State, sites_dest_State):
     ],
     [
         Input("sites-dropdown-thrpt-src", "value"),
+        Input("checklist-thrpt", "value"),
     ],
     State("sites-dropdown-thrpt-src", "value"),
     State("sites-dropdown-thrpt-dest", "value"))
-def update_output(src_site, sites_src_State, sites_dest_State):
+def update_output(src_site, check, sites_src_State, sites_dest_State):
     dest_dropdown_items = ['None']
     if (sites_src_State is not None and len(sites_src_State) > 0):
-        is_src = df_to_plot.loc[(df_to_plot['src_site_' + src_site] == 1)]
+        if check:
+            is_src = df_to_plot.loc[(df_to_plot['src_site_' + src_site] == 1) & (df_to_plot['alarm_created'] == 1)]
+        else:
+            is_src = df_to_plot.loc[(df_to_plot['src_site_' + src_site] == 1)]
         is_src_sites = is_src.drop(['from', 'to', 'dt', 'ipv6', 'value', 'doc_count', 'ipv_ipv4', 'ipv_ipv6'], axis=1).sum(
             axis=0)
         is_src_sites = is_src_sites[is_src_sites.values != 0]

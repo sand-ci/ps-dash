@@ -12,7 +12,7 @@ def queryData(dateFrom, dateTo):
     intv = int(hp.CalcMinutes4Period(dateFrom, dateTo) / 60)
     time_list = hp.GetTimeRanges(dateFrom, dateTo, intv)
     for i in range(len(time_list) - 1):
-        print('querying', time_list[i], time_list[i + 1])
+        # print('throughput query', time_list[i], time_list[i + 1])
         data.extend(qrs.queryThroughputIdx(time_list[i], time_list[i + 1]))
 
     return data

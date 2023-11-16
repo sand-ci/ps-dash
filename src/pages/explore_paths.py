@@ -165,16 +165,19 @@ def update_output(asn, asnState, sites, sitesState):
 
     # graph
     pq = Parquet()
+    
     changeDf = pq.readFile('parquet/frames/prev_next_asn')
-    changeDf['jumpedFrom'] = changeDf['jumpedFrom'].astype(int)
-    changeDf['diff'] = changeDf['diff'].astype(int)
-    
-    sortedDf = changeDf[changeDf['jumpedFrom'] > 0].sort_values('count')
-    asnsDropdownData = list(set(sortedDf['diff'].unique().tolist() +
-                                sortedDf['jumpedFrom'].unique().tolist()))
-    
-    changeDf.loc[changeDf['jumpedFrom'] == 0] = 'No data'
-    fig = buildSankey(sitesState, asnState, changeDf)
+    if len(changeDf) == 0:
+        changeDf['jumpedFrom'] = changeDf['jumpedFrom'].astype(int)
+        changeDf['diff'] = changeDf['diff'].astype(int)
+        
+        sortedDf = changeDf[changeDf['jumpedFrom'] > 0].sort_values('count')
+        asnsDropdownData = list(set(sortedDf['diff'].unique().tolist() +
+                                    sortedDf['jumpedFrom'].unique().tolist()))
+        
+        changeDf.loc[changeDf['jumpedFrom'] == 0] = 'No data'
+        fig = buildSankey(sitesState, asnState, changeDf)
+    else: fig = go.Figure(title='No data')
 
     return [sitesDropdownData, asnsDropdownData, dcc.Graph(figure=fig), dataTables]
 

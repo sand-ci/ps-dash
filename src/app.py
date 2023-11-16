@@ -3,7 +3,7 @@ from dash import Dash, dcc, html
 import dash_bootstrap_components as dbc
 from model.Updater import ParquetUpdater
 
-# cache the data needed for the overview charts. Run the code on the background every 2 min and store the data in /parquet.
+# cache the data in /parquet.
 ParquetUpdater()
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP]
@@ -48,7 +48,7 @@ app.layout = html.Div([
             dbc.NavItem(dbc.NavLink("SITES OVERVIEW", href="/", id='sites-tab')),
             dbc.NavItem(dbc.NavLink("SEARCH ALARMS", href="/search-alarms", id='search-tab')),
             dbc.NavItem(dbc.NavLink("EXPLORE PATHS", href="/explore-paths", id='paths-tab')),
-            dbc.NavItem(dbc.NavLink("ML ALARMS", href="/ml-alarms/throughput", id='')),
+            dbc.NavItem(dbc.NavLink("MAJOR ALARMS", href="/ml-alarms/throughput", id='')),
         ], fill=True, justified=True, id='navbar'
     ),
     # dcc.Loading(

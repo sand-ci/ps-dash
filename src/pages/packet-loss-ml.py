@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from elasticsearch.helpers import scan
 
 import utils.helpers as hp
+from utils.parquet import Parquet
 
 import urllib3
 urllib3.disable_warnings()
@@ -35,7 +36,7 @@ dash.register_page(
 )
 
 def layout(**other_unknown_query_strings):
-    now = hp.defaultTimeRange(days=60, datesOnly=True)
+    now = hp.defaultTimeRange(days=90, datesOnly=True)
 
     #Packet loss alarms page
     return \
@@ -200,9 +201,16 @@ def layout(**other_unknown_query_strings):
             dbc.Col([
                 dcc.Dropdown(multi=False, id='sites-dropdown-pl-dest', placeholder="Choose a destination site for analysis", disabled=True, style={'font-size': '12px'}),
             ], width=5, style={"padding-left": "1%"}),
+            dbc.Row([
+                dcc.Checklist(
+                    options=[{'label': 'Filter for the destination sites with alarmed measurements present',
+                              'value': 'True'}],
+                    id='checklist-pl', style={'font-size': '1.5rem', "padding-top": "1%"}
+                ),
+            ]),
             html.Br(),
             dbc.Row([
-                html.H1(f"Alarms from the chosen source-destination pair", className="text-center"),
+                html.H1(f"Measurements and alarms for the chosen source-destination pair", className="text-center"),
                 html.Hr(className="my-2"),
                 html.Br(),
                 dcc.Loading(
@@ -264,11 +272,21 @@ def colorMap(eventTypes):
 def update_output(start_date, end_date, sensitivity, sitesState):
 
     if start_date and end_date:
-        start_date, end_date = [f'{start_date}T00:01:00.000Z', f'{end_date}T23:59:59.000Z']
-    else: start_date, end_date = hp.defaultTimeRange(days=60, datesOnly=True)
+        start_date, end_date = [f'{start_date}T00:01:00.000Z', f'{end_date}T00:01:00.000Z']
+    else:
+        start_date, end_date = hp.defaultTimeRange(days=90, datesOnly=True)
+        start_date, end_date = [f'{start_date}T00:01:00.000Z', f'{end_date}T00:01:00.000Z']
+
+    # check if the date range is default
+    start_date_check, end_date_check = hp.defaultTimeRange(days=90, datesOnly=True)
+    start_date_check, end_date_check = [f'{start_date_check}T00:01:00.000Z', f'{end_date_check}T00:01:00.000Z']
 
     # query for the dataset
-    plsDf = createPcktDataset(start_date, end_date)
+    if (start_date, end_date) == (start_date_check, end_date_check):
+        pq = Parquet()
+        plsDf = pq.readFile(f'parquet/ml-datasets/plsDf.parquet')
+    else:
+        plsDf = createPcktDataset(start_date, end_date)
     # plsDf = pd.read_csv('plsDf_sep_oct.csv')
 
     # onehot encode the whole dataset and leave only one month for further ML training
@@ -347,7 +365,7 @@ def update_output(start_date, end_date, sensitivity, sitesState):
     for i in data:
         columns.append({"name": "day-" + str(i), "id": str(i)} if i!=0 else {"name": str("site-name"), "id": str(i)})
     if data.empty:
-        columns.append({"name": "No alarms for the time period selected. Try choosing a longer period"
+        columns.append({"name": "No major alarms for the time period selected. Try choosing a longer period"
                                 " or decreasing the sensitivity in the advanced settings tab.", "id": '0'})
         cell_style.update({'text-align': 'center'})
 
@@ -568,7 +586,7 @@ def update_output(src_site, dest_site, sites_src_State, sites_dest_State):
             (df_to_plot['src_site_' + src_site] == 1) & (df_to_plot['dest_site_' + dest_site] == 1)]
 
         fig = plt.figure(figsize=(14, 4))
-        plt.title('Packet loss alarms for the ' + src_site + ' and ' + dest_site + ' sites pair')
+        plt.title('Measurements and packet loss alarms for the ' + src_site + ' and ' + dest_site + ' sites pair')
         plt.xlabel('timestamp')
         plt.ylabel('packet loss')
 
@@ -607,13 +625,17 @@ def update_output(src_site, dest_site, sites_src_State, sites_dest_State):
     ],
     [
         Input("sites-dropdown-pl-src", "value"),
+        Input("checklist-pl", "value"),
     ],
     State("sites-dropdown-pl-src", "value"),
     State("sites-dropdown-pl-dest", "value"))
-def update_output(src_site, sites_src_State, sites_dest_State):
+def update_output(src_site, check, sites_src_State, sites_dest_State):
     dest_dropdown_items = ['None']
     if (sites_src_State is not None and len(sites_src_State) > 0):
-        is_src = df_to_plot.loc[(df_to_plot['src_site_' + src_site] == 1)]
+        if check:
+            is_src = df_to_plot.loc[(df_to_plot['src_site_' + src_site] == 1) & (df_to_plot['alarm_created'] == 1)]
+        else:
+            is_src = df_to_plot.loc[(df_to_plot['src_site_' + src_site] == 1)]
         print(is_src.T)
         is_src_sites = is_src.drop(['from', 'to', 'avg_value', 'doc_count_x', 'doc_count_y', 'tests_done', 'dt'], axis=1).sum(
             axis=0)

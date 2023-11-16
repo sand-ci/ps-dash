@@ -1,3 +1,4 @@
+import traceback
 from elasticsearch.helpers import scan
 from datetime import datetime
 import pandas as pd
@@ -387,10 +388,11 @@ def queryTraceChanges(dateFrom, dateTo):
   baseline = pd.DataFrame(baseline)
   altPaths = pd.DataFrame(altPaths)
   
-  posDf['pair'] = posDf['src']+' -> '+posDf['dest']
-  df['pair'] = df['src']+' -> '+df['dest']
-  baseline['pair'] = baseline['src']+' -> '+baseline['dest']
-  altPaths['pair'] = altPaths['src']+' -> '+altPaths['dest']
+  if len(df) > 0:
+    posDf['pair'] = posDf['src']+' -> '+posDf['dest']
+    df['pair'] = df['src']+' -> '+df['dest']
+    baseline['pair'] = baseline['src']+' -> '+baseline['dest']
+    altPaths['pair'] = altPaths['src']+' -> '+altPaths['dest']
 
   return df, posDf, baseline, altPaths
 
@@ -672,6 +674,5 @@ def query4Avg(idx, dateFrom, dateTo):
                     'from': dateFrom, 'to': dateTo,
                     'doc_count': item['doc_count']
                     })
-  print(len(aggrs))
 
   return aggrs

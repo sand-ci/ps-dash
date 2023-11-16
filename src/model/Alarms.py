@@ -108,6 +108,12 @@ class Alarms(object):
   @staticmethod
   def oneInBothWaysUnfold(odf):
     data = []
+    # the field name changed on the DB side
+    if 'dest_loss%' in odf.columns and 'src_loss%' in odf.columns:
+      odf['dest_loss%'] = odf['dest_loss%'].fillna(odf['dest_loss'])
+      odf['src_loss%'] = odf['src_loss%'].fillna(odf['src_loss'])
+      odf.drop(columns=['dest_loss', 'src_loss'], inplace=True)
+
     for r in odf.to_dict('records'):
       for i, dest_site in enumerate(r['dest_sites']):
         rec = {
