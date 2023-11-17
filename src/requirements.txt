@@ -11,3 +11,4 @@ plotly_express>=0.4.1
 pyarrow>=5.0.0
 dask>=2021.4.0
 matplotlib
+sklearn
