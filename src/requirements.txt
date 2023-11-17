@@ -11,5 +11,5 @@ plotly==5.9.0
 pyarrow==5.0.0
 Requests==2.31.0
 scikit_learn==0.24.1
-urllib3==1.26.10
+urllib3==1.26.18
 xgboost==1.7.5
