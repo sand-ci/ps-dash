@@ -145,26 +145,16 @@ def queryPathChanged(dateFrom, dateTo):
             "diff"
         ],
         "query": {
-            "bool": {
-                "must": [
-                    {
-                        "range": {
-                            "from_date": {
-                                "gte": dateFrom,
-                                "format": "strict_date_optional_time"
-                            }
-                        }
-                    },
-                    {
-                        "range": {
-                            "to_date": {
-                                "lte": dateTo,
-                                "format": "strict_date_optional_time"
-                            }
-                        }
-                    }
-                ]
-            }
+          "bool": {
+            "must": [{
+              "range": {
+                "created_at": {
+                  "from": period[0],
+                  "to": period[1]
+                }
+              }
+            }]
+          }
         }
     }
     # print(str(q).replace("\'", "\""))
