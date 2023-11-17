@@ -163,8 +163,9 @@ class ParquetUpdater(object):
             print(location, "doesn't exists. Creating...")
             os.mkdir(location)
 
+    @timer
     def storeThroughputData(self):
-        now = hp.defaultTimeRange(days=90, datesOnly=True)
+        now = hp.defaultTimeRange(days=60, datesOnly=True)
         start_date = now[0]
         end_date = now[1]
         start_date, end_date = [f'{start_date}T00:01:00.000Z', f'{end_date}T23:59:59.000Z']
@@ -173,8 +174,9 @@ class ParquetUpdater(object):
 
         self.pq.writeToFile(rawDf, f'{self.location}ml-datasets/rawDf.parquet')
 
+    @timer
     def storePacketLossData(self):
-        now = hp.defaultTimeRange(days=90, datesOnly=True)
+        now = hp.defaultTimeRange(days=60, datesOnly=True)
         start_date = now[0]
         end_date = now[1]
         start_date, end_date = [f'{start_date}T00:01:00.000Z', f'{end_date}T23:59:59.000Z']

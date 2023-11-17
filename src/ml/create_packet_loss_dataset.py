@@ -10,7 +10,7 @@ def loadPacketLossData(dateFrom, dateTo):
     intv = int(hp.CalcMinutes4Period(dateFrom, dateTo) / 60)
     time_list = hp.GetTimeRanges(dateFrom, dateTo, intv)
     for i in range(len(time_list) - 1):
-        # print('packetloss query', time_list[i], time_list[i + 1])
+        print(f' {i+1}/{len(time_list)-1} packetloss query', time_list[i], time_list[i + 1])
         data.extend(qrs.query4Avg('ps_packetloss', time_list[i], time_list[i + 1]))
 
     return pd.DataFrame(data)

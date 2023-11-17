@@ -1,9 +1,12 @@
 import pandas as pd
+from utils.helpers import timer
 
+@timer
 def packet_loss_preprocess(plsDf_custom_x, model):
     #Preprocessing
     plsDf_custom_x = plsDf_custom_x.drop(['src', 'dest', 'pair', 'src_host', 'dest_host'], axis=1)
     plsDf_custom_x['dt'] = plsDf_custom_x['to']
+    print('plsDf_custom_x', plsDf_custom_x.shape)
 
     plsDf_custom_x['tests_done'] = plsDf_custom_x['tests_done'].str.rstrip('%').astype('float') / 100.0
 
@@ -20,12 +23,16 @@ def packet_loss_preprocess(plsDf_custom_x, model):
     df_to_plot['flag'] = y
     df_to_plot['dt'] = (pd.to_datetime(df_to_plot['dt'], unit='ms'))
 
+    print('df_to_plot', df_to_plot.shape)
+
     del plsDf_custom_x
 
     # convert timestamp back to datetime
     plsDf_onehot_plot = df_to_plot.copy()
     plsDf_onehot_plot['flag'] = plsDf_custom_y.copy()
     plsDf_onehot_plot['dt'] = (pd.to_datetime(plsDf_onehot_plot['dt'], unit='ms'))
+
+    print('plsDf_onehot_plot', plsDf_onehot_plot.shape)
 
     return df_to_plot, plsDf_onehot_plot
 

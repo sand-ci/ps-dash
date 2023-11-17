@@ -301,8 +301,10 @@ def update_output(start_date, end_date, sensitivity, sitesState):
     df_to_plot, plsDf_onehot_plot = packet_loss_preprocess(plsDf, model)
     del plsDf, model
 
+    print('+++++++   plsDf_onehot_plot', plsDf_onehot_plot.shape)
     # create a list with all sites as sources
     src_sites = plsDf_onehot_plot.loc[:, plsDf_onehot_plot.columns.str.startswith("src_site")].columns.values.tolist()
+    print('+++++++   src_sites', src_sites)
     commonprefix = 'src_site_'
     src_sites = [x[len(commonprefix):] for x in src_sites]
     sdropdown_items = src_sites
