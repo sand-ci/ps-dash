@@ -149,8 +149,9 @@ def queryPathChanged(dateFrom, dateTo):
             "must": [{
               "range": {
                 "created_at": {
-                  "from": period[0],
-                  "to": period[1]
+                  "from": dateFrom,
+                  "to": dateTo,
+                  "format": "strict_date_optional_time"
                 }
               }
             }]
@@ -184,7 +185,8 @@ def queryAlarms(dateFrom, dateTo):
                         "range": {
                             "created_at": {
                                 "from": period[0],
-                                "to": period[1]
+                                "to": period[1],
+                                "format": "epoch_millis"
                             }
                         }
                     },
