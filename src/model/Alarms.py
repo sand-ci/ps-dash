@@ -322,8 +322,11 @@ class Alarms(object):
             df.drop('tag', axis=1, inplace=True)
         if 'id' in df.columns:
             df.drop('id', axis=1, inplace=True)
+        if 'avg_value' in df.columns:
+            df['avg_value'] = df['avg_value'].apply(lambda x: f'{x}%')
+        if 'alarm_id' in df.columns:
+          df.rename(columns={'alarm_id': 'alarm_link'}, inplace=True)
 
-        df.rename(columns={'alarm_id': 'alarm_link'}, inplace=True)
         df = df[['from','to'] + [col for col in df.columns if not col in ['from', 'to']]]
         
         df = self.createAlarmURL(df, event)
@@ -381,7 +384,7 @@ class Alarms(object):
               v = "\n" + v
 
             if k == 'avg_value':
-              v = str(v*100)+'%'
+              v = str(v)+'%'
             elif k == '%change':
               v = str(v)+'%'
             

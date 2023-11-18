@@ -227,6 +227,12 @@ def queryAlarms(dateFrom, dateTo):
           if 'from' in desc.keys() and 'to' in desc.keys():
             desc['from'] = desc['from'].replace('T', ' ')
             desc['to'] = desc['to'].replace('T', ' ')
+
+          if 'avg_value%' in desc.keys():
+              desc['avg_value'] = desc['avg_value%']
+              desc.pop('avg_value%')
+              print('avg_value2', desc['avg_value'])
+          
           temp.append(desc)
 
           data[event] = temp
