@@ -2,6 +2,7 @@ import dash
 from dash import Dash, dash_table, dcc, html
 import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output
+import pandas as pd
 
 import plotly.graph_objects as go
 
@@ -163,11 +164,28 @@ def update_output(asn, asnState, sites, sitesState):
     
     dataTables = html.Div(dataTables)
 
+
     # graph
     pq = Parquet()
-    
     changeDf = pq.readFile('parquet/frames/prev_next_asn')
+    asnsDropdownData = []
+
     if len(changeDf) == 0:
+        fig = go.Figure()
+        fig.update_layout(
+            annotations=[
+                dict(
+                    text="No data available for the selected criteria.",
+                    showarrow=False,
+                    font=dict(size=16),
+                    xref="paper",
+                    yref="paper",
+                    x=0.5,
+                    y=0.5,
+                )
+            ]
+        )
+    else:
         changeDf['jumpedFrom'] = changeDf['jumpedFrom'].astype(int)
         changeDf['diff'] = changeDf['diff'].astype(int)
         
@@ -177,7 +195,6 @@ def update_output(asn, asnState, sites, sitesState):
         
         changeDf.loc[changeDf['jumpedFrom'] == 0] = 'No data'
         fig = buildSankey(sitesState, asnState, changeDf)
-    else: fig = go.Figure(title='No data')
 
     return [sitesDropdownData, asnsDropdownData, dcc.Graph(figure=fig), dataTables]
 
