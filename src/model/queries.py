@@ -7,12 +7,24 @@ import utils.helpers as hp
 
 import urllib3
 from datetime import datetime
+import datetime
 urllib3.disable_warnings()
 
 
 
 def convertDate(dt):
     return datetime.strptime(dt, "%Y-%m-%dT%H:%M:%S.000Z").strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+# On 18 Nov 2023 all alarms moved to querying netsites instead of sites, 
+# but kept src_site and dest_site for backward compatibility
+def obtainFieldNames(dateFrom):
+  target_date = datetime.datetime(2023, 11, 18)
+  target_milliseconds = target_date.timestamp() * 1000
+
+  if dateFrom > target_milliseconds:
+    return 'src_netsite', 'dest_netsite'
+  else:
+    return 'src_site', 'dest_site'
 
 
 def queryThroughputIdx(dateFrom, dateTo):
@@ -43,6 +55,9 @@ def queryThroughputIdx(dateFrom, dateTo):
       ]
     }
   }
+
+  
+  src_field_name, dest_field_name = obtainFieldNames(dateFrom)
 
   aggregations = {
     "groupby": {
@@ -87,17 +102,17 @@ def queryThroughputIdx(dateFrom, dateTo):
           {
             "src_site": {
               "terms": {
-                "field": "src_site"
+                "field": src_field_name
               }
             }
           },
           {
             "dest_site": {
               "terms": {
-                "field": "dest_site"
+                "field": dest_field_name
               }
             }
-          }
+          },
         ]
       },
       "aggs": {
@@ -113,7 +128,7 @@ def queryThroughputIdx(dateFrom, dateTo):
     #     print(idx, str(query).replace("\'", "\""))
   aggrs = []
 
-  aggdata = hp.es.search(index='ps_throughput', query=query, aggregations=aggregations)
+  aggdata = hp.es.search(index='ps_throughput', query=query, aggregations=aggregations, _source=False)
   for item in aggdata['aggregations']['groupby']['buckets']:
       aggrs.append({'hash': str(item['key']['src'] + '-' + item['key']['dest']),
                     'from': dateFrom, 'to': dateTo,
@@ -128,7 +143,6 @@ def queryThroughputIdx(dateFrom, dateTo):
   return aggrs
 
 def queryPathChanged(dateFrom, dateTo):
-    print('queryPathChanged', dateFrom, dateTo)
     # start = datetime.strptime(dateFrom, '%Y-%m-%dT%H:%M:%S.000Z')
     # end = datetime.strptime(dateTo, '%Y-%m-%dT%H:%M:%S.000Z')
     # if (end - start).days < 2:
@@ -231,7 +245,6 @@ def queryAlarms(dateFrom, dateTo):
           if 'avg_value%' in desc.keys():
               desc['avg_value'] = desc['avg_value%']
               desc.pop('avg_value%')
-              print('avg_value2', desc['avg_value'])
           
           temp.append(desc)
 
@@ -315,8 +328,8 @@ def getCategory(event):
 
 
 def queryTraceChanges(dateFrom, dateTo):
-  dateFrom = convertDate(dateFrom)
-  dateTo = convertDate(dateTo)
+  # dateFrom = convertDate(dateFrom)
+  # dateTo = convertDate(dateTo)
 
   q = {
     "query": {
@@ -348,7 +361,7 @@ def queryTraceChanges(dateFrom, dateTo):
   data, positions, baseline, altPaths = [],[],[],[]
   positions = []
   for item in result:
-
+      print(len(data))
       tempD = {}
       for k,v in item['_source'].items():
           if k not in ['positions', 'baseline', 'alt_paths', 'created_at']:
@@ -580,6 +593,7 @@ def query4Avg(idx, dateFrom, dateTo):
   # dateFrom = convertDate(dateFrom)
   # dateTo = convertDate(dateTo)
   val_fld = hp.getValueField(idx)
+  src_field_name, dest_field_name = obtainFieldNames(dateFrom)
   query = {
             "size" : 0,
             "query" : {
@@ -629,14 +643,14 @@ def query4Avg(idx, dateFrom, dateTo):
                     {
                       "src_site" : {
                         "terms" : {
-                          "field" : "src_site"
+                          "field" : src_field_name
                         }
                       }
                     },
                     {
                       "dest_site" : {
                         "terms" : {
-                          "field" : "dest_site"
+                          "field" : dest_field_name
                         }
                       }
                     },
@@ -669,7 +683,7 @@ def query4Avg(idx, dateFrom, dateTo):
 
   aggrs = []
 
-  aggdata = hp.es.search(index=idx, body=query)
+  aggdata = hp.es.search(index=idx, body=query, _source=False)
   for item in aggdata['aggregations']['groupby']['buckets']:
       aggrs.append({'pair': str(item['key']['src']+'-'+item['key']['dest']),
                     'src': item['key']['src'], 'dest': item['key']['dest'],
