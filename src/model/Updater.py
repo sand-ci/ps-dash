@@ -13,6 +13,8 @@ import pandas as pd
 
 from ml.create_thrpt_dataset import createThrptDataset
 from ml.create_packet_loss_dataset import createPcktDataset
+import os
+from datetime import datetime, timedelta
 
 @timer
 class ParquetUpdater(object):
@@ -20,16 +22,21 @@ class ParquetUpdater(object):
     def __init__(self):
         self.location = 'parquet/'
         self.createLocation(self.location)
-        self.createLocation('parquet/raw/')
-        self.createLocation('parquet/frames/')
-        self.createLocation('parquet/pivot/')
-        self.createLocation('parquet/ml-datasets/')
-        self.pq = Parquet()
-        self.cacheIndexData()
-        self.storeAlarms()
-        self.storePathChangeDescDf()
-        self.storeThroughputData()
-        self.storePacketLossData()
+
+        folders = ['raw', 'frames', 'pivot', 'ml-datasets'] 
+        for folder in folders:
+            self.createLocation(self.location + folder + '/')
+        
+        # Prevent the data from being updated if it is fresh
+        if self.__isDataFresh(self.location) == False:
+            print("Data is too old or folders are empty. Updating...")
+            self.pq = Parquet()
+            self.cacheIndexData()
+            self.storeAlarms()
+            self.storePathChangeDescDf()
+            self.storeThroughputData()
+            self.storePacketLossData()
+
         try:
             Scheduler(3600, self.cacheIndexData)
             Scheduler(1800, self.storeAlarms)
@@ -40,6 +47,29 @@ class ParquetUpdater(object):
             Scheduler(int(60*60*12), self.storePacketLossData)
         except Exception as e:
             print(traceback.format_exc())
+
+
+
+    @staticmethod
+    def __isDataFresh(folder_path):
+        total_size = 0
+        twenty_five_hours_ago = datetime.now() - timedelta(hours=25)
+
+        if os.path.exists(folder_path):
+            for path, dirs, files in os.walk(folder_path):
+                if not dirs and not files:
+                    return False
+
+                for file in files:
+                    file_path = os.path.join(path, file)
+                    file_date_created = datetime.fromtimestamp(os.path.getctime(file_path))
+                    total_size += os.path.getsize(file_path)
+
+                    if total_size <= 10 or file_date_created <= twenty_five_hours_ago:
+                        return False
+
+        return True
+
 
     @timer
     def queryData(self, idx, dateFrom, dateTo):
