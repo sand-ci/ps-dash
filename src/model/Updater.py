@@ -20,6 +20,7 @@ from datetime import datetime, timedelta
 class ParquetUpdater(object):
     
     def __init__(self):
+        self.pq = Parquet()
         self.location = 'parquet/'
         self.createLocation(self.location)
 
