@@ -318,8 +318,15 @@ def queryTraceChanges(dateFrom, dateTo):
         "must": [
           {
             "range": {
-              "created_at": {
+              "from_date": {
                 "gte": dateFrom,
+                "format": "strict_date_optional_time"
+              }
+            }
+          },
+          {
+            "range": {
+              "to_date": {
                 "lte": dateTo,
                 "format": "strict_date_optional_time"
               }
@@ -330,7 +337,7 @@ def queryTraceChanges(dateFrom, dateTo):
     }
   }
 
-  print(str(q).replace("\'", "\""))
+  # print(str(q).replace("\'", "\""))
   result = scan(client=hp.es,index='ps_traces_changes',query=q)
   data, positions, baseline, altPaths = [],[],[],[]
   positions = []
