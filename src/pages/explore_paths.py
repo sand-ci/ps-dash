@@ -141,7 +141,7 @@ def update_output(asn, asnState, sites, sitesState):
     graphData = graphData[graphData['site'].isin(sitesState)]
 
     sitesDropdownData = []
-    for s in sorted(scntdf['site'].unique()):
+    for s in sorted(pivotFrames['path changed'].tag.unique().tolist()):
         sitesDropdownData.append({"label": s.upper(), "value": s.upper()})
 
     # data tables
@@ -154,6 +154,9 @@ def update_output(asn, asnState, sites, sitesState):
             df = df[df['diff'].isin(asnState)]
         elif 'asn' in df.columns and len(asnState) > 0:
             df = df[df['asn'].isin(asnState)]
+        
+        if 'src_site' in df.columns and 'dest_site' in df.columns and len(sitesState) > 0:
+            df = df[(df['src_site'].isin(sitesState)) | (df['dest_site'].isin(sitesState))]
 
         if len(df) > 0:
             dataTables.append(generate_tables(frames[event], df, event, alarmsInst))

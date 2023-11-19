@@ -162,7 +162,7 @@ def queryPathChanged(dateFrom, dateTo):
           "bool": {
             "must": [{
               "range": {
-                "created_at": {
+                "to_date": {
                   "from": dateFrom,
                   "to": dateTo,
                   "format": "strict_date_optional_time"
@@ -337,16 +337,9 @@ def queryTraceChanges(dateFrom, dateTo):
         "must": [
           {
             "range": {
-              "from_date": {
-                "gte": dateFrom,
-                "format": "strict_date_optional_time"
-              }
-            }
-          },
-          {
-            "range": {
               "to_date": {
-                "lte": dateTo,
+                "from": dateFrom,
+                "to": dateTo,
                 "format": "strict_date_optional_time"
               }
             }

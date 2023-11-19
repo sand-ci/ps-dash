@@ -31,7 +31,6 @@ class ParquetUpdater(object):
         # Prevent the data from being updated if it is fresh
         if self.__isDataFresh(self.location) == False:
             print("Data is too old or folders are empty. Updating...")
-            self.pq = Parquet()
             self.cacheIndexData()
             self.storeAlarms()
             self.storePathChangeDescDf()
@@ -168,7 +167,7 @@ class ParquetUpdater(object):
 
     @timer
     def storePathChangeDescDf(self):
-        dateFrom, dateTo = hp.defaultTimeRange(days=4)
+        dateFrom, dateTo = hp.defaultTimeRange(days=2)
         chdf, posDf, baseline = qrs.queryTraceChanges(dateFrom, dateTo)[:3]
 
         df = pd.DataFrame()
