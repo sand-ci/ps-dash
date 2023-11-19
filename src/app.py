@@ -68,7 +68,7 @@ app.layout = html.Div(children=[
                     dbc.NavItem(dbc.NavLink("SITES OVERVIEW", href="/", id='sites-tab')),
                     dbc.NavItem(dbc.NavLink("SEARCH ALARMS", href="/search-alarms", id='search-tab')),
                     dbc.NavItem(dbc.NavLink("EXPLORE PATHS", href="/explore-paths", id='paths-tab')),
-                    # dbc.NavItem(dbc.NavLink("MAJOR ALARMS", href="/ml-alarms/throughput", id='')),
+                    dbc.NavItem(dbc.NavLink("MAJOR ALARMS", href="/ml-alarms/throughput", id='')),
                 ], fill=True, justified=True, id='navbar'
             ),
 	        dash.page_container
