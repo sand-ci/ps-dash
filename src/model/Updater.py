@@ -206,13 +206,13 @@ class ParquetUpdater(object):
 
         rawDf = createThrptDataset(start_date, end_date)
 
-        self.pq.writeToFile(rawDf, f'{self.location}ml-datasets/rawDf.parquet')
+        self.pq.writeToFile(rawDf, f'{self.location}ml-datasets/throughput_Df.parquet')
 
         # train the ML model on the loaded dataset
         rawDf_onehot, model = trainMLmodel(rawDf)
         del rawDf
 
-        self.pq.writeToFile(rawDf_onehot, f'{self.location}ml-datasets/rawDf_onehot.parquet')
+        self.pq.writeToFile(rawDf_onehot, f'{self.location}ml-datasets/throughput_onehot_Df.parquet')
         # save the classification model as a pickle file
         model_pkl_file = f'{self.location}ml-datasets/XGB_Classifier_model_throughput.pkl'
         with open(model_pkl_file, 'wb') as file:
@@ -227,7 +227,7 @@ class ParquetUpdater(object):
         start_date, end_date = [f'{start_date}T00:01:00.000Z', f'{end_date}T23:59:59.000Z']
 
         plsDf = createPcktDataset(start_date, end_date)
-        self.pq.writeToFile(plsDf, f'{self.location}ml-datasets/plsDf.parquet')
+        self.pq.writeToFile(plsDf, f'{self.location}ml-datasets/packet_loss_Df.parquet')
 
         # onehot encode the whole dataset and leave only one month for further ML training
         plsDf_onehot_month = one_month_data(plsDf)

@@ -285,7 +285,7 @@ def update_output(start_date, end_date, sensitivity, sitesState):
     # query for the dataset
     if (start_date, end_date) == (start_date_check, end_date_check):
         pq = Parquet()
-        plsDf = pq.readFile(f'parquet/ml-datasets/plsDf.parquet')
+        plsDf = pq.readFile(f'parquet/ml-datasets/packet_loss_Df.parquet')
 
         model_pkl_file = f'parquet/ml-datasets/XGB_Classifier_model_packet_loss.pkl'
         with open(model_pkl_file, 'rb') as file:

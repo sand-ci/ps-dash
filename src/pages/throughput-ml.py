@@ -290,8 +290,8 @@ def update_output(start_date, end_date, sensitivity, sitesState):
     # query for the dataset
     if (start_date, end_date) == (start_date_check, end_date_check):
         pq = Parquet()
-        rawDf = pq.readFile('parquet/ml-datasets/rawDf.parquet')
-        rawDf_onehot = pq.readFile('parquet/ml-datasets/rawDf_onehot.parquet')
+        rawDf = pq.readFile('parquet/ml-datasets/throughput_Df.parquet')
+        rawDf_onehot = pq.readFile('parquet/ml-datasets/throughput_onehot_Df.parquet')
 
         model_pkl_file = f'parquet/ml-datasets/XGB_Classifier_model_throughput.pkl'
         with open(model_pkl_file, 'rb') as file:
