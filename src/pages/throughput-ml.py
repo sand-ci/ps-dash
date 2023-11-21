@@ -9,6 +9,7 @@ from datetime import timedelta
 from datetime import date
 import pandas as pd
 import matplotlib.pyplot as plt
+import pickle
 
 import utils.helpers as hp
 from utils.parquet import Parquet
@@ -18,6 +19,7 @@ urllib3.disable_warnings()
 
 from ml.create_thrpt_dataset import createThrptDataset
 from ml.thrpt_dataset_model_train import trainMLmodel
+from ml.thrpt_dataset_model_train import predictData
 
 def title():
     return f"Search & explore"
@@ -289,14 +291,22 @@ def update_output(start_date, end_date, sensitivity, sitesState):
     if (start_date, end_date) == (start_date_check, end_date_check):
         pq = Parquet()
         rawDf = pq.readFile('parquet/ml-datasets/rawDf.parquet')
+        rawDf_onehot = pq.readFile('parquet/ml-datasets/rawDf_onehot.parquet')
+
+        model_pkl_file = f'parquet/ml-datasets/XGB_Classifier_model_throughput.pkl'
+        with open(model_pkl_file, 'rb') as file:
+            model = pickle.load(file)
     else:
         rawDf = createThrptDataset(start_date, end_date)
+        # train the ML model on the loaded dataset
+        rawDf_onehot, model = trainMLmodel(rawDf)
+        del rawDf
 
     # rawDf = pd.read_csv('rawDf_sep_oct.csv')
 
-    # train the ML model on the loaded dataset and return the dataset with original alarms and the ML alarms
+    # predict the data on the model and return the dataset with original alarms and the ML alarms
     global rawDf_onehot_plot, df_to_plot
-    rawDf_onehot_plot, df_to_plot = trainMLmodel(rawDf)
+    rawDf_onehot_plot, df_to_plot = predictData(rawDf_onehot, model)
 
     # create a list with all sites as sources
     src_sites = rawDf_onehot_plot.loc[:, rawDf_onehot_plot.columns.str.startswith("src_site")].columns.values.tolist()

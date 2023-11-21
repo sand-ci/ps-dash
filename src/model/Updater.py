@@ -10,9 +10,13 @@ import utils.helpers as hp
 from utils.helpers import timer
 import model.queries as qrs
 import pandas as pd
+import pickle
 
 from ml.create_thrpt_dataset import createThrptDataset
+from ml.thrpt_dataset_model_train import trainMLmodel
 from ml.create_packet_loss_dataset import createPcktDataset
+from ml.packet_loss_one_month_onehot import one_month_data
+from ml.packet_loss_train_model import packet_loss_train_model
 import os
 from datetime import datetime, timedelta
 
@@ -34,8 +38,8 @@ class ParquetUpdater(object):
             self.cacheIndexData()
             self.storeAlarms()
             self.storePathChangeDescDf()
-            self.storeThroughputData()
-            self.storePacketLossData()
+            self.storeThroughputDataAndModel()
+            self.storePacketLossDataAndModel()
 
         try:
             Scheduler(3600, self.cacheIndexData)
@@ -43,8 +47,8 @@ class ParquetUpdater(object):
             Scheduler(1800, self.storePathChangeDescDf)
 
             # Store the data for the Major Alarms analysis
-            Scheduler(int(60*60*12), self.storeThroughputData)
-            Scheduler(int(60*60*12), self.storePacketLossData)
+            Scheduler(int(60*60*12), self.storeThroughputDataAndModel)
+            Scheduler(int(60*60*12), self.storePacketLossDataAndModel)
         except Exception as e:
             print(traceback.format_exc())
 
@@ -194,7 +198,7 @@ class ParquetUpdater(object):
             os.mkdir(location)
 
     @timer
-    def storeThroughputData(self):
+    def storeThroughputDataAndModel(self):
         now = hp.defaultTimeRange(days=60, datesOnly=True)
         start_date = now[0]
         end_date = now[1]
@@ -204,17 +208,37 @@ class ParquetUpdater(object):
 
         self.pq.writeToFile(rawDf, f'{self.location}ml-datasets/rawDf.parquet')
 
+        # train the ML model on the loaded dataset
+        rawDf_onehot, model = trainMLmodel(rawDf)
+        del rawDf
+
+        self.pq.writeToFile(rawDf_onehot, f'{self.location}ml-datasets/rawDf_onehot.parquet')
+        # save the classification model as a pickle file
+        model_pkl_file = f'{self.location}ml-datasets/XGB_Classifier_model_throughput.pkl'
+        with open(model_pkl_file, 'wb') as file:
+            pickle.dump(model, file)
+
+
     @timer
-    def storePacketLossData(self):
+    def storePacketLossDataAndModel(self):
         now = hp.defaultTimeRange(days=60, datesOnly=True)
         start_date = now[0]
         end_date = now[1]
         start_date, end_date = [f'{start_date}T00:01:00.000Z', f'{end_date}T23:59:59.000Z']
 
         plsDf = createPcktDataset(start_date, end_date)
-
         self.pq.writeToFile(plsDf, f'{self.location}ml-datasets/plsDf.parquet')
 
+        # onehot encode the whole dataset and leave only one month for further ML training
+        plsDf_onehot_month = one_month_data(plsDf)
+        # train the model on one month data
+        model = packet_loss_train_model(plsDf_onehot_month)
+        del plsDf_onehot_month
+
+        # save the classification model as a pickle file
+        model_pkl_file = f'{self.location}ml-datasets/XGB_Classifier_model_packet_loss.pkl'
+        with open(model_pkl_file, 'wb') as file:
+            pickle.dump(model, file)
 
 
 

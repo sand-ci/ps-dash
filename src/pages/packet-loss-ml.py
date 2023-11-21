@@ -10,6 +10,7 @@ from datetime import date
 import pandas as pd
 import matplotlib.pyplot as plt
 from elasticsearch.helpers import scan
+import pickle
 
 import utils.helpers as hp
 from utils.parquet import Parquet
@@ -231,7 +232,7 @@ def layout(**other_unknown_query_strings):
 
 def colorMap(eventTypes):
   colors = ['#75cbe6', '#3b6d8f', '#75E6DA', '#189AB4', '#2E8BC0', '#145DA0', '#05445E', '#0C2D48',
-          '#5EACE0', '#d6ebff', '#498bcc', '#82cbf9', 
+          '#5EACE0', '#d6ebff', '#498bcc', '#82cbf9',
           '#2894f8', '#fee838', '#3e6595', '#4adfe1', '#b14ae1'
           '#1f77b4', '#ff7f0e', '#2ca02c','#00224e', '#123570', '#3b496c', '#575d6d', '#707173', '#8a8678', '#a59c74',
           ]
@@ -239,7 +240,7 @@ def colorMap(eventTypes):
   paletteDict = {}
   for i,e in enumerate(eventTypes):
       paletteDict[e] = colors[i]
-  
+
   return paletteDict
 
 # a callback for the first section of a page with the list of Major alarms
@@ -285,16 +286,20 @@ def update_output(start_date, end_date, sensitivity, sitesState):
     if (start_date, end_date) == (start_date_check, end_date_check):
         pq = Parquet()
         plsDf = pq.readFile(f'parquet/ml-datasets/plsDf.parquet')
+
+        model_pkl_file = f'parquet/ml-datasets/XGB_Classifier_model_packet_loss.pkl'
+        with open(model_pkl_file, 'rb') as file:
+            model = pickle.load(file)
     else:
         plsDf = createPcktDataset(start_date, end_date)
+        # onehot encode the whole dataset and leave only one month for further ML training
+        plsDf_onehot_month = one_month_data(plsDf)
+
+        # train the model on one month data
+        model = packet_loss_train_model(plsDf_onehot_month)
+        del plsDf_onehot_month
+
     # plsDf = pd.read_csv('plsDf_sep_oct.csv')
-
-    # onehot encode the whole dataset and leave only one month for further ML training
-    plsDf_onehot_month = one_month_data(plsDf)
-
-    #train the model on one month data
-    model = packet_loss_train_model(plsDf_onehot_month)
-    del plsDf_onehot_month
 
     # predict the alarms using ML model and return the dataset with original alarms and the ML alarms
     global plsDf_onehot_plot, df_to_plot
