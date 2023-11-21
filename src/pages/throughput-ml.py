@@ -9,6 +9,7 @@ from datetime import timedelta
 from datetime import date
 import pandas as pd
 import matplotlib.pyplot as plt
+import pickle
 
 import utils.helpers as hp
 from utils.parquet import Parquet
@@ -18,6 +19,7 @@ urllib3.disable_warnings()
 
 from ml.create_thrpt_dataset import createThrptDataset
 from ml.thrpt_dataset_model_train import trainMLmodel
+from ml.thrpt_dataset_model_train import predictData
 
 def title():
     return f"Search & explore"
@@ -288,15 +290,23 @@ def update_output(start_date, end_date, sensitivity, sitesState):
     # query for the dataset
     if (start_date, end_date) == (start_date_check, end_date_check):
         pq = Parquet()
-        rawDf = pq.readFile('parquet/ml-datasets/rawDf.parquet')
+        rawDf = pq.readFile('parquet/ml-datasets/throughput_Df.parquet')
+        rawDf_onehot = pq.readFile('parquet/ml-datasets/throughput_onehot_Df.parquet')
+
+        model_pkl_file = f'parquet/ml-datasets/XGB_Classifier_model_throughput.pkl'
+        with open(model_pkl_file, 'rb') as file:
+            model = pickle.load(file)
     else:
         rawDf = createThrptDataset(start_date, end_date)
+        # train the ML model on the loaded dataset
+        rawDf_onehot, model = trainMLmodel(rawDf)
+        del rawDf
 
     # rawDf = pd.read_csv('rawDf_sep_oct.csv')
 
-    # train the ML model on the loaded dataset and return the dataset with original alarms and the ML alarms
+    # predict the data on the model and return the dataset with original alarms and the ML alarms
     global rawDf_onehot_plot, df_to_plot
-    rawDf_onehot_plot, df_to_plot = trainMLmodel(rawDf)
+    rawDf_onehot_plot, df_to_plot = predictData(rawDf_onehot, model)
 
     # create a list with all sites as sources
     src_sites = rawDf_onehot_plot.loc[:, rawDf_onehot_plot.columns.str.startswith("src_site")].columns.values.tolist()
@@ -414,151 +424,158 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
 
     # creating plots for the site both as a source and dest
     plotly_fig = {}
-    if (sitesState is not None and len(sitesState) > 0) & (allsites in src_sites) & (allsites in dest_sites):
-        rawDf_onehot_site_plot = rawDf_onehot_plot.loc[
-            (rawDf_onehot_plot['src_site_' + allsites] == 1) | (rawDf_onehot_plot['dest_site_' + allsites] == 1)]
-        df_to_plot_site = df_to_plot.loc[
-            (df_to_plot['src_site_' + allsites] == 1) | (df_to_plot['dest_site_' + allsites] == 1)]
+    if (sitesState is not None and len(sitesState) > 0):
+        if (allsites in src_sites) & (allsites in dest_sites):
+            rawDf_onehot_site_plot = rawDf_onehot_plot.loc[
+                (rawDf_onehot_plot['src_site_' + allsites] == 1) | (rawDf_onehot_plot['dest_site_' + allsites] == 1)]
+            df_to_plot_site = df_to_plot.loc[
+                (df_to_plot['src_site_' + allsites] == 1) | (df_to_plot['dest_site_' + allsites] == 1)]
 
-        fig = plt.figure(figsize=(14, 4))
-        plt.title('Bandwidth decreased alarms for the ' + allsites + ' site')
-        plt.xlabel('timestamp')
-        plt.ylabel('throughput (Mbps)')
+            fig = plt.figure(figsize=(14, 4))
+            plt.title('Bandwidth decreased alarms for the ' + allsites + ' site')
+            plt.xlabel('timestamp')
+            plt.ylabel('throughput (Mbps)')
 
-        plt.plot(rawDf_onehot_site_plot['dt'], rawDf_onehot_site_plot['value'], 'o', color='lightblue',
-                 label="all throughput measurements")
-        plt.plot(rawDf_onehot_site_plot.loc[rawDf_onehot_site_plot['alarm_created'] == 1, 'dt'],
-                 rawDf_onehot_site_plot.loc[rawDf_onehot_site_plot['alarm_created'] == 1, 'value'], 'go', markersize=8.5,
-                 label="alarms using alarms system")
-        plt.plot(df_to_plot_site.loc[df_to_plot_site['alarm_created'] == 1, 'dt'],
-                 df_to_plot_site.loc[df_to_plot_site['alarm_created'] == 1, 'value'], 'ro', label="alarms using ML")
-        plt.plot(rawDf_onehot_site_plot.groupby(rawDf_onehot_site_plot['dt'].dt.date)["value"].mean(),
-                 label='daily throughput mean')
-        plt.plot(df_to_plot_site.groupby(df_to_plot_site.loc[df_to_plot_site['alarm_created'] == 1, 'dt'].dt.date)[
-                     "value"].mean(), label='daily alarm measurements mean')
+            plt.plot(rawDf_onehot_site_plot['dt'], rawDf_onehot_site_plot['value'], 'o', color='lightblue',
+                     label="all throughput measurements")
+            plt.plot(rawDf_onehot_site_plot.loc[rawDf_onehot_site_plot['alarm_created'] == 1, 'dt'],
+                     rawDf_onehot_site_plot.loc[rawDf_onehot_site_plot['alarm_created'] == 1, 'value'], 'go',
+                     markersize=8.5,
+                     label="alarms using alarms system")
+            plt.plot(df_to_plot_site.loc[df_to_plot_site['alarm_created'] == 1, 'dt'],
+                     df_to_plot_site.loc[df_to_plot_site['alarm_created'] == 1, 'value'], 'ro', label="alarms using ML")
+            plt.plot(rawDf_onehot_site_plot.groupby(rawDf_onehot_site_plot['dt'].dt.date)["value"].mean(),
+                     label='daily throughput mean')
+            plt.plot(df_to_plot_site.groupby(df_to_plot_site.loc[df_to_plot_site['alarm_created'] == 1, 'dt'].dt.date)[
+                         "value"].mean(), label='daily alarm measurements mean')
 
-        plotly_fig = mpl_to_plotly(fig)
-        plotly_fig.update_layout(layout)
+            plotly_fig = mpl_to_plotly(fig)
+            plotly_fig.update_layout(layout)
 
-        plotly_fig = dcc.Graph(figure=plotly_fig)
-    elif (sitesState is not None and len(sitesState) > 0):
-        plotly_fig = html.H4('Measurements for this site are present as a source or destination ONLY',
+            plotly_fig = dcc.Graph(figure=plotly_fig)
+        elif (sitesState is not None and len(sitesState) > 0):
+            plotly_fig = html.H4('Measurements for this site are present as a source or destination ONLY',
                                  style={"padding-bottom": "1%", "padding-top": "1%"})
 
     plotly_fig_mean = {}
-    if (sitesState is not None and len(sitesState) > 0) & (allsites in src_sites) & (allsites in dest_sites):
-        fig_mean = plt.figure(figsize=(14, 4))
-        plt.title('Bandwidth decreased alarms aggregated by days for the ' + allsites + ' site')
-        plt.xlabel('timestamp')
-        plt.ylabel('number of daily alarms')
+    if (sitesState is not None and len(sitesState) > 0):
+        if (allsites in src_sites) & (allsites in dest_sites):
+            fig_mean = plt.figure(figsize=(14, 4))
+            plt.title('Bandwidth decreased alarms aggregated by days for the ' + allsites + ' site')
+            plt.xlabel('timestamp')
+            plt.ylabel('number of daily alarms')
 
-        plt.plot(df_to_plot_site.groupby(df_to_plot_site['dt'].dt.date)["alarm_created"].sum())
-        plotly_fig_mean = mpl_to_plotly(fig_mean)
-        plotly_fig_mean.update_layout(layout_mean)
+            plt.plot(df_to_plot_site.groupby(df_to_plot_site['dt'].dt.date)["alarm_created"].sum())
+            plotly_fig_mean = mpl_to_plotly(fig_mean)
+            plotly_fig_mean.update_layout(layout_mean)
 
-        plotly_fig_mean = dcc.Graph(figure=plotly_fig_mean)
-    elif (sitesState is not None and len(sitesState) > 0):
-        plotly_fig_mean = html.H4('Measurements for this site are present as a source or destination ONLY',
-                                 style={"padding-bottom": "1%", "padding-top": "1%"})
+            plotly_fig_mean = dcc.Graph(figure=plotly_fig_mean)
+        elif (sitesState is not None and len(sitesState) > 0):
+            plotly_fig_mean = html.H4('Measurements for this site are present as a source or destination ONLY',
+                                      style={"padding-bottom": "1%", "padding-top": "1%"})
 
     # creating plots for the site as a source only
     plotly_fig_src = {}
-    if (sitesState is not None and len(sitesState) > 0) & (allsites in src_sites):
-        rawDf_onehot_site_plot = rawDf_onehot_plot.loc[(rawDf_onehot_plot['src_site_' + allsites] == 1)]
-        df_to_plot_site = df_to_plot.loc[(df_to_plot['src_site_' + allsites] == 1)]
+    if (sitesState is not None and len(sitesState) > 0):
+        if (allsites in src_sites):
+            rawDf_onehot_site_plot = rawDf_onehot_plot.loc[(rawDf_onehot_plot['src_site_' + allsites] == 1)]
+            df_to_plot_site = df_to_plot.loc[(df_to_plot['src_site_' + allsites] == 1)]
 
-        fig_src = plt.figure(figsize=(14, 4))
-        plt.title('Bandwidth decreased alarms for the ' + allsites + ' site as a source only')
-        plt.xlabel('timestamp')
-        plt.ylabel('throughput (Mbps)')
+            fig_src = plt.figure(figsize=(14, 4))
+            plt.title('Bandwidth decreased alarms for the ' + allsites + ' site as a source only')
+            plt.xlabel('timestamp')
+            plt.ylabel('throughput (Mbps)')
 
-        plt.plot(rawDf_onehot_site_plot['dt'], rawDf_onehot_site_plot['value'], 'o', color='lightblue',
-                 label="all throughput measurements")
-        plt.plot(rawDf_onehot_site_plot.loc[rawDf_onehot_site_plot['alarm_created'] == 1, 'dt'],
-                 rawDf_onehot_site_plot.loc[rawDf_onehot_site_plot['alarm_created'] == 1, 'value'], 'go', markersize=8.5,
-                 label="alarms using alarms system")
-        plt.plot(df_to_plot_site.loc[df_to_plot_site['alarm_created'] == 1, 'dt'],
-                 df_to_plot_site.loc[df_to_plot_site['alarm_created'] == 1, 'value'], 'ro', label="alarms using ML")
-        plt.plot(rawDf_onehot_site_plot.groupby(rawDf_onehot_site_plot['dt'].dt.date)["value"].mean(),
-                 label='daily throughput mean')
-        plt.plot(df_to_plot_site.groupby(df_to_plot_site.loc[df_to_plot_site['alarm_created'] == 1, 'dt'].dt.date)[
-                     "value"].mean(), label='daily alarm measurements mean')
+            plt.plot(rawDf_onehot_site_plot['dt'], rawDf_onehot_site_plot['value'], 'o', color='lightblue',
+                     label="all throughput measurements")
+            plt.plot(rawDf_onehot_site_plot.loc[rawDf_onehot_site_plot['alarm_created'] == 1, 'dt'],
+                     rawDf_onehot_site_plot.loc[rawDf_onehot_site_plot['alarm_created'] == 1, 'value'], 'go',
+                     markersize=8.5,
+                     label="alarms using alarms system")
+            plt.plot(df_to_plot_site.loc[df_to_plot_site['alarm_created'] == 1, 'dt'],
+                     df_to_plot_site.loc[df_to_plot_site['alarm_created'] == 1, 'value'], 'ro', label="alarms using ML")
+            plt.plot(rawDf_onehot_site_plot.groupby(rawDf_onehot_site_plot['dt'].dt.date)["value"].mean(),
+                     label='daily throughput mean')
+            plt.plot(df_to_plot_site.groupby(df_to_plot_site.loc[df_to_plot_site['alarm_created'] == 1, 'dt'].dt.date)[
+                         "value"].mean(), label='daily alarm measurements mean')
 
-        plotly_fig_src = mpl_to_plotly(fig_src)
-        plotly_fig_src.update_layout(layout)
+            plotly_fig_src = mpl_to_plotly(fig_src)
+            plotly_fig_src.update_layout(layout)
 
-        plotly_fig_src = dcc.Graph(figure=plotly_fig_src)
-    elif (sitesState is not None and len(sitesState) > 0):
-        plotly_fig_src = html.H4('No measurements for this site as a source',
-                                      style={"padding-bottom": "1%", "padding-top": "1%"})
+            plotly_fig_src = dcc.Graph(figure=plotly_fig_src)
+        elif (sitesState is not None and len(sitesState) > 0):
+            plotly_fig_src = html.H4('No measurements for this site as a source',
+                                     style={"padding-bottom": "1%", "padding-top": "1%"})
 
     plotly_fig_mean_src = {}
-    if (sitesState is not None and len(sitesState) > 0) & (allsites in src_sites):
-        fig_mean = plt.figure(figsize=(14, 4))
-        plt.title('Bandwidth decreased alarms aggregated by days for the ' + allsites + ' site')
-        plt.xlabel('timestamp')
-        plt.ylabel('number of daily alarms')
+    if (sitesState is not None and len(sitesState) > 0):
+        if (allsites in src_sites):
+            fig_mean = plt.figure(figsize=(14, 4))
+            plt.title('Bandwidth decreased alarms aggregated by days for the ' + allsites + ' site')
+            plt.xlabel('timestamp')
+            plt.ylabel('number of daily alarms')
 
-        plt.plot(df_to_plot_site.groupby(df_to_plot_site['dt'].dt.date)["alarm_created"].sum())
-        plotly_fig_mean_src = mpl_to_plotly(fig_mean)
-        plotly_fig_mean_src.update_layout(layout_mean)
+            plt.plot(df_to_plot_site.groupby(df_to_plot_site['dt'].dt.date)["alarm_created"].sum())
+            plotly_fig_mean_src = mpl_to_plotly(fig_mean)
+            plotly_fig_mean_src.update_layout(layout_mean)
 
-        plotly_fig_mean_src = dcc.Graph(figure=plotly_fig_mean_src)
-    elif (sitesState is not None and len(sitesState) > 0):
-        plotly_fig_mean_src = html.H4('No measurements for this site as a source',
-                                      style={"padding-bottom": "1%", "padding-top": "1%"})
+            plotly_fig_mean_src = dcc.Graph(figure=plotly_fig_mean_src)
+        elif (sitesState is not None and len(sitesState) > 0):
+            plotly_fig_mean_src = html.H4('No measurements for this site as a source',
+                                          style={"padding-bottom": "1%", "padding-top": "1%"})
 
     # creating plots for the site as a dest only
     plotly_fig_dest = {}
-    if (sitesState is not None and len(sitesState) > 0) & (allsites in dest_sites):
+    if (sitesState is not None and len(sitesState) > 0):
+        if (allsites in dest_sites):
+            rawDf_onehot_site_plot = rawDf_onehot_plot.loc[(rawDf_onehot_plot['dest_site_' + allsites] == 1)]
+            df_to_plot_site = df_to_plot.loc[(df_to_plot['dest_site_' + allsites] == 1)]
 
-        rawDf_onehot_site_plot = rawDf_onehot_plot.loc[(rawDf_onehot_plot['dest_site_' + allsites] == 1)]
-        df_to_plot_site = df_to_plot.loc[(df_to_plot['dest_site_' + allsites] == 1)]
+            fig_dest = plt.figure(figsize=(14, 4))
+            plt.title('Bandwidth decreased alarms for the ' + allsites + ' site as a destination only')
+            plt.xlabel('timestamp')
+            plt.ylabel('throughput (Mbps)')
 
+            plt.plot(rawDf_onehot_site_plot['dt'], rawDf_onehot_site_plot['value'], 'o', color='lightblue',
+                     label="all throughput measurements")
+            plt.plot(rawDf_onehot_site_plot.loc[rawDf_onehot_site_plot['alarm_created'] == 1, 'dt'],
+                     rawDf_onehot_site_plot.loc[rawDf_onehot_site_plot['alarm_created'] == 1, 'value'], 'go',
+                     markersize=8.5,
+                     label="alarms using alarms system")
+            plt.plot(df_to_plot_site.loc[df_to_plot_site['alarm_created'] == 1, 'dt'],
+                     df_to_plot_site.loc[df_to_plot_site['alarm_created'] == 1, 'value'], 'ro', label="alarms using ML")
+            plt.plot(rawDf_onehot_site_plot.groupby(rawDf_onehot_site_plot['dt'].dt.date)["value"].mean(),
+                     label='daily throughput mean')
+            plt.plot(df_to_plot_site.groupby(df_to_plot_site.loc[df_to_plot_site['alarm_created'] == 1, 'dt'].dt.date)[
+                         "value"].mean(), label='daily alarm measurements mean')
 
-        fig_dest = plt.figure(figsize=(14, 4))
-        plt.title('Bandwidth decreased alarms for the ' + allsites + ' site as a destination only')
-        plt.xlabel('timestamp')
-        plt.ylabel('throughput (Mbps)')
+            plotly_fig_dest = mpl_to_plotly(fig_dest)
+            plotly_fig_dest.update_layout(layout)
 
-        plt.plot(rawDf_onehot_site_plot['dt'], rawDf_onehot_site_plot['value'], 'o', color='lightblue',
-                 label="all throughput measurements")
-        plt.plot(rawDf_onehot_site_plot.loc[rawDf_onehot_site_plot['alarm_created'] == 1, 'dt'],
-                 rawDf_onehot_site_plot.loc[rawDf_onehot_site_plot['alarm_created'] == 1, 'value'], 'go', markersize=8.5,
-                 label="alarms using alarms system")
-        plt.plot(df_to_plot_site.loc[df_to_plot_site['alarm_created'] == 1, 'dt'],
-                 df_to_plot_site.loc[df_to_plot_site['alarm_created'] == 1, 'value'], 'ro', label="alarms using ML")
-        plt.plot(rawDf_onehot_site_plot.groupby(rawDf_onehot_site_plot['dt'].dt.date)["value"].mean(),
-                 label='daily throughput mean')
-        plt.plot(df_to_plot_site.groupby(df_to_plot_site.loc[df_to_plot_site['alarm_created'] == 1, 'dt'].dt.date)[
-                     "value"].mean(), label='daily alarm measurements mean')
-
-        plotly_fig_dest = mpl_to_plotly(fig_dest)
-        plotly_fig_dest.update_layout(layout)
-
-        plotly_fig_dest = dcc.Graph(figure=plotly_fig_dest)
-    elif (sitesState is not None and len(sitesState) > 0):
-        plotly_fig_dest = html.H4('No measurements for this site as a destination',
+            plotly_fig_dest = dcc.Graph(figure=plotly_fig_dest)
+        elif (sitesState is not None and len(sitesState) > 0):
+            plotly_fig_dest = html.H4('No measurements for this site as a destination',
                                       style={"padding-bottom": "1%", "padding-top": "1%"})
 
     plotly_fig_mean_dest = {}
-    if (sitesState is not None and len(sitesState) > 0) & (allsites in dest_sites):
-        fig_mean = plt.figure(figsize=(14, 4))
-        plt.title('Bandwidth decreased alarms aggregated by days for the ' + allsites + ' site')
-        plt.xlabel('timestamp')
-        plt.ylabel('number of daily alarms')
+    if (sitesState is not None and len(sitesState) > 0):
+        if (allsites in dest_sites):
+            fig_mean = plt.figure(figsize=(14, 4))
+            plt.title('Bandwidth decreased alarms aggregated by days for the ' + allsites + ' site')
+            plt.xlabel('timestamp')
+            plt.ylabel('number of daily alarms')
 
-        plt.plot(df_to_plot_site.groupby(df_to_plot_site['dt'].dt.date)["alarm_created"].sum())
-        plotly_fig_mean_dest = mpl_to_plotly(fig_mean)
-        plotly_fig_mean_dest.update_layout(layout_mean)
+            plt.plot(df_to_plot_site.groupby(df_to_plot_site['dt'].dt.date)["alarm_created"].sum())
+            plotly_fig_mean_dest = mpl_to_plotly(fig_mean)
+            plotly_fig_mean_dest.update_layout(layout_mean)
 
-        plotly_fig_mean_dest = dcc.Graph(figure=plotly_fig_mean_dest)
-    elif (sitesState is not None and len(sitesState) > 0):
-        plotly_fig_mean_dest = html.H4('No measurements for this site as a destination',
-                                      style={"padding-bottom": "1%", "padding-top": "1%"})
+            plotly_fig_mean_dest = dcc.Graph(figure=plotly_fig_mean_dest)
+        elif (sitesState is not None and len(sitesState) > 0):
+            plotly_fig_mean_dest = html.H4('No measurements for this site as a destination',
+                                           style={"padding-bottom": "1%", "padding-top": "1%"})
 
     return [plotly_fig,
-            plotly_fig_src,plotly_fig_dest, plotly_fig_mean,
+            plotly_fig_src, plotly_fig_dest, plotly_fig_mean,
             plotly_fig_mean_src, plotly_fig_mean_dest]
 
 # a callback for the third section of a page with two plots for a chosen destination-source pair

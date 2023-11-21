@@ -10,6 +10,7 @@ from datetime import date
 import pandas as pd
 import matplotlib.pyplot as plt
 from elasticsearch.helpers import scan
+import pickle
 
 import utils.helpers as hp
 from utils.parquet import Parquet
@@ -231,7 +232,7 @@ def layout(**other_unknown_query_strings):
 
 def colorMap(eventTypes):
   colors = ['#75cbe6', '#3b6d8f', '#75E6DA', '#189AB4', '#2E8BC0', '#145DA0', '#05445E', '#0C2D48',
-          '#5EACE0', '#d6ebff', '#498bcc', '#82cbf9', 
+          '#5EACE0', '#d6ebff', '#498bcc', '#82cbf9',
           '#2894f8', '#fee838', '#3e6595', '#4adfe1', '#b14ae1'
           '#1f77b4', '#ff7f0e', '#2ca02c','#00224e', '#123570', '#3b496c', '#575d6d', '#707173', '#8a8678', '#a59c74',
           ]
@@ -239,7 +240,7 @@ def colorMap(eventTypes):
   paletteDict = {}
   for i,e in enumerate(eventTypes):
       paletteDict[e] = colors[i]
-  
+
   return paletteDict
 
 # a callback for the first section of a page with the list of Major alarms
@@ -284,17 +285,21 @@ def update_output(start_date, end_date, sensitivity, sitesState):
     # query for the dataset
     if (start_date, end_date) == (start_date_check, end_date_check):
         pq = Parquet()
-        plsDf = pq.readFile(f'parquet/ml-datasets/plsDf.parquet')
+        plsDf = pq.readFile(f'parquet/ml-datasets/packet_loss_Df.parquet')
+
+        model_pkl_file = f'parquet/ml-datasets/XGB_Classifier_model_packet_loss.pkl'
+        with open(model_pkl_file, 'rb') as file:
+            model = pickle.load(file)
     else:
         plsDf = createPcktDataset(start_date, end_date)
+        # onehot encode the whole dataset and leave only one month for further ML training
+        plsDf_onehot_month = one_month_data(plsDf)
+
+        # train the model on one month data
+        model = packet_loss_train_model(plsDf_onehot_month)
+        del plsDf_onehot_month
+
     # plsDf = pd.read_csv('plsDf_sep_oct.csv')
-
-    # onehot encode the whole dataset and leave only one month for further ML training
-    plsDf_onehot_month = one_month_data(plsDf)
-
-    #train the model on one month data
-    model = packet_loss_train_model(plsDf_onehot_month)
-    del plsDf_onehot_month
 
     # predict the alarms using ML model and return the dataset with original alarms and the ML alarms
     global plsDf_onehot_plot, df_to_plot
@@ -421,143 +426,150 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
 
     # creating the first plot
     plotly_fig = {}
-    if (sitesState is not None and len(sitesState) > 0) & (allsites in src_sites) & (allsites in dest_sites):
-        plsDf_onehot_site_plot = plsDf_onehot_plot.loc[
-            (plsDf_onehot_plot['src_site_' + allsites] == 1) | (plsDf_onehot_plot['dest_site_' + allsites] == 1)]
-        df_to_plot_site = df_to_plot.loc[
-            (df_to_plot['src_site_' + allsites] == 1) | (df_to_plot['dest_site_' + allsites] == 1)]
+    if (sitesState is not None and len(sitesState) > 0):
+        if (allsites in src_sites) & (allsites in dest_sites):
+            plsDf_onehot_site_plot = plsDf_onehot_plot.loc[
+                (plsDf_onehot_plot['src_site_' + allsites] == 1) | (plsDf_onehot_plot['dest_site_' + allsites] == 1)]
+            df_to_plot_site = df_to_plot.loc[
+                (df_to_plot['src_site_' + allsites] == 1) | (df_to_plot['dest_site_' + allsites] == 1)]
 
-        fig = plt.figure(figsize=(14, 4))
-        plt.title('Packet loss alarms for the ' + allsites + ' site')
-        plt.xlabel('timestamp')
-        plt.ylabel('packet loss')
+            fig = plt.figure(figsize=(14, 4))
+            plt.title('Packet loss alarms for the ' + allsites + ' site')
+            plt.xlabel('timestamp')
+            plt.ylabel('packet loss')
 
-        plt.plot(plsDf_onehot_site_plot['dt'], plsDf_onehot_site_plot['avg_value'], 'co',
-                 label="all packet loss measurements")
-        plt.plot(df_to_plot_site.loc[df_to_plot['flag'] == 2, 'dt'],
-                 df_to_plot_site.loc[df_to_plot_site['flag'] == 2, 'avg_value'], 'go',
-                 label="complete loss alarms using ML")
-        plt.plot(df_to_plot_site.loc[df_to_plot['flag'] == 1, 'dt'],
-                 df_to_plot_site.loc[df_to_plot_site['flag'] == 1, 'avg_value'], 'ro',
-                 label="partial loss alarms using ML")
-        plt.plot(df_to_plot_site.groupby(df_to_plot_site['dt'].dt.date)["avg_value"].mean(),
-                 label='daily packet loss mean')
+            plt.plot(plsDf_onehot_site_plot['dt'], plsDf_onehot_site_plot['avg_value'], 'co',
+                     label="all packet loss measurements")
+            plt.plot(df_to_plot_site.loc[df_to_plot['flag'] == 2, 'dt'],
+                     df_to_plot_site.loc[df_to_plot_site['flag'] == 2, 'avg_value'], 'go',
+                     label="complete loss alarms using ML")
+            plt.plot(df_to_plot_site.loc[df_to_plot['flag'] == 1, 'dt'],
+                     df_to_plot_site.loc[df_to_plot_site['flag'] == 1, 'avg_value'], 'ro',
+                     label="partial loss alarms using ML")
+            plt.plot(df_to_plot_site.groupby(df_to_plot_site['dt'].dt.date)["avg_value"].mean(),
+                     label='daily packet loss mean')
 
-        plotly_fig = mpl_to_plotly(fig)
-        plotly_fig.update_layout(layout)
+            plotly_fig = mpl_to_plotly(fig)
+            plotly_fig.update_layout(layout)
 
-        plotly_fig = dcc.Graph(figure=plotly_fig)
-    elif (sitesState is not None and len(sitesState) > 0):
-        plotly_fig = html.H4('Measurements for this site are present as a source or destination ONLY',
-                             style={"padding-bottom": "1%", "padding-top": "1%"})
+            plotly_fig = dcc.Graph(figure=plotly_fig)
+        elif (sitesState is not None and len(sitesState) > 0):
+            plotly_fig = html.H4('Measurements for this site are present as a source or destination ONLY',
+                                 style={"padding-bottom": "1%", "padding-top": "1%"})
 
     plotly_fig_mean = {}
-    if (sitesState is not None and len(sitesState) > 0) & (allsites in src_sites) & (allsites in dest_sites):
-        fig_mean = plt.figure(figsize=(14, 4))
-        plt.title('Packet loss alarms aggregated by days for the ' + allsites + ' site')
-        plt.xlabel('timestamp')
-        plt.ylabel('number of daily alarms')
+    if (sitesState is not None and len(sitesState) > 0):
+        if (allsites in src_sites) & (allsites in dest_sites):
+            fig_mean = plt.figure(figsize=(14, 4))
+            plt.title('Packet loss alarms aggregated by days for the ' + allsites + ' site')
+            plt.xlabel('timestamp')
+            plt.ylabel('number of daily alarms')
 
-        plt.plot(df_to_plot_site.groupby(df_to_plot_site.loc[(df_to_plot_site['flag'] == 1), 'dt'].dt.date)["flag"].sum())
-        plotly_fig_mean = mpl_to_plotly(fig_mean)
-        plotly_fig_mean.update_layout(layout_mean)
+            plt.plot(df_to_plot_site.groupby(df_to_plot_site.loc[(df_to_plot_site['flag'] == 1), 'dt'].dt.date)[
+                         "flag"].sum())
+            plotly_fig_mean = mpl_to_plotly(fig_mean)
+            plotly_fig_mean.update_layout(layout_mean)
 
-        plotly_fig_mean = dcc.Graph(figure=plotly_fig_mean)
-    elif (sitesState is not None and len(sitesState) > 0):
-        plotly_fig_mean = html.H4('Measurements for this site are present as a source or destination ONLY',
-                                 style={"padding-bottom": "1%", "padding-top": "1%"})
-
-    plotly_fig_src = {}
-    if (sitesState is not None and len(sitesState) > 0) & (allsites in src_sites):
-        plsDf_onehot_site_plot = plsDf_onehot_plot.loc[(plsDf_onehot_plot['src_site_' + allsites] == 1)]
-        df_to_plot_site = df_to_plot.loc[(df_to_plot['src_site_' + allsites] == 1)]
-
-        fig_src = plt.figure(figsize=(14, 4))
-        plt.title('Packet loss alarms for the ' + allsites + ' site as a source only')
-        plt.xlabel('timestamp')
-        plt.ylabel('packet loss')
-
-        plt.plot(plsDf_onehot_site_plot['dt'], plsDf_onehot_site_plot['avg_value'], 'co',
-                 label="all packet loss measurements")
-        plt.plot(df_to_plot_site.loc[df_to_plot['flag'] == 2, 'dt'],
-                 df_to_plot_site.loc[df_to_plot_site['flag'] == 2, 'avg_value'], 'go',
-                 label="complete loss alarms using ML")
-        plt.plot(df_to_plot_site.loc[df_to_plot['flag'] == 1, 'dt'],
-                 df_to_plot_site.loc[df_to_plot_site['flag'] == 1, 'avg_value'], 'ro',
-                 label="partial loss alarms using ML")
-        plt.plot(df_to_plot_site.groupby(df_to_plot_site['dt'].dt.date)["avg_value"].mean(),
-                 label='daily packet loss mean')
-
-        plotly_fig_src = mpl_to_plotly(fig_src)
-        plotly_fig_src.update_layout(layout)
-
-        plotly_fig_src = dcc.Graph(figure=plotly_fig_src)
-    elif (sitesState is not None and len(sitesState) > 0):
-        plotly_fig_src = html.H4('No measurements for this site as a source',
-                                 style={"padding-bottom": "1%", "padding-top": "1%"})
-
-    plotly_fig_mean_src = {}
-    if (sitesState is not None and len(sitesState) > 0) & (allsites in src_sites):
-        fig_mean = plt.figure(figsize=(14, 4))
-        plt.title('Packet loss alarms aggregated by days for the ' + allsites + ' site')
-        plt.xlabel('timestamp')
-        plt.ylabel('number of daily alarms')
-
-        plt.plot(df_to_plot_site.groupby(df_to_plot_site.loc[(df_to_plot_site['flag'] == 1), 'dt'].dt.date)["flag"].sum())
-        plotly_fig_mean_src = mpl_to_plotly(fig_mean)
-        plotly_fig_mean_src.update_layout(layout_mean)
-
-        plotly_fig_mean_src = dcc.Graph(figure=plotly_fig_mean_src)
-    elif (sitesState is not None and len(sitesState) > 0):
-        plotly_fig_mean_src = html.H4('No measurements for this site as a source',
+            plotly_fig_mean = dcc.Graph(figure=plotly_fig_mean)
+        elif (sitesState is not None and len(sitesState) > 0):
+            plotly_fig_mean = html.H4('Measurements for this site are present as a source or destination ONLY',
                                       style={"padding-bottom": "1%", "padding-top": "1%"})
 
+    plotly_fig_src = {}
+    if (sitesState is not None and len(sitesState) > 0):
+        if (allsites in src_sites):
+            plsDf_onehot_site_plot = plsDf_onehot_plot.loc[(plsDf_onehot_plot['src_site_' + allsites] == 1)]
+            df_to_plot_site = df_to_plot.loc[(df_to_plot['src_site_' + allsites] == 1)]
+
+            fig_src = plt.figure(figsize=(14, 4))
+            plt.title('Packet loss alarms for the ' + allsites + ' site as a source only')
+            plt.xlabel('timestamp')
+            plt.ylabel('packet loss')
+
+            plt.plot(plsDf_onehot_site_plot['dt'], plsDf_onehot_site_plot['avg_value'], 'co',
+                     label="all packet loss measurements")
+            plt.plot(df_to_plot_site.loc[df_to_plot['flag'] == 2, 'dt'],
+                     df_to_plot_site.loc[df_to_plot_site['flag'] == 2, 'avg_value'], 'go',
+                     label="complete loss alarms using ML")
+            plt.plot(df_to_plot_site.loc[df_to_plot['flag'] == 1, 'dt'],
+                     df_to_plot_site.loc[df_to_plot_site['flag'] == 1, 'avg_value'], 'ro',
+                     label="partial loss alarms using ML")
+            plt.plot(df_to_plot_site.groupby(df_to_plot_site['dt'].dt.date)["avg_value"].mean(),
+                     label='daily packet loss mean')
+
+            plotly_fig_src = mpl_to_plotly(fig_src)
+            plotly_fig_src.update_layout(layout)
+
+            plotly_fig_src = dcc.Graph(figure=plotly_fig_src)
+        elif (sitesState is not None and len(sitesState) > 0):
+            plotly_fig_src = html.H4('No measurements for this site as a source',
+                                     style={"padding-bottom": "1%", "padding-top": "1%"})
+
+    plotly_fig_mean_src = {}
+    if (sitesState is not None and len(sitesState) > 0):
+        if (allsites in src_sites):
+            fig_mean = plt.figure(figsize=(14, 4))
+            plt.title('Packet loss alarms aggregated by days for the ' + allsites + ' site')
+            plt.xlabel('timestamp')
+            plt.ylabel('number of daily alarms')
+
+            plt.plot(df_to_plot_site.groupby(df_to_plot_site.loc[(df_to_plot_site['flag'] == 1), 'dt'].dt.date)[
+                         "flag"].sum())
+            plotly_fig_mean_src = mpl_to_plotly(fig_mean)
+            plotly_fig_mean_src.update_layout(layout_mean)
+
+            plotly_fig_mean_src = dcc.Graph(figure=plotly_fig_mean_src)
+        elif (sitesState is not None and len(sitesState) > 0):
+            plotly_fig_mean_src = html.H4('No measurements for this site as a source',
+                                          style={"padding-bottom": "1%", "padding-top": "1%"})
+
     plotly_fig_dest = {}
-    if (sitesState is not None and len(sitesState) > 0) & (allsites in dest_sites):
+    if (sitesState is not None and len(sitesState) > 0):
+        if (allsites in dest_sites):
+            plsDf_onehot_site_plot = plsDf_onehot_plot.loc[(plsDf_onehot_plot['dest_site_' + allsites] == 1)]
+            df_to_plot_site = df_to_plot.loc[(df_to_plot['dest_site_' + allsites] == 1)]
 
-        plsDf_onehot_site_plot = plsDf_onehot_plot.loc[(plsDf_onehot_plot['dest_site_' + allsites] == 1)]
-        df_to_plot_site = df_to_plot.loc[(df_to_plot['dest_site_' + allsites] == 1)]
+            fig_dest = plt.figure(figsize=(14, 4))
+            plt.title('Packet loss alarms for the ' + allsites + ' site as a destination only')
+            plt.xlabel('timestamp')
+            plt.ylabel('packet loss')
 
+            plt.plot(plsDf_onehot_site_plot['dt'], plsDf_onehot_site_plot['avg_value'], 'co',
+                     label="all packet loss measurements")
+            plt.plot(df_to_plot_site.loc[df_to_plot['flag'] == 2, 'dt'],
+                     df_to_plot_site.loc[df_to_plot_site['flag'] == 2, 'avg_value'], 'go',
+                     label="complete loss alarms using ML")
+            plt.plot(df_to_plot_site.loc[df_to_plot['flag'] == 1, 'dt'],
+                     df_to_plot_site.loc[df_to_plot_site['flag'] == 1, 'avg_value'], 'ro',
+                     label="partial loss alarms using ML")
+            plt.plot(df_to_plot_site.groupby(df_to_plot_site['dt'].dt.date)["avg_value"].mean(),
+                     label='daily packet loss mean')
 
-        fig_dest = plt.figure(figsize=(14, 4))
-        plt.title('Packet loss alarms for the ' + allsites + ' site as a destination only')
-        plt.xlabel('timestamp')
-        plt.ylabel('packet loss')
+            plotly_fig_dest = mpl_to_plotly(fig_dest)
+            plotly_fig_dest.update_layout(layout)
 
-        plt.plot(plsDf_onehot_site_plot['dt'], plsDf_onehot_site_plot['avg_value'], 'co',
-                 label="all packet loss measurements")
-        plt.plot(df_to_plot_site.loc[df_to_plot['flag'] == 2, 'dt'],
-                 df_to_plot_site.loc[df_to_plot_site['flag'] == 2, 'avg_value'], 'go',
-                 label="complete loss alarms using ML")
-        plt.plot(df_to_plot_site.loc[df_to_plot['flag'] == 1, 'dt'],
-                 df_to_plot_site.loc[df_to_plot_site['flag'] == 1, 'avg_value'], 'ro',
-                 label="partial loss alarms using ML")
-        plt.plot(df_to_plot_site.groupby(df_to_plot_site['dt'].dt.date)["avg_value"].mean(),
-                 label='daily packet loss mean')
-
-        plotly_fig_dest = mpl_to_plotly(fig_dest)
-        plotly_fig_dest.update_layout(layout)
-
-        plotly_fig_dest = dcc.Graph(figure=plotly_fig_dest)
-    elif (sitesState is not None and len(sitesState) > 0):
-        plotly_fig_dest = html.H4('No measurements for this site as a destination',
-                                  style={"padding-bottom": "1%", "padding-top": "1%"})
+            plotly_fig_dest = dcc.Graph(figure=plotly_fig_dest)
+        elif (sitesState is not None and len(sitesState) > 0):
+            plotly_fig_dest = html.H4('No measurements for this site as a destination',
+                                      style={"padding-bottom": "1%", "padding-top": "1%"})
 
     plotly_fig_mean_dest = {}
-    if (sitesState is not None and len(sitesState) > 0) & (allsites in dest_sites):
-        fig_mean = plt.figure(figsize=(14, 4))
-        plt.title('Packet loss alarms aggregated by days for the ' + allsites + ' site')
-        plt.xlabel('timestamp')
-        plt.ylabel('number of daily alarms')
+    if (sitesState is not None and len(sitesState) > 0):
+        if (allsites in dest_sites):
+            fig_mean = plt.figure(figsize=(14, 4))
+            plt.title('Packet loss alarms aggregated by days for the ' + allsites + ' site')
+            plt.xlabel('timestamp')
+            plt.ylabel('number of daily alarms')
 
-        plt.plot(df_to_plot_site.groupby(df_to_plot_site.loc[(df_to_plot_site['flag'] == 1), 'dt'].dt.date)["flag"].sum())
-        plotly_fig_mean_dest = mpl_to_plotly(fig_mean)
-        plotly_fig_mean_dest.update_layout(layout_mean)
+            plt.plot(df_to_plot_site.groupby(df_to_plot_site.loc[(df_to_plot_site['flag'] == 1), 'dt'].dt.date)[
+                         "flag"].sum())
+            plotly_fig_mean_dest = mpl_to_plotly(fig_mean)
+            plotly_fig_mean_dest.update_layout(layout_mean)
 
-        plotly_fig_mean_dest = dcc.Graph(figure=plotly_fig_mean_dest)
-    elif (sitesState is not None and len(sitesState) > 0):
-        plotly_fig_mean_dest = html.H4('No measurements for this site as a destination',
-                                       style={"padding-bottom": "1%", "padding-top": "1%"})
+            plotly_fig_mean_dest = dcc.Graph(figure=plotly_fig_mean_dest)
+        elif (sitesState is not None and len(sitesState) > 0):
+            plotly_fig_mean_dest = html.H4('No measurements for this site as a destination',
+                                           style={"padding-bottom": "1%", "padding-top": "1%"})
 
     return [plotly_fig,
             plotly_fig_src, plotly_fig_dest, plotly_fig_mean,

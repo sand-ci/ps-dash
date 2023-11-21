@@ -65,6 +65,11 @@ def trainMLmodel(rawDf):
     # disp = disp.plot(cmap=plt.cm.YlGnBu,values_format='g')
     # plt.show()
 
+    return rawDf_onehot, model
+
+def predictData(rawDf_onehot, model):
+    rawDf_custom_x = rawDf_onehot.drop(['alarm_created'], axis=1)
+
     #preparing final datasets for further analysis
     y = model.predict(rawDf_custom_x)
     df_to_plot = rawDf_custom_x.copy()
@@ -76,8 +81,6 @@ def trainMLmodel(rawDf):
     rawDf_onehot_plot['dt'] = (pd.to_datetime(rawDf_onehot_plot['dt'],unit='s'))
 
     return rawDf_onehot_plot, df_to_plot
-
-
 
 
 
