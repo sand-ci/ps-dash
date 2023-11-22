@@ -199,7 +199,7 @@ class ParquetUpdater(object):
 
     @timer
     def storeThroughputDataAndModel(self):
-        now = hp.defaultTimeRange(days=60, datesOnly=True)
+        now = hp.defaultTimeRange(days=90, datesOnly=True)
         start_date = now[0]
         end_date = now[1]
         start_date, end_date = [f'{start_date}T00:01:00.000Z', f'{end_date}T23:59:59.000Z']
@@ -221,7 +221,7 @@ class ParquetUpdater(object):
 
     @timer
     def storePacketLossDataAndModel(self):
-        now = hp.defaultTimeRange(days=60, datesOnly=True)
+        now = hp.defaultTimeRange(days=90, datesOnly=True)
         start_date = now[0]
         end_date = now[1]
         start_date, end_date = [f'{start_date}T00:01:00.000Z', f'{end_date}T23:59:59.000Z']
