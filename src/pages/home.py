@@ -1,3 +1,4 @@
+from functools import lru_cache
 import dash
 from dash import Dash, dash_table, dcc, html
 import dash_bootstrap_components as dbc
@@ -37,7 +38,7 @@ def builMap(mapDf):
     fig = px.scatter_mapbox(data_frame=mapDf, lat="lat", lon="lon",
                             color="cnt", 
                             size="cnt",
-                            color_continuous_scale=px.colors.sequential.deep,
+                            color_continuous_scale=px.colors.sequential.Bluered,
                             size_max=10,
                             hover_name="site",
                             custom_data=['site', 'event'],
@@ -77,93 +78,149 @@ def builMap(mapDf):
     return fig
 
 
+@lru_cache(maxsize=None)
+def getMetaData():
+    metaDf = qrs.getMetaData()
+    return metaDf
+
+@lru_cache(maxsize=None)
+def loadAllTests():
+    measures = pq.readFile('parquet/raw/measures.parquet')
+    return measures
+
+
 @timer
 # Generates the 4 plot for the 
-def SitesOverviewPlots(site_name, direction, metaDf, measures):
+def SitesOverviewPlots(site_name):
+    metaDf = getMetaData()
+    alltests = loadAllTests()
+
     units = {
-        'ps_packetloss': 'packets',
-        'ps_throughput': 'MBps',
-        'ps_owd': 'ms'
-        }
+    'ps_packetloss': 'packet loss',
+    'ps_throughput': 'MBps',
+    'ps_owd': 'ms'
+    }
 
     colors = ['#720026', '#e4ac05', '#00bcd4', '#1768AC', '#ffa822', '#134e6f', '#ff6150', '#1ac0c6', '#492b7c', '#9467bd',
-                '#1f77b4', '#ff7f0e', '#2ca02c','#00224e', '#123570', '#3b496c', '#575d6d', '#707173', '#8a8678', '#a59c74',
-                '#c3b369', '#e1cc55', '#fee838', '#3e6595', '#4adfe1', '#b14ae1',
-                '#1f77b4', '#ff7f0e', '#2ca02c','#00224e', '#123570', '#3b496c', '#575d6d', '#707173', '#8a8678', '#a59c74',
-                '#720026', '#e4ac05', '#00bcd4', '#1768AC', '#ffa822', '#134e6f', '#ff6150', '#1ac0c6', '#492b7c', '#9467bd',
-                '#1f77b4', '#ff7f0e', '#2ca02c','#00224e', '#123570', '#3b496c', '#575d6d', '#707173', '#8a8678', '#a59c74',
-                '#c3b369', '#e1cc55', '#fee838', '#3e6595', '#4adfe1', '#b14ae1',]
+            '#1f77b4', '#ff7f0e', '#2ca02c','#00224e', '#123570', '#3b496c', '#575d6d', '#707173', '#8a8678', '#a59c74',
+            '#c3b369', '#e1cc55', '#fee838', '#3e6595', '#4adfe1', '#b14ae1',
+            '#1f77b4', '#ff7f0e', '#2ca02c','#00224e', '#123570', '#3b496c', '#575d6d', '#707173', '#8a8678', '#a59c74',
+            '#720026', '#e4ac05', '#00bcd4', '#1768AC', '#ffa822', '#134e6f', '#ff6150', '#1ac0c6', '#492b7c', '#9467bd',
+            '#1f77b4', '#ff7f0e', '#2ca02c','#00224e', '#123570', '#3b496c', '#575d6d', '#707173', '#8a8678', '#a59c74',
+            '#c3b369', '#e1cc55', '#fee838', '#3e6595', '#4adfe1', '#b14ae1',]
+
+
+    fig = go.Figure()
+    fig = make_subplots(rows=3, cols=2, subplot_titles=("Throughput as source", "Throughput as destination",
+                                                        "Packet loss as source", "Packet loss as destination",
+                                                        "One-way delay as source", "One-way delay as destination"))
+
+    direction = {1: 'src', 2: 'dest'}
+
+    # convert all IPs to upper case since IPv6 is often mixed case
+    alltests.loc[:, 'src'] = alltests['src'].str.upper()
+    alltests.loc[:, 'dest'] = alltests['dest'].str.upper()
+
+    alltests['dt'] = pd.to_datetime(alltests['from'], unit='ms')
+    metaDf.loc[:, 'ip'] = metaDf['ip'].str.upper()
+
+    # convert throughput bites to MB
+    alltests.loc[alltests['idx']=='ps_throughput', 'value'] = alltests[alltests['idx']=='ps_throughput']['value'].apply(lambda x: round(x/1e+6, 2))
 
     # extract the data relevant for the given site name
     ips = metaDf[metaDf['site']==site_name]['ip'].values
-    measures = measures[measures[direction].isin(ips)].sort_values('from', ascending=False)
-    measures['dt'] = pd.to_datetime(measures['from'], unit='ms')
-    # convert throughput bites to MB
-    measures.loc[measures['idx']=='ps_throughput', 'value'] = measures[measures['idx']=='ps_throughput']['value'].apply(lambda x: round(x/1e+6, 2))
-    
-    fig = go.Figure()
-    fig = make_subplots(rows=2, cols=2, subplot_titles=("Packet loss", "Throughput", 'One-way delay'))
-    for i, ip in enumerate(ips):
-
-        # The following code sets the visibility to True only for the first occurence of an IP
-        visible = {'ps_packetloss': False, 
-                'ps_throughput': False,
-                'ps_owd': False}
-
-        if ip in measures[measures['idx']=='ps_packetloss'][direction].unique():
-            visible['ps_packetloss'] = True
-        elif ip in measures[measures['idx']=='ps_throughput'][direction].unique():
-            visible['ps_throughput'] = True
-        elif ip in measures[measures['idx']=='ps_owd'][direction].unique():
-            visible['ps_owd'] = True
+    ip_colors = {ip: color for ip, color in zip(ips, colors)}
 
 
-        fig.add_trace(
-            go.Scattergl(
-                x=measures[(measures[direction]==ip) & (measures['idx']=='ps_packetloss')]['dt'],
-                y=measures[(measures[direction]==ip) & (measures['idx']=='ps_packetloss')]['value'],
-                mode='markers',
-                marker=dict(
-                    color=colors[i]),
-                name=ip,
-                yaxis="y1",
-                legendgroup=ip,
-                showlegend = visible['ps_packetloss']),
-            row=1, col=1
-        )
+    legend_names = set()
 
-        fig.add_trace(
-            go.Scattergl(
-                x=measures[(measures[direction]==ip) & (measures['idx']=='ps_throughput')]['dt'],
-                y=measures[(measures[direction]==ip) & (measures['idx']=='ps_throughput')]['value'],
-                mode='markers',
-                marker=dict(
-                    color=colors[i]),
-                name=ip,
-                yaxis="y1",
-                legendgroup=ip,
-                showlegend = visible['ps_throughput']),
-            row=1, col=2
-        )
+    for col in [1,2]:
+        measures = alltests[alltests[direction[col]].isin(ips)].copy().sort_values('from', ascending=False)
 
-        fig.add_trace(
-            go.Scattergl(
-                x=measures[(measures[direction]==ip) & (measures['idx']=='ps_owd')]['dt'],
-                y=measures[(measures[direction]==ip) & (measures['idx']=='ps_owd')]['value'],
-                mode='markers',
-                marker=dict(
-                    color=colors[i]),
-                name=ip,
-                yaxis="y1",
-                legendgroup=ip,
-                showlegend = visible['ps_owd']),
-            row=2, col=1
-        )
+        for i, ip in enumerate(ips):
+            # The following code sets the visibility to True only for the first occurrence of an IP
+            first_time_seen = ip not in legend_names
+            not_on_legend = True
+            legend_names.add(ip)
+
+            throughput = measures[(measures[direction[col]]==ip) & (measures['idx']=='ps_throughput')]
+            
+            if not throughput.empty:
+                showlegend = first_time_seen==True and not_on_legend==True
+                not_on_legend = False
+                fig.add_trace(
+                    go.Scattergl(
+                        x=throughput['dt'],
+                        y=throughput['value'],
+                        mode='markers',
+                        marker=dict(
+                            color=ip_colors[ip]),
+                        name=ip,
+                        yaxis="y1",
+                        legendgroup=ip,
+                        showlegend=showlegend),
+                    row=1, col=col
+                )
+            else: fig.add_trace(
+                    go.Scattergl(
+                        x=throughput['dt'],
+                        y=throughput['value']),
+                    row=1, col=col
+                )
+            
+            packetloss = measures[(measures[direction[col]]==ip) & (measures['idx']=='ps_packetloss')]
+            if not packetloss.empty:
+                showlegend = first_time_seen==True and not_on_legend==True
+                not_on_legend = False
+                fig.add_trace(
+                    go.Scattergl(
+                        x=packetloss['dt'],
+                        y=packetloss['value'],
+                        mode='markers',
+                        marker=dict(
+                            color=ip_colors[ip]),
+                        name=ip,
+                        yaxis="y1",
+                        legendgroup=ip,
+                        showlegend=showlegend),
+                    row=2, col=col
+                )
+            else: fig.add_trace(
+                    go.Scattergl(
+                        x=packetloss['dt'],
+                        y=packetloss['value']),
+                    row=2, col=col
+                )
+
+            owd = measures[(measures[direction[col]]==ip) & (measures['idx']=='ps_owd')]
+            if not owd.empty:
+                showlegend = first_time_seen==True and not_on_legend==True
+                not_on_legend = False
+                fig.add_trace(
+                    go.Scattergl(
+                        x=owd['dt'],
+                        y=owd['value'],
+                        mode='markers',
+                        marker=dict(
+                            color=ip_colors[ip]),
+                            
+                        name=ip,
+                        yaxis="y1",
+                        legendgroup=ip,
+                        showlegend=showlegend),
+                    row=3, col=col
+                )
+            else: fig.add_trace(
+                    go.Scattergl(
+                        x=owd['dt'],
+                        y=owd['value']),
+                    row=3, col=col
+                )
 
 
     fig.update_layout(
             showlegend=True,
-            title_text=f'{site_name} as {"source" if direction == "src" else "destination"} of measures',
+            title_text=f'{site_name} network measurements',
             legend=dict(
                 traceorder="normal",
                 font=dict(
@@ -171,15 +228,14 @@ def SitesOverviewPlots(site_name, direction, metaDf, measures):
                     size=12,
                 ),
             ),
-            height=600,
+            height=900,
         )
 
 
     # Update yaxis properties
-    fig.update_yaxes(title_text=units['ps_packetloss'], row=1, col=1)
-    fig.update_yaxes(title_text=units['ps_throughput'], row=1, col=2)
-    fig.update_yaxes(title_text=units['ps_owd'], row=2, col=1)
-
+    fig.update_yaxes(title_text=units['ps_throughput'], row=1, col=col)
+    fig.update_yaxes(title_text=units['ps_packetloss'], row=2, col=col)
+    fig.update_yaxes(title_text=units['ps_owd'], row=3, col=col)
     fig.layout.template = 'plotly_white'
     # py.offline.plot(fig)
 
@@ -265,10 +321,6 @@ dash.register_page(__name__, path='/')
 pq = Parquet()
 alarmsInst = Alarms()
 dateFrom, dateTo = hp.defaultTimeRange(1)
-frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
-metaDf = qrs.getMetaData()
-alarmCnt = groupAlarms(pivotFrames, metaDf, dateFrom)
-eventCnt = countDistEvents(alarmCnt)
 
 
 def layout(**other_unknown_query_strings):
@@ -278,13 +330,12 @@ def layout(**other_unknown_query_strings):
     global pivotFrames
     global eventCnt
     global alarmCnt
-    global metaDf
 
     dateFrom, dateTo = hp.defaultTimeRange(1)
     print("Overview for period:", dateFrom," - ", dateTo)
     # dateFrom, dateTo = ['2022-12-11 09:40', '2022-12-11 21:40']
     frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
-    metaDf = qrs.getMetaData()
+    metaDf = getMetaData()
     alarmCnt = groupAlarms(pivotFrames, metaDf, dateFrom)
     eventCnt = countDistEvents(alarmCnt)
 
@@ -313,16 +364,9 @@ def layout(**other_unknown_query_strings):
                 dbc.Row([
                          dbc.Col(
                              dcc.Loading(
-                                 dcc.Graph(id="site-plots-out", className="site-plots site-inner-cont p-05"),
+                                 dcc.Graph(id="site-plots-in-out", className="site-plots site-inner-cont p-05"),
                              color='#00245A'),
                         width=12)
-                    ],   className='site boxwithshadow page-cont mb-2 g-0', justify="center", align="center"),
-                dbc.Row([
-                         dbc.Col(
-                             dcc.Loading(
-                                 dcc.Graph(id="site-plots-in", className="site-plots site-inner-cont p-05"),
-                            color='#00245A'), 
-                         width=12)
                     ],   className='site boxwithshadow page-cont mb-2 g-0', justify="center", align="center"),
                 html.Div(id='page-content-noloading'),
                 html.Br(),
@@ -337,18 +381,16 @@ def layout(**other_unknown_query_strings):
     [
         Output('datatables', 'children'),
         Output('selected-site', 'children'),
-        Output('site-plots-out', 'figure'),
-        Output('site-plots-in', 'figure'),
+        Output('site-plots-in-out', 'figure'),
     ],
     Input('site-map', 'clickData')
 )
 def display_output(value):
-    global metaDf
     global eventCnt
 
     if value is not None:
         location = value['points'][0]['customdata'][0]
     else:
         location = eventCnt[eventCnt['cnt'] == eventCnt['cnt'].max()]['site'].values[0]
-    measures = pq.readFile('parquet/raw/measures.parquet')
-    return [generate_tables(location), html.H1(f'Selected site: {location}'), SitesOverviewPlots(location, 'src', metaDf, measures), SitesOverviewPlots(location, 'dest', metaDf, measures)]
+    
+    return [generate_tables(location), html.H1(f'Selected site: {location}'), SitesOverviewPlots(location)]
