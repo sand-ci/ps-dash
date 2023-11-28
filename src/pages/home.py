@@ -1,4 +1,6 @@
 from functools import lru_cache
+
+import numpy as np
 import dash
 from dash import Dash, dash_table, dcc, html
 import dash_bootstrap_components as dbc
@@ -23,9 +25,18 @@ def countDistEvents(alarmCnt):
     # at which location the issue appeared,
     # since the alrm does not (generally) contain hosts/ips
     def groupByEvent(group):
-        return pd.Series([group['event'].unique(), group.lat.values[0], group.lon.values[0], len(group['event'].unique())])
-
-    mapDf = alarmCnt[['site', 'event', 'lat', 'lon']].groupby('site').apply(groupByEvent).reset_index()
+        # keep also sites with no alarms to show them on the map
+        if group['cnt'].sum() == 0:
+            events = ['no alarms']
+            cnt = 0
+        else:
+            idx = [i for i, x in enumerate(group['cnt'].values) if x > 0]
+            # get here only the events where cnt > 0
+            events = group['event'].values[idx].tolist()
+            cnt = len(events)
+        return pd.Series([events, group.lat.values[0], group.lon.values[0], cnt])
+    
+    mapDf = alarmCnt[['site', 'event', 'lat', 'lon', 'cnt']].groupby('site').apply(groupByEvent).reset_index()
     mapDf.columns = ['site', 'event', 'lat', 'lon', 'cnt']
     mapDf['lat'] = mapDf['lat'].astype(float)
     mapDf['lon'] = mapDf['lon'].astype(float)
@@ -35,20 +46,25 @@ def countDistEvents(alarmCnt):
 
 @timer
 def builMap(mapDf):
+    # usually test and production sites are at the same location
+    mapDf['lat'] = mapDf['lat'] + np.random.normal(scale=0.01, size=len(mapDf))
+    mapDf['lon'] = mapDf['lon'] + np.random.normal(scale=0.01, size=len(mapDf))
+    mapDf['cnt_size'] = mapDf['cnt'] + 1
     fig = px.scatter_mapbox(data_frame=mapDf, lat="lat", lon="lon",
                             color="cnt", 
-                            size="cnt",
+                            size="cnt_size",
                             color_continuous_scale=px.colors.sequential.Bluered,
-                            size_max=10,
+                            size_max=11,
                             hover_name="site",
                             custom_data=['site', 'event'],
-                            zoom=1
+                            zoom=1,
                         )
     fig.update_traces(
         hovertemplate="<br>".join([
             "Site: <b>%{customdata[0]}</b>",
             "Events: %{customdata[1]}",
-        ])
+        ]),
+        marker=dict(opacity=0.8)
     )
 
     fig.update_layout(
@@ -69,12 +85,9 @@ def builMap(mapDf):
             thickness=30,
             len=0.95,
         )
-        )
+    )
 
     fig.update_layout(template='plotly_white')
-    # fig.update_annotations(font_size=12)
-    # py.offline.plot(fig)
-
     return fig
 
 
@@ -117,18 +130,13 @@ def SitesOverviewPlots(site_name):
 
     direction = {1: 'src', 2: 'dest'}
 
-    # convert all IPs to upper case since IPv6 is often mixed case
-    alltests.loc[:, 'src'] = alltests['src'].str.upper()
-    alltests.loc[:, 'dest'] = alltests['dest'].str.upper()
-
     alltests['dt'] = pd.to_datetime(alltests['from'], unit='ms')
-    metaDf.loc[:, 'ip'] = metaDf['ip'].str.upper()
 
     # convert throughput bites to MB
     alltests.loc[alltests['idx']=='ps_throughput', 'value'] = alltests[alltests['idx']=='ps_throughput']['value'].apply(lambda x: round(x/1e+6, 2))
 
     # extract the data relevant for the given site name
-    ips = metaDf[metaDf['site']==site_name]['ip'].values
+    ips = metaDf[(metaDf['site']==site_name) | (metaDf['netsite']==site_name)]['ip'].values
     ip_colors = {ip: color for ip, color in zip(ips, colors)}
 
 
@@ -254,7 +262,10 @@ def groupAlarms(pivotFrames, metaDf, dateFrom):
             if not sdf.empty:
                 entry = {"event": e, "site": site, 'cnt': len(sdf),
                         "lat": lat, "lon": lon}
-                alarmCnt.append(entry)
+            else:
+                entry = {"event": e, "site": site, 'cnt': 0,
+                        "lat": lat, "lon": lon}
+            alarmCnt.append(entry)
 
     return pd.DataFrame(alarmCnt)
 
@@ -271,7 +282,7 @@ def generate_tables(site):
     out = []
     alarms4Site = alarmCnt[alarmCnt['site'] == site]
 
-    if len(alarms4Site) > 0:
+    if alarms4Site['cnt'].sum() > 0:
         for event in sorted(alarms4Site['event'].unique()):
             eventDf = pivotFrames[event]
             # find all cases where selected site was pinned in tag field
@@ -311,7 +322,7 @@ def generate_tables(site):
 
                 out.append(element)
     else:
-        out = html.Div(html.H3('No events'))
+        out = html.Div(html.H3('No alarms for this site in the past day'), style={'textAlign': 'center'})
 
     return out
 
