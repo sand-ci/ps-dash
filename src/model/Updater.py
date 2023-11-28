@@ -37,7 +37,6 @@ class ParquetUpdater(object):
             print("Data is too old or folders are empty. Updating...")
             self.cacheIndexData()
             self.storeAlarms()
-            self.groupAlarms()
             self.storePathChangeDescDf()
             self.storeThroughputDataAndModel()
             self.storePacketLossDataAndModel()
@@ -45,7 +44,6 @@ class ParquetUpdater(object):
         try:
             Scheduler(60*60, self.cacheIndexData)
             Scheduler(60*10, self.storeAlarms)
-            Scheduler(60*10, self.groupAlarms)
             Scheduler(60*30, self.storePathChangeDescDf)
 
             # Store the data for the Major Alarms analysis
@@ -55,9 +53,8 @@ class ParquetUpdater(object):
             print(traceback.format_exc())
 
 
-    def groupAlarms(self):
+    def groupAlarms(self, pivotFrames):
         dateFrom = hp.defaultTimeRange(1)[0]
-        frames, pivotFrames = Alarms().loadData(dateFrom, dateTo)
         metaDf = qrs.getMetaData()
 
         nodes = metaDf[~(metaDf['site'].isnull()) & ~(
@@ -157,7 +154,8 @@ class ParquetUpdater(object):
         print("Update data. Get all alarms for the past 60 days...", dateFrom, dateTo)
         oa = Alarms()
         frames, pivotFrames = oa.getAllAlarms(dateFrom, dateTo)
-        
+        self.groupAlarms(pivotFrames)
+
         for event,df in pivotFrames.items():
             filename = oa.eventCF(event)
             fdf = frames[event]
