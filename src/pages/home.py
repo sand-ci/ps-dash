@@ -251,26 +251,6 @@ def SitesOverviewPlots(site_name):
 
 
 @timer
-def groupAlarms(pivotFrames, metaDf, dateFrom):
-    nodes = metaDf[~(metaDf['site'].isnull()) & ~(
-        metaDf['site'] == '') & ~(metaDf['lat'] == '') & ~(metaDf['lat'].isnull())]
-    alarmCnt = []
-
-    for site, lat, lon in nodes[['site', 'lat', 'lon']].drop_duplicates().values.tolist():
-        for e, df in pivotFrames.items():
-            sdf = df[(df['tag'] == site) & ((df['to'] >= dateFrom) | (df['from'] >= dateFrom))]
-            if not sdf.empty:
-                entry = {"event": e, "site": site, 'cnt': len(sdf),
-                        "lat": lat, "lon": lon}
-            else:
-                entry = {"event": e, "site": site, 'cnt': 0,
-                        "lat": lat, "lon": lon}
-            alarmCnt.append(entry)
-
-    return pd.DataFrame(alarmCnt)
-
-
-@timer
 # '''Takes selected site from the Geo map and generates a Dash datatable'''
 def generate_tables(site):
     global dateFrom
@@ -346,8 +326,8 @@ def layout(**other_unknown_query_strings):
     print("Overview for period:", dateFrom," - ", dateTo)
     # dateFrom, dateTo = ['2022-12-11 09:40', '2022-12-11 21:40']
     frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
-    metaDf = getMetaData()
-    alarmCnt = groupAlarms(pivotFrames, metaDf, dateFrom)
+
+    alarmCnt = pq.readFile('parquet/alarmsGrouped.parquet')
     eventCnt = countDistEvents(alarmCnt)
 
     print(f'Number of alarms: {len(alarmCnt)}')

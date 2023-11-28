@@ -37,14 +37,16 @@ class ParquetUpdater(object):
             print("Data is too old or folders are empty. Updating...")
             self.cacheIndexData()
             self.storeAlarms()
+            self.groupAlarms()
             self.storePathChangeDescDf()
             self.storeThroughputDataAndModel()
             self.storePacketLossDataAndModel()
 
         try:
-            Scheduler(3600, self.cacheIndexData)
-            Scheduler(1800, self.storeAlarms)
-            Scheduler(1800, self.storePathChangeDescDf)
+            Scheduler(60*60, self.cacheIndexData)
+            Scheduler(60*10, self.storeAlarms)
+            Scheduler(60*10, self.groupAlarms)
+            Scheduler(60*30, self.storePathChangeDescDf)
 
             # Store the data for the Major Alarms analysis
             Scheduler(int(60*60*12), self.storeThroughputDataAndModel)
@@ -52,6 +54,30 @@ class ParquetUpdater(object):
         except Exception as e:
             print(traceback.format_exc())
 
+
+    def groupAlarms(self):
+        dateFrom = hp.defaultTimeRange(1)[0]
+        frames, pivotFrames = Alarms().loadData(dateFrom, dateTo)
+        metaDf = qrs.getMetaData()
+
+        nodes = metaDf[~(metaDf['site'].isnull()) & ~(
+            metaDf['site'] == '') & ~(metaDf['lat'] == '') & ~(metaDf['lat'].isnull())]
+        alarmCnt = []
+
+        for site, lat, lon in nodes[['site', 'lat', 'lon']].drop_duplicates().values.tolist():
+            for e, df in pivotFrames.items():
+                sdf = df[(df['tag'] == site) & ((df['to'] >= dateFrom) | (df['from'] >= dateFrom))]
+                if not sdf.empty:
+                    entry = {"event": e, "site": site, 'cnt': len(sdf),
+                            "lat": lat, "lon": lon}
+                else:
+                    entry = {"event": e, "site": site, 'cnt': 0,
+                            "lat": lat, "lon": lon}
+                alarmCnt.append(entry)
+
+        alarmsGrouped = pd.DataFrame(alarmCnt)
+
+        self.pq.writeToFile(alarmsGrouped, f'{self.location}alarmsGrouped.parquet')
 
 
     @staticmethod
@@ -100,6 +126,10 @@ class ParquetUpdater(object):
         for idx in INDICES:
             df = pd.DataFrame(self.queryData(idx, dateFrom, dateTo))
             # pq.writeToFile(df, f'{location}{idx}.parquet')
+            df.loc[:, 'src'] = df['src'].str.upper()
+            df.loc[:, 'dest'] = df['dest'].str.upper()
+            df.loc[:, 'src_site'] = df['src_site'].str.upper()
+            df.loc[:, 'dest_site'] = df['dest_site'].str.upper()
             df['idx'] = idx
             measures = pd.concat([measures, df])
         self.pq.writeToFile(measures, f'{location}measures.parquet')
