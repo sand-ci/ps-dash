@@ -133,9 +133,9 @@ def queryThroughputIdx(dateFrom, dateTo):
       aggrs.append({'hash': str(item['key']['src'] + '-' + item['key']['dest']),
                     'from': dateFrom, 'to': dateTo,
                     'ipv6': item['key']['ipv6'],
-                    'src': item['key']['src'], 'dest': item['key']['dest'],
+                    'src': item['key']['src'].upper(), 'dest': item['key']['dest'].upper(),
                     'src_host': item['key']['src_host'], 'dest_host': item['key']['dest_host'],
-                    'src_site': item['key']['src_site'], 'dest_site': item['key']['dest_site'],
+                    'src_site': item['key']['src_site'].upper(), 'dest_site': item['key']['dest_site'].upper(),
                     'value': item['throughput']['value'],
                     'doc_count': item['doc_count']
                     })
@@ -322,8 +322,6 @@ def getCategory(event):
   results = hp.es.search(index='aaas_categories', query=q)
 
   for res in results['hits']['hits']:
-    print(event)
-    print(res['_source'])
     return res['_source']
 
 
@@ -354,14 +352,22 @@ def queryTraceChanges(dateFrom, dateTo):
   data, positions, baseline, altPaths = [],[],[],[]
   positions = []
   for item in result:
-      print(len(data))
+      # print(len(data))
+      item['_source']['src'] = item['_source']['src'].upper()
+      item['_source']['dest'] = item['_source']['dest'].upper()
+      item['_source']['src_site'] = item['_source']['src_site'].upper()
+      item['_source']['dest_site'] = item['_source']['dest_site'].upper()
+
       tempD = {}
       for k,v in item['_source'].items():
           if k not in ['positions', 'baseline', 'alt_paths', 'created_at']:
               tempD[k] = v
       data.append(tempD)
 
-      src,dest,src_site,dest_site, = item['_source']['src'], item['_source']['dest'], item['_source']['src_site'], item['_source']['dest_site']
+      src = item['_source']['src']
+      dest = item['_source']['dest']
+      src_site = item['_source']['src_site']
+      dest_site = item['_source']['dest_site']
       from_date,to_date = item['_source']['from_date'], item['_source']['to_date']
 
       temp = item['_source']['positions']

@@ -47,59 +47,63 @@ def convertTime(ts):
     return int((stripped - datetime(1970, 1, 1)).total_seconds()*1000)
 
 
-
+# TODO: move that query to queries.py
 @timer
 def getRawDataFromES(src, dest, ipv6, dateFrom, dateTo):
-
     metaDf = qrs.getMetaData()
-    sips = metaDf[(metaDf['site'] == src)]['ip'].values.tolist()
-    dips = metaDf[metaDf['site'] == dest]['ip'].values.tolist()
+    sips = metaDf[(metaDf['site'] == src) | (metaDf['netsite'] == src)]['ip'].values.tolist()
+    sips = [ip.upper() for ip in sips] + [ip.lower() for ip in sips]
+    dips = metaDf[(metaDf['site'] == dest) | (metaDf['netsite'] == dest)]['ip'].values.tolist()
+    dips = [ip.upper() for ip in dips] + [ip.lower() for ip in dips]
 
-    q = {
-        "query" : {  
-            "bool" : {
-            "must" : [
-                  {
-                    "range": {
-                        "timestamp": {
-                        "gte": convertTime(dateFrom),
-                        "lte": convertTime(dateTo)
+    if len(sips) > 0 or len(dips) > 0:
+      q = {
+          "query" : {  
+              "bool" : {
+              "must" : [
+                    {
+                      "range": {
+                          "timestamp": {
+                          "gte": convertTime(dateFrom),
+                          "lte": convertTime(dateTo),
+                          "format": "epoch_millis"
+                          }
                         }
+                    },
+                    {
+                      "terms" : {
+                        "src": sips
                       }
-                  },
-                  {
-                    "terms" : {
-                      "src": sips
+                    },
+                    {
+                      "terms" : {
+                        "dest": dips
+                      }
+                    },
+                    {
+                      "term": {
+                          "ipv6": {
+                            "value": ipv6
+                          }
+                      }
                     }
-                  },
-                  {
-                    "terms" : {
-                      "dest": dips
-                    }
-                  },
-                  {
-                    "term": {
-                        "ipv6": {
-                          "value": ipv6
-                        }
-                    }
-                  }
-              ]
+                ]
+              }
             }
           }
-        }
-    # print(str(q).replace("\'", "\""))
+      print(str(q).replace("\'", "\""))
 
-    result = scan(client=hp.es,index='ps_throughput',query=q)
-    data = []
+      result = scan(client=hp.es,index='ps_throughput',query=q)
+      data = []
 
-    for item in result:
-        data.append(item['_source'])
+      for item in result:
+          data.append(item['_source'])
 
-    df = pd.DataFrame(data)
-    df['pair'] = df['src']+'->'+df['dest']
-    df['dt'] = pd.to_datetime(df['timestamp'], unit='ms')
-
+      df = pd.DataFrame(data)
+      print(df.head())
+      df['pair'] = df['src']+'->'+df['dest']
+      df['dt'] = df['timestamp']
+    else: print(f'No IPs found for the selected sites {src} and {dest} {ipv6}')
     return df
 
 
@@ -129,7 +133,7 @@ def buildSummary(alarm):
 
   if alarm['event'] in ['bandwidth decreased', 'bandwidth increased']:
     return f"{desc} for the {alarm['source']['ipv']} links between sites {alarm['source']['src_site']} and {alarm['source']['dest_site']}.\
-          Current throughput is {alarm['source']['last3days_avg']} MB, dropped by {alarm['source']['%change']}% with respect to the 21-day-average. "
+          Current throughput is {alarm['source']['last3days_avg']} MB, dropped by {alarm['source']['change']}% with respect to the 21-day-average. "
 
   elif alarm['event'] in ['bandwidth decreased from/to multiple sites', 'bandwidth increased from/to multiple sites']:
     temp = f"{desc} for the {alarm['source']['ipv']} links between site {alarm['source']['site']}"
@@ -155,7 +159,7 @@ def getSitePairs(alarm):
     sitePairs = [{'src_site': alarm['source']['src_site'],
                 'dest_site': alarm['source']['dest_site'],
                 'ipv6': alarm['source']['ipv6'],
-                'change':  alarm['source']['%change']}]
+                'change':  alarm['source']['change']}]
 
   elif event in ['bandwidth decreased from/to multiple sites', 'bandwidth increased from/to multiple sites']:
     for i,s in enumerate(alarm['source']['dest_sites']):
@@ -299,6 +303,8 @@ def buildGraphComponents(alarmData, dateFrom, dateTo, event, pivotFrames):
   df = getRawDataFromES(alarmData['src_site'], alarmData['dest_site'], alarmData['ipv6'], dateFrom, dateTo)
   df.loc[:, 'MBps'] = df['throughput'].apply(lambda x: round(x/1e+6, 2))
 
+  print(df.head())
+
   
   data = alarmsInst.getOtherAlarms(currEvent=event, alarmEnd=dateTo, pivotFrames=pivotFrames,
                                    src_site=alarmData['src_site'], dest_site=alarmData['dest_site'])
@@ -348,6 +354,11 @@ def buildGraphComponents(alarmData, dateFrom, dateTo, event, pivotFrames):
 
 
 def buildDataTable(df):
+    columns = ['dt', 'pair', 'throughput', 'throughput', 'src_host', 'dest_host',
+              'retransmits', 'src_site', 'src_netsite', 'src_rcsite', 'dest_site',
+              'dest_netsite', 'dest_rcsite', 'src_production', 'dest_production']
+
+    df = df[columns]
     return html.Div(dash_table.DataTable(
             data=df.to_dict('records'),
             columns=[{"name": i, "id": i} for i in df.columns],
