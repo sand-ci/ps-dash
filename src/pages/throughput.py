@@ -91,7 +91,7 @@ def getRawDataFromES(src, dest, ipv6, dateFrom, dateTo):
               }
             }
           }
-      print(str(q).replace("\'", "\""))
+      # print(str(q).replace("\'", "\""))
 
       result = scan(client=hp.es,index='ps_throughput',query=q)
       data = []
@@ -100,11 +100,13 @@ def getRawDataFromES(src, dest, ipv6, dateFrom, dateTo):
           data.append(item['_source'])
 
       df = pd.DataFrame(data)
-      print(df.head())
+
       df['pair'] = df['src']+'->'+df['dest']
       df['dt'] = df['timestamp']
+      return df
+
     else: print(f'No IPs found for the selected sites {src} and {dest} {ipv6}')
-    return df
+    
 
 
 @timer
@@ -125,29 +127,6 @@ def buildPlot(df):
   fig.layout.template = 'plotly_white'
   # fig.show()
   return fig
-
-
-@timer
-def buildSummary(alarm):
-  desc = 'Bandwidth decreased' if alarm['event'].startswith('bandwidth decreased') else 'Bandwidth increased'
-
-  if alarm['event'] in ['bandwidth decreased', 'bandwidth increased']:
-    return f"{desc} for the {alarm['source']['ipv']} links between sites {alarm['source']['src_site']} and {alarm['source']['dest_site']}.\
-          Current throughput is {alarm['source']['last3days_avg']} MB, dropped by {alarm['source']['change']}% with respect to the 21-day-average. "
-
-  elif alarm['event'] in ['bandwidth decreased from/to multiple sites', 'bandwidth increased from/to multiple sites']:
-    temp = f"{desc} for the {alarm['source']['ipv']} links between site {alarm['source']['site']}"
-    firstIn = False
-    if alarm['source']['dest_sites']:
-      firstIn = True
-      temp+=f" to sites: {'  |  '.join(alarm['source']['dest_sites'])} change in percentages: {('  |  '.join([str(l) for l in alarm['source']['dest_change']]))}"
-    if alarm['source']['src_sites']:
-      if firstIn:
-        temp+= ' and '
-      temp += f"from sites: {'  |  '.join(alarm['source']['src_sites'])}, change in percentages: {('  |  '.join([str(l) for l in alarm['source']['src_change']]))}"
-
-    temp += " with respect to the 21-day average."
-    return temp
 
 
 @timer
@@ -186,12 +165,13 @@ def layout(q=None, **other_unknown_query_strings):
     alarm = qrs.getAlarm(q)
     print('URL query:', q)
     print()
-    print('Alarm content:', alarm)
+
     sitePairs = getSitePairs(alarm)
     alarmData = alarm['source']
     dateFrom, dateTo = hp.getPriorNhPeriod(alarmData['to'])
     print('Alarm\'s content:', alarmData)
     pivotFrames = alarmsInst.loadData(dateFrom, dateTo)[1]
+
     data = alarmsInst.getOtherAlarms(
                                     currEvent=alarm['event'],
                                     alarmEnd=alarmData['to'],
@@ -303,12 +283,10 @@ def buildGraphComponents(alarmData, dateFrom, dateTo, event, pivotFrames):
   df = getRawDataFromES(alarmData['src_site'], alarmData['dest_site'], alarmData['ipv6'], dateFrom, dateTo)
   df.loc[:, 'MBps'] = df['throughput'].apply(lambda x: round(x/1e+6, 2))
 
-  print(df.head())
-
   
   data = alarmsInst.getOtherAlarms(currEvent=event, alarmEnd=dateTo, pivotFrames=pivotFrames,
                                    src_site=alarmData['src_site'], dest_site=alarmData['dest_site'])
-  print(data)
+
   otherAlarms = alarmsInst.formatOtherAlarms(data)
 
   return html.Div(children=[
@@ -354,7 +332,7 @@ def buildGraphComponents(alarmData, dateFrom, dateTo, event, pivotFrames):
 
 
 def buildDataTable(df):
-    columns = ['dt', 'pair', 'throughput', 'throughput', 'src_host', 'dest_host',
+    columns = ['dt', 'pair', 'throughput', 'src_host', 'dest_host',
               'retransmits', 'src_site', 'src_netsite', 'src_rcsite', 'dest_site',
               'dest_netsite', 'dest_rcsite', 'src_production', 'dest_production']
 
