@@ -198,7 +198,7 @@ class Alarms(object):
                   isTooOld = True
 
       if not folder or isTooOld:
-          print('query', event)
+          # print('query', event)
           print('+++++++++++++++++++++')
           frames, pivotFrames = self.getAllAlarms(dateFrom, dateTo)
 
@@ -227,7 +227,7 @@ class Alarms(object):
     # frames, pivotFrames = self.loadData(dateFrom, dateTo)
     print('getOtherAlarms')
     print('+++++++++++++++++++++')
-    print(dateFrom, dateTo, currEvent, alarmEnd, '# alarms:', [len(d) for d in pivotFrames], site, src_site, dest_site)
+    # print(dateFrom, dateTo, currEvent, alarmEnd, '# alarms:', [len(d) for d in pivotFrames], site, src_site, dest_site)
     print()
 
     alarmsListed = {}
@@ -332,6 +332,7 @@ class Alarms(object):
         df = self.createAlarmURL(df, event)
     except Exception as e:
         print('Exception ------- ', event)
+        print(df.head())
         print(e, traceback.format_exc())
 
     return df
@@ -374,6 +375,8 @@ class Alarms(object):
             field = '%{src_loss}'
           if k == '%change':
             field = '%{%change}%'
+          if k == 'change':
+            field = '%{change}%'
 
           if field in words or field+',' in words or field+'.' in words or field+';' in words:
             if isinstance(v, list):
@@ -386,6 +389,8 @@ class Alarms(object):
             if k == 'avg_value':
               v = str(v)+'%'
             elif k == '%change':
+              v = str(v)+'%'
+            elif k == 'change':
               v = str(v)+'%'
             
             if v is None:
