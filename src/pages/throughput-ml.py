@@ -237,7 +237,7 @@ def layout(**other_unknown_query_strings):
 
 def colorMap(eventTypes):
   colors = ['#75cbe6', '#3b6d8f', '#75E6DA', '#189AB4', '#2E8BC0', '#145DA0', '#05445E', '#0C2D48',
-          '#5EACE0', '#d6ebff', '#498bcc', '#82cbf9', 
+          '#5EACE0', '#d6ebff', '#498bcc', '#82cbf9',
           '#2894f8', '#fee838', '#3e6595', '#4adfe1', '#b14ae1'
           '#1f77b4', '#ff7f0e', '#2ca02c','#00224e', '#123570', '#3b496c', '#575d6d', '#707173', '#8a8678', '#a59c74',
           ]
@@ -245,7 +245,7 @@ def colorMap(eventTypes):
   paletteDict = {}
   for i,e in enumerate(eventTypes):
       paletteDict[e] = colors[i]
-  
+
   return paletteDict
 
 # a callback for the first section of a page with the list of Major alarms
@@ -298,11 +298,10 @@ def update_output(start_date, end_date, sensitivity, sitesState):
             model = pickle.load(file)
     else:
         rawDf = createThrptDataset(start_date, end_date)
+        # rawDf = pd.read_csv('rawDf_sep_nov.csv')
         # train the ML model on the loaded dataset
         rawDf_onehot, model = trainMLmodel(rawDf)
         del rawDf
-
-    # rawDf = pd.read_csv('rawDf_sep_oct.csv')
 
     # predict the data on the model and return the dataset with original alarms and the ML alarms
     global rawDf_onehot_plot, df_to_plot
@@ -409,6 +408,7 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
     # creating a global layout for the plots
     global layout, layout_mean
     layout = dict(xaxis_range=[start_date - timedelta(days=2), end_date + timedelta(days=2)],
+            height=400,
             showlegend=True,
             margin=dict(l=5, r=5, t=50, b=20),
             paper_bgcolor='rgba(0,0,0,0)',
@@ -431,7 +431,7 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
             df_to_plot_site = df_to_plot.loc[
                 (df_to_plot['src_site_' + allsites] == 1) | (df_to_plot['dest_site_' + allsites] == 1)]
 
-            fig = plt.figure(figsize=(14, 4))
+            fig = plt.figure()
             plt.title('Bandwidth decreased alarms for the ' + allsites + ' site')
             plt.xlabel('timestamp')
             plt.ylabel('throughput (Mbps)')
@@ -452,7 +452,7 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
             plotly_fig = mpl_to_plotly(fig)
             plotly_fig.update_layout(layout)
 
-            plotly_fig = dcc.Graph(figure=plotly_fig)
+            plotly_fig = dcc.Graph(figure= plotly_fig, responsive=True, style= {'height':'400'})
         elif (sitesState is not None and len(sitesState) > 0):
             plotly_fig = html.H4('Measurements for this site are present as a source or destination ONLY',
                                  style={"padding-bottom": "1%", "padding-top": "1%"})
@@ -460,7 +460,7 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
     plotly_fig_mean = {}
     if (sitesState is not None and len(sitesState) > 0):
         if (allsites in src_sites) & (allsites in dest_sites):
-            fig_mean = plt.figure(figsize=(14, 4))
+            fig_mean = plt.figure()
             plt.title('Bandwidth decreased alarms aggregated by days for the ' + allsites + ' site')
             plt.xlabel('timestamp')
             plt.ylabel('number of daily alarms')
@@ -469,7 +469,7 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
             plotly_fig_mean = mpl_to_plotly(fig_mean)
             plotly_fig_mean.update_layout(layout_mean)
 
-            plotly_fig_mean = dcc.Graph(figure=plotly_fig_mean)
+            plotly_fig_mean = dcc.Graph(figure=plotly_fig_mean, responsive=True, style= {'height':'400'})
         elif (sitesState is not None and len(sitesState) > 0):
             plotly_fig_mean = html.H4('Measurements for this site are present as a source or destination ONLY',
                                       style={"padding-bottom": "1%", "padding-top": "1%"})
@@ -481,7 +481,7 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
             rawDf_onehot_site_plot = rawDf_onehot_plot.loc[(rawDf_onehot_plot['src_site_' + allsites] == 1)]
             df_to_plot_site = df_to_plot.loc[(df_to_plot['src_site_' + allsites] == 1)]
 
-            fig_src = plt.figure(figsize=(14, 4))
+            fig_src = plt.figure()
             plt.title('Bandwidth decreased alarms for the ' + allsites + ' site as a source only')
             plt.xlabel('timestamp')
             plt.ylabel('throughput (Mbps)')
@@ -502,7 +502,7 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
             plotly_fig_src = mpl_to_plotly(fig_src)
             plotly_fig_src.update_layout(layout)
 
-            plotly_fig_src = dcc.Graph(figure=plotly_fig_src)
+            plotly_fig_src = dcc.Graph(figure=plotly_fig_src, responsive=True, style= {'height':'400'})
         elif (sitesState is not None and len(sitesState) > 0):
             plotly_fig_src = html.H4('No measurements for this site as a source',
                                      style={"padding-bottom": "1%", "padding-top": "1%"})
@@ -510,7 +510,7 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
     plotly_fig_mean_src = {}
     if (sitesState is not None and len(sitesState) > 0):
         if (allsites in src_sites):
-            fig_mean = plt.figure(figsize=(14, 4))
+            fig_mean = plt.figure()
             plt.title('Bandwidth decreased alarms aggregated by days for the ' + allsites + ' site')
             plt.xlabel('timestamp')
             plt.ylabel('number of daily alarms')
@@ -519,7 +519,7 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
             plotly_fig_mean_src = mpl_to_plotly(fig_mean)
             plotly_fig_mean_src.update_layout(layout_mean)
 
-            plotly_fig_mean_src = dcc.Graph(figure=plotly_fig_mean_src)
+            plotly_fig_mean_src = dcc.Graph(figure=plotly_fig_mean_src, responsive=True, style= {'height':'400'})
         elif (sitesState is not None and len(sitesState) > 0):
             plotly_fig_mean_src = html.H4('No measurements for this site as a source',
                                           style={"padding-bottom": "1%", "padding-top": "1%"})
@@ -531,7 +531,7 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
             rawDf_onehot_site_plot = rawDf_onehot_plot.loc[(rawDf_onehot_plot['dest_site_' + allsites] == 1)]
             df_to_plot_site = df_to_plot.loc[(df_to_plot['dest_site_' + allsites] == 1)]
 
-            fig_dest = plt.figure(figsize=(14, 4))
+            fig_dest = plt.figure()
             plt.title('Bandwidth decreased alarms for the ' + allsites + ' site as a destination only')
             plt.xlabel('timestamp')
             plt.ylabel('throughput (Mbps)')
@@ -552,7 +552,7 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
             plotly_fig_dest = mpl_to_plotly(fig_dest)
             plotly_fig_dest.update_layout(layout)
 
-            plotly_fig_dest = dcc.Graph(figure=plotly_fig_dest)
+            plotly_fig_dest = dcc.Graph(figure=plotly_fig_dest, responsive=True, style= {'height':'400'})
         elif (sitesState is not None and len(sitesState) > 0):
             plotly_fig_dest = html.H4('No measurements for this site as a destination',
                                       style={"padding-bottom": "1%", "padding-top": "1%"})
@@ -560,7 +560,7 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
     plotly_fig_mean_dest = {}
     if (sitesState is not None and len(sitesState) > 0):
         if (allsites in dest_sites):
-            fig_mean = plt.figure(figsize=(14, 4))
+            fig_mean = plt.figure()
             plt.title('Bandwidth decreased alarms aggregated by days for the ' + allsites + ' site')
             plt.xlabel('timestamp')
             plt.ylabel('number of daily alarms')
@@ -569,7 +569,7 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
             plotly_fig_mean_dest = mpl_to_plotly(fig_mean)
             plotly_fig_mean_dest.update_layout(layout_mean)
 
-            plotly_fig_mean_dest = dcc.Graph(figure=plotly_fig_mean_dest)
+            plotly_fig_mean_dest = dcc.Graph(figure=plotly_fig_mean_dest, responsive=True, style= {'height':'400'})
         elif (sitesState is not None and len(sitesState) > 0):
             plotly_fig_mean_dest = html.H4('No measurements for this site as a destination',
                                            style={"padding-bottom": "1%", "padding-top": "1%"})
@@ -602,7 +602,7 @@ def update_output(src_site, dest_site, sites_src_State, sites_dest_State):
         df_to_plot_site = df_to_plot.loc[
             (df_to_plot['src_site_' + src_site] == 1) & (df_to_plot['dest_site_' + dest_site] == 1)]
 
-        fig = plt.figure(figsize=(14, 4))
+        fig = plt.figure()
         plt.title('Measurements and bandwidth decreased alarms for the ' + src_site + ' and ' + dest_site + ' sites pair')
         plt.xlabel('timestamp')
         plt.ylabel('throughput (Mbps)')
@@ -624,7 +624,7 @@ def update_output(src_site, dest_site, sites_src_State, sites_dest_State):
 
     plotly_fig_mean_src_dest = {}
     if (sites_src_State is not None and len(sites_src_State) > 0) & (sites_dest_State is not None and len(sites_dest_State) > 0):
-        fig_mean = plt.figure(figsize=(14, 4))
+        fig_mean = plt.figure()
         plt.title('Bandwidth decreased alarms aggregated by days for the ' + src_site + ' and ' + dest_site + ' sites pair')
         plt.xlabel('timestamp')
         plt.ylabel('number of daily alarms')
@@ -632,7 +632,8 @@ def update_output(src_site, dest_site, sites_src_State, sites_dest_State):
         plotly_fig_mean_src_dest = mpl_to_plotly(fig_mean)
         plotly_fig_mean_src_dest.update_layout(layout_mean)
 
-    return [dcc.Graph(figure=plotly_fig_scr_dest),dcc.Graph(figure=plotly_fig_mean_src_dest),
+    return [dcc.Graph(figure=plotly_fig_scr_dest, responsive=True, style= {'height':'400'})
+        ,dcc.Graph(figure=plotly_fig_mean_src_dest, responsive=True, style= {'height':'400'}),
             False if (sites_src_State is not None and len(sites_src_State) > 0) else True]
 
 # a callback for the third section of a page. Filters out the dest sites with measurements to the source site selected
