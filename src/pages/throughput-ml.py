@@ -290,7 +290,7 @@ def update_output(start_date, end_date, sensitivity, sitesState):
     # query for the dataset
     if (start_date, end_date) == (start_date_check, end_date_check):
         pq = Parquet()
-        rawDf = pq.readFile('parquet/ml-datasets/throughput_Df.parquet')
+        # rawDf = pq.readFile('parquet/ml-datasets/throughput_Df.parquet')
         rawDf_onehot = pq.readFile('parquet/ml-datasets/throughput_onehot_Df.parquet')
 
         model_pkl_file = f'parquet/ml-datasets/XGB_Classifier_model_throughput.pkl'
@@ -306,6 +306,7 @@ def update_output(start_date, end_date, sensitivity, sitesState):
     # predict the data on the model and return the dataset with original alarms and the ML alarms
     global rawDf_onehot_plot, df_to_plot
     rawDf_onehot_plot, df_to_plot = predictData(rawDf_onehot, model)
+    del rawDf_onehot
 
     # create a list with all sites as sources
     src_sites = rawDf_onehot_plot.loc[:, rawDf_onehot_plot.columns.str.startswith("src_site")].columns.values.tolist()

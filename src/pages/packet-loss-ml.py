@@ -285,7 +285,7 @@ def update_output(start_date, end_date, sensitivity, sitesState):
     # query for the dataset
     if (start_date, end_date) == (start_date_check, end_date_check):
         pq = Parquet()
-        plsDf = pq.readFile(f'parquet/ml-datasets/packet_loss_Df.parquet')
+        plsDf_onehot = pq.readFile(f'parquet/ml-datasets/packet_loss_onehot_Df.parquet')
 
         model_pkl_file = f'parquet/ml-datasets/XGB_Classifier_model_packet_loss.pkl'
         with open(model_pkl_file, 'rb') as file:
@@ -293,7 +293,8 @@ def update_output(start_date, end_date, sensitivity, sitesState):
     else:
         plsDf = createPcktDataset(start_date, end_date)
         # onehot encode the whole dataset and leave only one month for further ML training
-        plsDf_onehot_month = one_month_data(plsDf)
+        plsDf_onehot_month, plsDf_onehot = one_month_data(plsDf)
+        del plsDf
 
         # train the model on one month data
         model = packet_loss_train_model(plsDf_onehot_month)
@@ -303,8 +304,8 @@ def update_output(start_date, end_date, sensitivity, sitesState):
 
     # predict the alarms using ML model and return the dataset with original alarms and the ML alarms
     global plsDf_onehot_plot, df_to_plot
-    df_to_plot, plsDf_onehot_plot = packet_loss_preprocess(plsDf, model)
-    del plsDf, model
+    df_to_plot, plsDf_onehot_plot = packet_loss_preprocess(plsDf_onehot, model)
+    del model, plsDf_onehot
 
     print('+++++++   plsDf_onehot_plot', plsDf_onehot_plot.shape)
     # create a list with all sites as sources

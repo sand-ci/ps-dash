@@ -3,15 +3,6 @@ from utils.helpers import timer
 
 @timer
 def packet_loss_preprocess(plsDf_custom_x, model):
-    #Preprocessing
-    plsDf_custom_x = plsDf_custom_x.drop(['src', 'dest', 'pair', 'src_host', 'dest_host'], axis=1)
-    plsDf_custom_x['dt'] = plsDf_custom_x['to']
-    print('plsDf_custom_x', plsDf_custom_x.shape)
-
-    plsDf_custom_x['tests_done'] = plsDf_custom_x['tests_done'].str.rstrip('%').astype('float') / 100.0
-
-    #one hot encode the dataset 'case loading a pre-encoded dataset apparently crashes a jupyter notebook kernel
-    plsDf_custom_x = pd.get_dummies(plsDf_custom_x, dtype=int)
 
     plsDf_custom_y = plsDf_custom_x['flag']
     plsDf_custom_x = plsDf_custom_x.drop(['flag'], axis=1)
