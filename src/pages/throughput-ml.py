@@ -657,6 +657,9 @@ def update_output(src_site, check, sites_src_State, sites_dest_State):
         is_src_sites = is_src.drop(['from', 'to', 'dt', 'ipv6', 'value', 'doc_count', 'ipv_ipv4', 'ipv_ipv6'], axis=1).sum(
             axis=0)
         is_src_sites = is_src_sites[is_src_sites.values != 0]
+
+        # sort dest sites by the number of (alarmed) measurements
+        is_src_sites = is_src_sites.sort_values(ascending=False)
         commonprefix = 'dest_site_'
         dest_dropdown_items = [x[len(commonprefix):] for x, y in is_src_sites.items() if x.startswith(commonprefix)]
 
