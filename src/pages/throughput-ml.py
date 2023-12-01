@@ -218,7 +218,7 @@ def layout(**other_unknown_query_strings):
                 html.Hr(className="my-2"),
                 html.Br(),
                 dcc.Loading(
-                    html.Div(id='results-table-thrpt-dest-src'),
+                    html.Div(id='results-table-thrpt-dest-src', style={'height':'400px'}),
                     style={'height': '0.5rem'}, color='#00245A')
             ], className="m-2", style={"padding-top": "1%"}),
             dbc.Row([
@@ -226,7 +226,7 @@ def layout(**other_unknown_query_strings):
                 html.Hr(className="my-2"),
                 html.Br(),
                 dcc.Loading(
-                    html.Div(id='results-table-thrpt-mean-dest-src'),
+                    html.Div(id='results-table-thrpt-mean-dest-src', style={'height':'400px'}),
                     style={'height': '0.5rem'}, color='#00245A')
             ], className="m-2"),
         ], className="p-2 site boxwithshadow page-cont mb-2 g-0", align="center"),
