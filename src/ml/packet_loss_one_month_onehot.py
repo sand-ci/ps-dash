@@ -24,5 +24,5 @@ def one_month_data(plsDf_custom):
 
     first_month_n = round(len(plsDf_onehot.index)*percentile)
 
-    return plsDf_onehot.iloc[:first_month_n]
+    return plsDf_onehot.iloc[:first_month_n], plsDf_onehot
 

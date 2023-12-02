@@ -37,7 +37,7 @@ dash.register_page(
 )
 
 def layout(**other_unknown_query_strings):
-    now = hp.defaultTimeRange(days=90, datesOnly=True)
+    now = hp.defaultTimeRange(days=60, datesOnly=True)
 
     #Packet loss alarms page
     return \
@@ -215,7 +215,7 @@ def layout(**other_unknown_query_strings):
                 html.Hr(className="my-2"),
                 html.Br(),
                 dcc.Loading(
-                    html.Div(id='results-table-pl-dest-src'),
+                    html.Div(id='results-table-pl-dest-src', style={'height':'400px'}),
                     style={'height': '0.5rem'}, color='#00245A')
             ], className="m-2", style={"padding-top": "1%"}),
             dbc.Row([
@@ -223,7 +223,7 @@ def layout(**other_unknown_query_strings):
                 html.Hr(className="my-2"),
                 html.Br(),
                 dcc.Loading(
-                    html.Div(id='results-table-pl-mean-dest-src'),
+                    html.Div(id='results-table-pl-mean-dest-src', style={'height':'400px'}),
                     style={'height': '0.5rem'}, color='#00245A')
             ], className="m-2"),
         ], className="p-2 site boxwithshadow page-cont mb-2 g-0", align="center"),
@@ -275,17 +275,17 @@ def update_output(start_date, end_date, sensitivity, sitesState):
     if start_date and end_date:
         start_date, end_date = [f'{start_date}T00:01:00.000Z', f'{end_date}T00:01:00.000Z']
     else:
-        start_date, end_date = hp.defaultTimeRange(days=90, datesOnly=True)
+        start_date, end_date = hp.defaultTimeRange(days=60, datesOnly=True)
         start_date, end_date = [f'{start_date}T00:01:00.000Z', f'{end_date}T00:01:00.000Z']
 
     # check if the date range is default
-    start_date_check, end_date_check = hp.defaultTimeRange(days=90, datesOnly=True)
+    start_date_check, end_date_check = hp.defaultTimeRange(days=60, datesOnly=True)
     start_date_check, end_date_check = [f'{start_date_check}T00:01:00.000Z', f'{end_date_check}T00:01:00.000Z']
 
     # query for the dataset
     if (start_date, end_date) == (start_date_check, end_date_check):
         pq = Parquet()
-        plsDf = pq.readFile(f'parquet/ml-datasets/packet_loss_Df.parquet')
+        plsDf_onehot = pq.readFile(f'parquet/ml-datasets/packet_loss_onehot_Df.parquet')
 
         model_pkl_file = f'parquet/ml-datasets/XGB_Classifier_model_packet_loss.pkl'
         with open(model_pkl_file, 'rb') as file:
@@ -293,7 +293,8 @@ def update_output(start_date, end_date, sensitivity, sitesState):
     else:
         plsDf = createPcktDataset(start_date, end_date)
         # onehot encode the whole dataset and leave only one month for further ML training
-        plsDf_onehot_month = one_month_data(plsDf)
+        plsDf_onehot_month, plsDf_onehot = one_month_data(plsDf)
+        del plsDf
 
         # train the model on one month data
         model = packet_loss_train_model(plsDf_onehot_month)
@@ -303,8 +304,8 @@ def update_output(start_date, end_date, sensitivity, sitesState):
 
     # predict the alarms using ML model and return the dataset with original alarms and the ML alarms
     global plsDf_onehot_plot, df_to_plot
-    df_to_plot, plsDf_onehot_plot = packet_loss_preprocess(plsDf, model)
-    del plsDf, model
+    df_to_plot, plsDf_onehot_plot = packet_loss_preprocess(plsDf_onehot, model)
+    del model, plsDf_onehot
 
     print('+++++++   plsDf_onehot_plot', plsDf_onehot_plot.shape)
     # create a list with all sites as sources
@@ -411,6 +412,7 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
     # creating a global layout for the plots
     global layout, layout_mean
     layout = dict(xaxis_range=[start_date - timedelta(days=2), end_date + timedelta(days=2)],
+            height = 400,
             showlegend=True,
             margin=dict(l=5, r=5, t=50, b=20),
             paper_bgcolor='rgba(0,0,0,0)',
@@ -433,7 +435,7 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
             df_to_plot_site = df_to_plot.loc[
                 (df_to_plot['src_site_' + allsites] == 1) | (df_to_plot['dest_site_' + allsites] == 1)]
 
-            fig = plt.figure(figsize=(14, 4))
+            fig = plt.figure()
             plt.title('Packet loss alarms for the ' + allsites + ' site')
             plt.xlabel('timestamp')
             plt.ylabel('packet loss')
@@ -452,7 +454,7 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
             plotly_fig = mpl_to_plotly(fig)
             plotly_fig.update_layout(layout)
 
-            plotly_fig = dcc.Graph(figure=plotly_fig)
+            plotly_fig = dcc.Graph(figure=plotly_fig, responsive=True, style= {'height':'400'})
         elif (sitesState is not None and len(sitesState) > 0):
             plotly_fig = html.H4('Measurements for this site are present as a source or destination ONLY',
                                  style={"padding-bottom": "1%", "padding-top": "1%"})
@@ -460,7 +462,7 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
     plotly_fig_mean = {}
     if (sitesState is not None and len(sitesState) > 0):
         if (allsites in src_sites) & (allsites in dest_sites):
-            fig_mean = plt.figure(figsize=(14, 4))
+            fig_mean = plt.figure()
             plt.title('Packet loss alarms aggregated by days for the ' + allsites + ' site')
             plt.xlabel('timestamp')
             plt.ylabel('number of daily alarms')
@@ -470,7 +472,7 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
             plotly_fig_mean = mpl_to_plotly(fig_mean)
             plotly_fig_mean.update_layout(layout_mean)
 
-            plotly_fig_mean = dcc.Graph(figure=plotly_fig_mean)
+            plotly_fig_mean = dcc.Graph(figure=plotly_fig_mean, responsive=True, style= {'height':'400'})
         elif (sitesState is not None and len(sitesState) > 0):
             plotly_fig_mean = html.H4('Measurements for this site are present as a source or destination ONLY',
                                       style={"padding-bottom": "1%", "padding-top": "1%"})
@@ -481,7 +483,7 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
             plsDf_onehot_site_plot = plsDf_onehot_plot.loc[(plsDf_onehot_plot['src_site_' + allsites] == 1)]
             df_to_plot_site = df_to_plot.loc[(df_to_plot['src_site_' + allsites] == 1)]
 
-            fig_src = plt.figure(figsize=(14, 4))
+            fig_src = plt.figure()
             plt.title('Packet loss alarms for the ' + allsites + ' site as a source only')
             plt.xlabel('timestamp')
             plt.ylabel('packet loss')
@@ -500,7 +502,7 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
             plotly_fig_src = mpl_to_plotly(fig_src)
             plotly_fig_src.update_layout(layout)
 
-            plotly_fig_src = dcc.Graph(figure=plotly_fig_src)
+            plotly_fig_src = dcc.Graph(figure=plotly_fig_src, responsive=True, style= {'height':'400'})
         elif (sitesState is not None and len(sitesState) > 0):
             plotly_fig_src = html.H4('No measurements for this site as a source',
                                      style={"padding-bottom": "1%", "padding-top": "1%"})
@@ -508,7 +510,7 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
     plotly_fig_mean_src = {}
     if (sitesState is not None and len(sitesState) > 0):
         if (allsites in src_sites):
-            fig_mean = plt.figure(figsize=(14, 4))
+            fig_mean = plt.figure()
             plt.title('Packet loss alarms aggregated by days for the ' + allsites + ' site')
             plt.xlabel('timestamp')
             plt.ylabel('number of daily alarms')
@@ -518,7 +520,7 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
             plotly_fig_mean_src = mpl_to_plotly(fig_mean)
             plotly_fig_mean_src.update_layout(layout_mean)
 
-            plotly_fig_mean_src = dcc.Graph(figure=plotly_fig_mean_src)
+            plotly_fig_mean_src = dcc.Graph(figure=plotly_fig_mean_src, responsive=True, style= {'height':'400'})
         elif (sitesState is not None and len(sitesState) > 0):
             plotly_fig_mean_src = html.H4('No measurements for this site as a source',
                                           style={"padding-bottom": "1%", "padding-top": "1%"})
@@ -529,7 +531,7 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
             plsDf_onehot_site_plot = plsDf_onehot_plot.loc[(plsDf_onehot_plot['dest_site_' + allsites] == 1)]
             df_to_plot_site = df_to_plot.loc[(df_to_plot['dest_site_' + allsites] == 1)]
 
-            fig_dest = plt.figure(figsize=(14, 4))
+            fig_dest = plt.figure()
             plt.title('Packet loss alarms for the ' + allsites + ' site as a destination only')
             plt.xlabel('timestamp')
             plt.ylabel('packet loss')
@@ -548,7 +550,7 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
             plotly_fig_dest = mpl_to_plotly(fig_dest)
             plotly_fig_dest.update_layout(layout)
 
-            plotly_fig_dest = dcc.Graph(figure=plotly_fig_dest)
+            plotly_fig_dest = dcc.Graph(figure=plotly_fig_dest, responsive=True, style= {'height':'400'})
         elif (sitesState is not None and len(sitesState) > 0):
             plotly_fig_dest = html.H4('No measurements for this site as a destination',
                                       style={"padding-bottom": "1%", "padding-top": "1%"})
@@ -556,7 +558,7 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
     plotly_fig_mean_dest = {}
     if (sitesState is not None and len(sitesState) > 0):
         if (allsites in dest_sites):
-            fig_mean = plt.figure(figsize=(14, 4))
+            fig_mean = plt.figure()
             plt.title('Packet loss alarms aggregated by days for the ' + allsites + ' site')
             plt.xlabel('timestamp')
             plt.ylabel('number of daily alarms')
@@ -566,7 +568,7 @@ def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
             plotly_fig_mean_dest = mpl_to_plotly(fig_mean)
             plotly_fig_mean_dest.update_layout(layout_mean)
 
-            plotly_fig_mean_dest = dcc.Graph(figure=plotly_fig_mean_dest)
+            plotly_fig_mean_dest = dcc.Graph(figure=plotly_fig_mean_dest, responsive=True, style= {'height':'400'})
         elif (sitesState is not None and len(sitesState) > 0):
             plotly_fig_mean_dest = html.H4('No measurements for this site as a destination',
                                            style={"padding-bottom": "1%", "padding-top": "1%"})
@@ -599,7 +601,7 @@ def update_output(src_site, dest_site, sites_src_State, sites_dest_State):
         df_to_plot_site = df_to_plot.loc[
             (df_to_plot['src_site_' + src_site] == 1) & (df_to_plot['dest_site_' + dest_site] == 1)]
 
-        fig = plt.figure(figsize=(14, 4))
+        fig = plt.figure()
         plt.title('Measurements and packet loss alarms for the ' + src_site + ' and ' + dest_site + ' sites pair')
         plt.xlabel('timestamp')
         plt.ylabel('packet loss')
@@ -620,7 +622,7 @@ def update_output(src_site, dest_site, sites_src_State, sites_dest_State):
 
     plotly_fig_mean_src_dest = {}
     if (sites_src_State is not None and len(sites_src_State) > 0) & (sites_dest_State is not None and len(sites_dest_State) > 0):
-        fig_mean = plt.figure(figsize=(14, 4))
+        fig_mean = plt.figure()
         plt.title('Packet loss alarms aggregated by days for the ' + src_site + ' and ' + dest_site + ' sites pair')
         plt.xlabel('timestamp')
         plt.ylabel('number of daily alarms')
@@ -629,7 +631,8 @@ def update_output(src_site, dest_site, sites_src_State, sites_dest_State):
         plotly_fig_mean_src_dest = mpl_to_plotly(fig_mean)
         plotly_fig_mean_src_dest.update_layout(layout_mean)
 
-    return [dcc.Graph(figure=plotly_fig_scr_dest),dcc.Graph(figure=plotly_fig_mean_src_dest),
+    return [dcc.Graph(figure=plotly_fig_scr_dest, responsive=True, style= {'height':'400'})
+        ,dcc.Graph(figure=plotly_fig_mean_src_dest, responsive=True, style= {'height':'400'}),
             False if (sites_src_State is not None and len(sites_src_State) > 0) else True]
 
 # a callback for the third section of a page. Filters out the dest sites with measurements to the source site selected
@@ -654,6 +657,9 @@ def update_output(src_site, check, sites_src_State, sites_dest_State):
         is_src_sites = is_src.drop(['from', 'to', 'avg_value', 'doc_count_x', 'doc_count_y', 'tests_done', 'dt'], axis=1).sum(
             axis=0)
         is_src_sites = is_src_sites[is_src_sites.values != 0]
+
+        # sort dest sites by the number of (alarmed) measurements
+        is_src_sites = is_src_sites.sort_values(ascending=False)
         commonprefix = 'dest_site_'
         dest_dropdown_items = [x[len(commonprefix):] for x, y in is_src_sites.items() if x.startswith(commonprefix)]
 

@@ -258,7 +258,10 @@ class ParquetUpdater(object):
         self.pq.writeToFile(plsDf, f'{self.location}ml-datasets/packet_loss_Df.parquet')
 
         # onehot encode the whole dataset and leave only one month for further ML training
-        plsDf_onehot_month = one_month_data(plsDf)
+        plsDf_onehot_month, plsDf_onehot = one_month_data(plsDf)
+        self.pq.writeToFile(plsDf_onehot, f'{self.location}ml-datasets/packet_loss_onehot_Df.parquet')
+        del plsDf_onehot
+
         # train the model on one month data
         model = packet_loss_train_model(plsDf_onehot_month)
         del plsDf_onehot_month
