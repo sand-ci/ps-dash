@@ -293,12 +293,13 @@ class Alarms(object):
           df = self.replaceCol('cannotBeReachedFrom', df, '\n')
 
         if 'dest_change' in df.columns:
+            
             df['dest_change'] = df[['dest_sites', 'dest_change']].apply(lambda x: self.list2str(x, sign[event]), axis=1)
-            df.drop('dest_change', axis=1, inplace=True)
+            # df.drop('dest_change', axis=1, inplace=True)
             df.drop('dest_sites', axis=1, inplace=True)
         if 'src_change' in df.columns:
             df['src_change'] = df[['src_sites', 'src_change']].apply(lambda x: self.list2str(x, sign[event]), axis=1)
-            df.drop('src_change', axis=1, inplace=True)
+            # df.drop('src_change', axis=1, inplace=True)
             df.drop('src_sites', axis=1, inplace=True)
 
         if 'dest_loss%' in df.columns:
@@ -320,13 +321,15 @@ class Alarms(object):
             df.drop('alarms_id', axis=1, inplace=True)
         if 'tag' in df.columns:
             df.drop('tag', axis=1, inplace=True)
+        if '%change' in df.columns:
+           df.drop('%change', axis=1, inplace=True)
         if 'id' in df.columns:
             df.drop('id', axis=1, inplace=True)
         if 'avg_value' in df.columns:
             df['avg_value'] = df['avg_value'].apply(lambda x: f'{x}%')
         if 'alarm_id' in df.columns:
-          df.rename(columns={'alarm_id': 'alarm_link'}, inplace=True)
-
+          df['alarm_link'] = df['alarm_id']
+          df.drop('alarm_id', axis=1, inplace=True)
         df = df[['from','to'] + [col for col in df.columns if not col in ['from', 'to']]]
         
         df = self.createAlarmURL(df, event)
@@ -352,7 +355,11 @@ class Alarms(object):
     if 'alarm_link' in df.columns:
         url = f'{request.host_url}{page}'
         df['alarm_link'] = df['alarm_link'].apply(
-            lambda id: f"<a href='{url}{id}' target='_blank'>VIEW</a>" if id else '-')
+            lambda id: f"<a class='btn btn-secondary' role='button' href='{url}{id}' target='_blank'>VIEW IN A NEW TAB</a>" if id else '-')
+    
+    # if event == 'path changed between sites':
+    #     df['alarm_link'] = df['path'].apply(
+    #         lambda site: f"<a href='{request.host_url}paths-site/{site}?dateFrom={df['from'].min()}&dateTo={df['to'].max()}' target='_blank'>VIEW</a>" if site else '-')
             
     return df
 
