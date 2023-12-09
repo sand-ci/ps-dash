@@ -84,14 +84,14 @@ def queryThroughputIdx(dateFrom, dateTo):
             }
           },
           {
-            "src_site": {
+            "src_host": {
               "terms": {
                 "field": "src_host"
               }
             }
           },
           {
-            "dest_site": {
+            "dest_host": {
               "terms": {
                 "field": "dest_host"
               }
