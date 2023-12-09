@@ -81,7 +81,7 @@ def layout(**other_unknown_query_strings):
                 ]),
                
             ]),
-        ], className="p-1 site boxwithshadow page-cont mb-2 g-0", justify="center", align="center"),
+        ], className="p-1 site boxwithshadow page-cont mb-1 g-0", justify="center", align="center"),
         html.Br(),
         html.Br(),
         dbc.Row([
@@ -93,7 +93,7 @@ def layout(**other_unknown_query_strings):
                     html.Div(id='results-table'),
                 style={'height':'0.5rem'}, color='#00245A')
             ], className="m-2"),
-        ], className="p-2 site boxwithshadow page-cont mb-2 g-0", justify="center", align="center"),
+        ], className="p-2 site boxwithshadow page-cont mb-1 g-0", justify="center", align="center"),
         html.Br(),
         html.Br(),
     ], className='g-0 main-cont', align="start", style={"padding": "0.5% 1.5%"})

@@ -104,7 +104,7 @@ def layout(**other_unknown_query_strings):
                 style={'height': '0.5rem','font-size': '14px', "margin-bottom": "2%"}, color='#00245A')
 
             ], className="m-2"),
-        ], className="p-2 site boxwithshadow page-cont mb-2 g-0"),
+        ], className="p-2 site boxwithshadow page-cont mb-1 g-0"),
         html.Br(),
         dbc.Row([
             dbc.Row([
@@ -140,7 +140,7 @@ def layout(**other_unknown_query_strings):
                     html.Div(id='results-table-thrpt', style={'height':'450px'}),
                 style={'height':'0.5rem'}, color='#00245A')
             ], className="m-2"),
-        ], className="p-2 site boxwithshadow page-cont mb-2 g-0", justify="center", align="center"),
+        ], className="p-2 site boxwithshadow page-cont mb-1 g-0", justify="center", align="center"),
         html.Br(),
         dbc.Row([
             dbc.Row([
@@ -173,7 +173,7 @@ def layout(**other_unknown_query_strings):
                     html.Div(id='results-table-thrpt-mean-src', style={'height':'450px'}),
                     style={'height': '0.5rem'}, color='#00245A')
             ], className="m-2"),
-        ], className="p-2 site boxwithshadow page-cont mb-2 g-0", justify="center", align="center"),
+        ], className="p-2 site boxwithshadow page-cont mb-1 g-0", justify="center", align="center"),
         html.Br(),
         dbc.Row([
             dbc.Row([
@@ -193,7 +193,7 @@ def layout(**other_unknown_query_strings):
                     html.Div(id='results-table-thrpt-mean-dest', style={'height':'450px'}),
                     style={'height': '0.5rem'}, color='#00245A')
             ], className="m-2"),
-        ], className="p-2 site boxwithshadow page-cont mb-2 g-0", justify="center", align="center"),
+        ], className="p-2 site boxwithshadow page-cont mb-1 g-0", justify="center", align="center"),
         html.Br(),
         dbc.Row([
             dbc.Row([
@@ -229,7 +229,7 @@ def layout(**other_unknown_query_strings):
                     html.Div(id='results-table-thrpt-mean-dest-src', style={'height':'450px'}),
                     style={'height': '0.5rem'}, color='#00245A')
             ], className="m-2"),
-        ], className="p-2 site boxwithshadow page-cont mb-2 g-0", align="center"),
+        ], className="p-2 site boxwithshadow page-cont mb-1 g-0", align="center"),
         html.Br(),
     ], className='g-0 main-cont', align="start", style={"padding": "0.5% 1.5%"})
 
