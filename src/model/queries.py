@@ -97,20 +97,20 @@ def queryThroughputIdx(dateFrom, dateTo):
               }
             }
           },
-          # {
-          #   "src_site": {
-          #     "terms": {
-          #       "field": src_field_name
-          #     }
-          #   }
-          # },
-          # {
-          #   "dest_site": {
-          #     "terms": {
-          #       "field": dest_field_name
-          #     }
-          #   }
-          # },
+          {
+            "src_site": {
+              "terms": {
+                "field": src_field_name
+              }
+            }
+          },
+          {
+            "dest_site": {
+              "terms": {
+                "field": dest_field_name
+              }
+            }
+          },
         ]
       },
       "aggs": {
