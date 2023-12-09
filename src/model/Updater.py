@@ -53,8 +53,10 @@ class ParquetUpdater(object):
             print(traceback.format_exc())
 
 
+    # The following function is used to group alarms by site 
+    # taking into account the most recent 24 hours only
     def groupAlarms(self, pivotFrames):
-        dateFrom = hp.defaultTimeRange(1)[0]
+        dateFrom, dateTo = hp.defaultTimeRange(1)
         metaDf = qrs.getMetaData()
 
         nodes = metaDf[~(metaDf['site'].isnull()) & ~(
@@ -63,9 +65,16 @@ class ParquetUpdater(object):
 
         for site, lat, lon in nodes[['site', 'lat', 'lon']].drop_duplicates().values.tolist():
             for e, df in pivotFrames.items():
-                sdf = df[(df['tag'] == site) & ((df['to'] >= dateFrom) | (df['from'] >= dateFrom))]
-                if not sdf.empty:
-                    entry = {"event": e, "site": site, 'cnt': len(sdf),
+                # column "to" is closest to the time the alarms was generated, 
+                # thus we want to which approx. when the alarms was created,
+                # to be between dateFrom and dateTo
+
+                sdf = df[(df['tag'] == site) & ((df['to'] >= dateFrom) & (df['to'] <= dateTo))]
+                if len(sdf) > 0:
+                    # sdf['id'].unique() returns the number of unique alarms for the given site
+                    # those are the documents generated and stored in ES. They can be found in frames folder
+                    # While pivotFrames expands the alarms to the level of individual sites
+                    entry = {"event": e, "site": site, 'cnt':  len(sdf['id'].unique()),
                             "lat": lat, "lon": lon}
                 else:
                     entry = {"event": e, "site": site, 'cnt': 0,
@@ -249,7 +258,7 @@ class ParquetUpdater(object):
 
     @timer
     def storePacketLossDataAndModel(self):
-        now = hp.defaultTimeRange(days=90, datesOnly=True)
+        now = hp.defaultTimeRange(days=60, datesOnly=True)
         start_date = now[0]
         end_date = now[1]
         start_date, end_date = [f'{start_date}T00:01:00.000Z', f'{end_date}T23:59:59.000Z']
