@@ -1,5 +1,3 @@
-from functools import lru_cache
-
 import numpy as np
 import dash
 from dash import Dash, dash_table, dcc, html
@@ -8,9 +6,9 @@ from dash.dependencies import Input, Output
 
 import plotly.graph_objects as go
 import plotly.express as px
-from plotly.subplots import make_subplots
 
 import pandas as pd
+from flask import request
 
 from model.Alarms import Alarms
 import utils.helpers as hp
@@ -19,52 +17,47 @@ import model.queries as qrs
 from utils.parquet import Parquet
 
 
-def countDistEvents(alarmCnt):
-    # NOTE: taking only the first found location for a given site name.
-    # Alarms are mostly based on sites, and we cannot destinguish
-    # at which location the issue appeared,
-    # since the alrm does not (generally) contain hosts/ips
-    def groupByEvent(group):
-        # keep also sites with no alarms to show them on the map
-        if group['cnt'].sum() == 0:
-            events = ['no alarms']
-            cnt = 0
-        else:
-            idx = [i for i, x in enumerate(group['cnt'].values) if x > 0]
-            # get here only the events where cnt > 0
-            events = group['event'].values[idx].tolist()
-            cnt = len(events)
-        return pd.Series([events, group.lat.values[0], group.lon.values[0], cnt])
-    
-    mapDf = alarmCnt[['site', 'event', 'lat', 'lon', 'cnt']].groupby('site').apply(groupByEvent).reset_index()
-    mapDf.columns = ['site', 'event', 'lat', 'lon', 'cnt']
-    mapDf['lat'] = mapDf['lat'].astype(float)
-    mapDf['lon'] = mapDf['lon'].astype(float)
-
-    return mapDf
-
-
 @timer
 def builMap(mapDf):
-    # usually test and production sites are at the same location
-    mapDf['lat'] = mapDf['lat'] + np.random.normal(scale=0.01, size=len(mapDf))
-    mapDf['lon'] = mapDf['lon'] + np.random.normal(scale=0.01, size=len(mapDf))
-    mapDf['cnt_size'] = mapDf['cnt'] + 1
+    # usually test and production sites are at the same location,
+    # so we add some noise to the coordinates to make them visible
+    mapDf['lat'] = mapDf['lat'].astype(float) + np.random.normal(scale=0.01, size=len(mapDf))
+    mapDf['lon'] = mapDf['lon'].astype(float) + np.random.normal(scale=0.01, size=len(mapDf))
+
+    color_mapping = {
+    '⚪': '#6a6969',
+    '🔴': '#c21515',
+    '🟡': '#ffd500',
+    '🟢': '#01a301'
+    }
+
+    size_mapping = {
+    '⚪': 4,
+    '🔴': 3,
+    '🟡': 2,
+    '🟢': 1
+    }
+
+    mapDf['size'] = mapDf['Status'].map(size_mapping)
+
     fig = px.scatter_mapbox(data_frame=mapDf, lat="lat", lon="lon",
-                            color="cnt", 
-                            size="cnt_size",
-                            color_continuous_scale=px.colors.sequential.Bluered,
-                            size_max=11,
-                            hover_name="site",
-                            custom_data=['site', 'event'],
-                            zoom=1,
-                        )
+                        color="Status",
+                        color_discrete_map=color_mapping,
+                        size_max=11,
+                        size='size',
+                        hover_name="site",
+                        custom_data=['Infrastructure','Network','Other'],
+                        zoom=1,
+                    )
+
     fig.update_traces(
         hovertemplate="<br>".join([
-            "Site: <b>%{customdata[0]}</b>",
-            "Events: %{customdata[1]}",
+            "<b>%{hovertext}</b>",
+            "Infrastructure: %{customdata[0]}",
+            "Network: %{customdata[1]}",
+            "Other: %{customdata[2]}",
         ]),
-        marker=dict(opacity=0.8)
+        marker=dict(opacity=0.7)
     )
 
     fig.update_layout(
@@ -73,292 +66,111 @@ def builMap(mapDf):
             accesstoken='pk.eyJ1IjoicGV0eWF2IiwiYSI6ImNraDNwb3k2MDAxNnIyeW85MTMwYTU1eWoifQ.1QQ1E5mPh3hoZjK5X5LH7Q',
             bearing=0,
             center=go.layout.mapbox.Center(
-                lat=50,
+                lat=43,
                 lon=-6
             ),
             pitch=0,
-            style='mapbox://styles/petyavas/ckhyzstu92b4c19r92w0o8ayt'
+            style='mapbox://styles/petyav/ckh3spvk002i419mzf8m9ixzi'
         ),
-        coloraxis_colorbar=dict(
-            title="# events",
-            thicknessmode="pixels",
-            thickness=30,
-            len=0.95,
-        )
+        showlegend=False,
+        title = 'Status of all sites in the past 24 hours'
     )
 
     fig.update_layout(template='plotly_white')
     return fig
 
 
-@lru_cache(maxsize=None)
-def getMetaData():
-    metaDf = qrs.getMetaData()
-    return metaDf
-
-@lru_cache(maxsize=None)
-def loadAllTests():
-    measures = pq.readFile('parquet/raw/measures.parquet')
-    return measures
-
-
 @timer
-# Generates the 4 plot for the 
-def SitesOverviewPlots(site_name):
-    metaDf = getMetaData()
-    alltests = loadAllTests()
+def generate_status_table(alarmCnt):
+    catdf = qrs.getSubcategories()
+    catdf = pd.merge(alarmCnt, catdf, on='event', how='left')
 
-    units = {
-    'ps_packetloss': 'packet loss',
-    'ps_throughput': 'MBps',
-    'ps_owd': 'ms'
-    }
+    df = catdf.groupby(['site', 'category'])['cnt'].sum().reset_index()
 
-    colors = ['#720026', '#e4ac05', '#00bcd4', '#1768AC', '#ffa822', '#134e6f', '#ff6150', '#1ac0c6', '#492b7c', '#9467bd',
-            '#1f77b4', '#ff7f0e', '#2ca02c','#00224e', '#123570', '#3b496c', '#575d6d', '#707173', '#8a8678', '#a59c74',
-            '#c3b369', '#e1cc55', '#fee838', '#3e6595', '#4adfe1', '#b14ae1',
-            '#1f77b4', '#ff7f0e', '#2ca02c','#00224e', '#123570', '#3b496c', '#575d6d', '#707173', '#8a8678', '#a59c74',
-            '#720026', '#e4ac05', '#00bcd4', '#1768AC', '#ffa822', '#134e6f', '#ff6150', '#1ac0c6', '#492b7c', '#9467bd',
-            '#1f77b4', '#ff7f0e', '#2ca02c','#00224e', '#123570', '#3b496c', '#575d6d', '#707173', '#8a8678', '#a59c74',
-            '#c3b369', '#e1cc55', '#fee838', '#3e6595', '#4adfe1', '#b14ae1',]
+    df_pivot = df.pivot(index='site', columns='category', values='cnt')
+    df_pivot.reset_index(inplace=True)
 
+    df_pivot.sort_values(by=['Network', 'Infrastructure', 'Other'], ascending=False, inplace=True)
 
-    fig = go.Figure()
-    fig = make_subplots(rows=3, cols=2, subplot_titles=("Throughput as source", "Throughput as destination",
-                                                        "Packet loss as source", "Packet loss as destination",
-                                                        "One-way delay as source", "One-way delay as destination"))
+    def give_status(row):
+        if row['Network'] > 0:
 
-    direction = {1: 'src', 2: 'dest'}
+            if row['Infrastructure'] > 0:
+                return '⚪'
+            return '🔴'
 
-    alltests['dt'] = pd.to_datetime(alltests['from'], unit='ms')
+        elif row['Infrastructure'] == 0 and row['Network'] == 0:
+            return '🟢'
+        
+        else: return '🟡'
 
-    # convert throughput bites to MB
-    alltests.loc[alltests['idx']=='ps_throughput', 'value'] = alltests[alltests['idx']=='ps_throughput']['value'].apply(lambda x: round(x/1e+6, 2))
+    df_pivot['Status'] = df_pivot.apply(give_status, axis=1)
+    df_pivot = df_pivot[['site', 'Status', 'Network', 'Infrastructure', 'Other']]
 
-    # extract the data relevant for the given site name
-    ips = metaDf[(metaDf['site']==site_name) | (metaDf['netsite']==site_name)]['ip'].values
-    ip_colors = {ip: color for ip, color in zip(ips, colors)}
+    url = f'{request.host_url}site'
+    df_pivot['url'] = df_pivot['site'].apply(lambda name: 
+                                             f"<a class='btn btn-secondary' role='button' href='{url}/{name}' target='_blank'>See latest alarms</a>" if name else '-')
 
-
-    legend_names = set()
-
-    for col in [1,2]:
-        measures = alltests[alltests[direction[col]].isin(ips)].copy().sort_values('from', ascending=False)
-
-        for i, ip in enumerate(ips):
-            # The following code sets the visibility to True only for the first occurrence of an IP
-            first_time_seen = ip not in legend_names
-            not_on_legend = True
-            legend_names.add(ip)
-
-            throughput = measures[(measures[direction[col]]==ip) & (measures['idx']=='ps_throughput')]
-            
-            if not throughput.empty:
-                showlegend = first_time_seen==True and not_on_legend==True
-                not_on_legend = False
-                fig.add_trace(
-                    go.Scattergl(
-                        x=throughput['dt'],
-                        y=throughput['value'],
-                        mode='markers',
-                        marker=dict(
-                            color=ip_colors[ip]),
-                        name=ip,
-                        yaxis="y1",
-                        legendgroup=ip,
-                        showlegend=showlegend),
-                    row=1, col=col
-                )
-            else: fig.add_trace(
-                    go.Scattergl(
-                        x=throughput['dt'],
-                        y=throughput['value']),
-                    row=1, col=col
-                )
-            
-            packetloss = measures[(measures[direction[col]]==ip) & (measures['idx']=='ps_packetloss')]
-            if not packetloss.empty:
-                showlegend = first_time_seen==True and not_on_legend==True
-                not_on_legend = False
-                fig.add_trace(
-                    go.Scattergl(
-                        x=packetloss['dt'],
-                        y=packetloss['value'],
-                        mode='markers',
-                        marker=dict(
-                            color=ip_colors[ip]),
-                        name=ip,
-                        yaxis="y1",
-                        legendgroup=ip,
-                        showlegend=showlegend),
-                    row=2, col=col
-                )
-            else: fig.add_trace(
-                    go.Scattergl(
-                        x=packetloss['dt'],
-                        y=packetloss['value']),
-                    row=2, col=col
-                )
-
-            owd = measures[(measures[direction[col]]==ip) & (measures['idx']=='ps_owd')]
-            if not owd.empty:
-                showlegend = first_time_seen==True and not_on_legend==True
-                not_on_legend = False
-                fig.add_trace(
-                    go.Scattergl(
-                        x=owd['dt'],
-                        y=owd['value'],
-                        mode='markers',
-                        marker=dict(
-                            color=ip_colors[ip]),
-                            
-                        name=ip,
-                        yaxis="y1",
-                        legendgroup=ip,
-                        showlegend=showlegend),
-                    row=3, col=col
-                )
-            else: fig.add_trace(
-                    go.Scattergl(
-                        x=owd['dt'],
-                        y=owd['value']),
-                    row=3, col=col
-                )
-
-
-    fig.update_layout(
-            showlegend=True,
-            title_text=f'{site_name} network measurements',
-            legend=dict(
-                traceorder="normal",
-                font=dict(
-                    family="sans-serif",
-                    size=12,
-                ),
-            ),
-            height=900,
-        )
-
-
-    # Update yaxis properties
-    fig.update_yaxes(title_text=units['ps_throughput'], row=1, col=col)
-    fig.update_yaxes(title_text=units['ps_packetloss'], row=2, col=col)
-    fig.update_yaxes(title_text=units['ps_owd'], row=3, col=col)
-    fig.layout.template = 'plotly_white'
-    # py.offline.plot(fig)
-
-    return fig
-
-
-@timer
-# '''Takes selected site from the Geo map and generates a Dash datatable'''
-def generate_tables(site):
-    global dateFrom
-    global dateTo
-    global frames
-    global pivotFrames
-    global alarmCnt
-
-    out = []
-    alarms4Site = alarmCnt[alarmCnt['site'] == site]
-
-    if alarms4Site['cnt'].sum() > 0:
-        for event in sorted(alarms4Site['event'].unique()):
-            eventDf = pivotFrames[event]
-            # find all cases where selected site was pinned in tag field
-            ids = eventDf[(eventDf['tag'] == site) & ((eventDf['to'] >= dateFrom) | (eventDf['from'] >= dateFrom))]['id'].values
-
-            tagsDf = frames[event]
-            dfr = tagsDf[tagsDf.index.isin(ids)]
-            dfr = alarmsInst.formatDfValues(dfr, event).sort_values('to', ascending=False)
-
-            if len(ids):
-                element = html.Div([
-                    html.H3(event.upper()),
+    if len(df_pivot) > 0:
+        element = html.Div([
                     dash_table.DataTable(
-                        data=dfr.to_dict('records'),
-                        columns=[{"name": i, "id": i, "presentation": "markdown"} for i in dfr.columns],
-                        markdown_options={"html": True},
-                        id='tbl',
-                        page_size=20,
-                        style_cell={
-                            'padding': '2px',
-                            'font-size': '13px',
-                            'whiteSpace': 'pre-line'
-                        },
-                        style_header={
-                            'backgroundColor': 'white',
-                            'fontWeight': 'bold'
-                        },
-                        style_data={
-                            'height': 'auto',
-                            'lineHeight': '15px',
-                            'overflowX': 'auto'
-                        },
-                        filter_action="native",
-                        sort_action="native",
-                    ),
-                ], className='single-table')
+                    df_pivot.to_dict('records'),[{"name": i.upper(), "id": i, "presentation": "markdown"} for i in df_pivot.columns],
+                    filter_action="native",
+                    sort_action="native",
+                    is_focused=True,
+                    markdown_options={"html": True},
+                    page_size=16,
+                    style_cell={
+                        'padding': '2px',
+                        'font-size': '15px',
+                        'textAlign': 'center'
+                    },
+                    style_header={
+                        'backgroundColor': 'white',
+                        'fontWeight': 'bold'
+                    },
+                    style_data={
+                        'height': 'auto',
+                        'overflowX': 'auto',
+                        # 'whiteSpace': 'normal',
+                    },
+                    style_table={'overflowY': 'auto', 'overflowX': 'auto'},
+                    style_data_conditional=[],
+                    id='status-tbl')
+                ], className='status-table')
 
-                out.append(element)
     else:
-        out = html.Div(html.H3('No alarms for this site in the past day'), style={'textAlign': 'center'})
+        element = html.Div(html.H3('No alarms for this site in the past day'), style={'textAlign': 'center'})
 
-    return out
+    return element, pd.merge(df_pivot, alarmCnt[['site', 'lat', 'lon']].drop_duplicates(subset='site', keep='first'), on='site', how='left')
 
 
 dash.register_page(__name__, path='/')
 
 pq = Parquet()
 alarmsInst = Alarms()
-dateFrom, dateTo = hp.defaultTimeRange(1)
 
 
 def layout(**other_unknown_query_strings):
-    global dateFrom
-    global dateTo
-    global frames
-    global pivotFrames
-    global eventCnt
-    global alarmCnt
-
     dateFrom, dateTo = hp.defaultTimeRange(1)
-    print("Overview for period:", dateFrom," - ", dateTo)
-    # dateFrom, dateTo = ['2022-12-11 09:40', '2022-12-11 21:40']
-    frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
-
     alarmCnt = pq.readFile('parquet/alarmsGrouped.parquet')
-    eventCnt = countDistEvents(alarmCnt)
-
+    statusTable, sitesDf = generate_status_table(alarmCnt)
+    print("Period:", dateFrom," - ", dateTo)
     print(f'Number of alarms: {len(alarmCnt)}')
-    print(f'Alarm types: {pivotFrames.keys()}')
 
     return html.Div(
+
             dbc.Row([
                 dbc.Row([
-                    dbc.Col(id='selected-site', className='cls-selected-site', align="start"),
-                    dbc.Col(html.H2(f'Alarms reported in the past 24 hours ({dateTo} UTC)'), className='cls-selected-site')
-                ], align="start", className='boxwithshadow mb-2 g-0'),
-                dbc.Row(
-                    dcc.Loading(
-                        dcc.Graph(figure=builMap(eventCnt), id='site-map',
-                                  className='cls-site-map boxwithshadow page-cont mb-2'),
-                    ), className='g-0'
-                ),
-                dbc.Row([
-                         dbc.Col(
-                             dcc.Loading(
-                                html.Div(id='datatables', children=[], className='datatables-cont'),
-                             color='#00245A'),
-                        width=12)
-                    ],   className='site boxwithshadow page-cont mb-2 g-0', justify="center", align="center"),
-                dbc.Row([
-                         dbc.Col(
-                             dcc.Loading(
-                                 dcc.Graph(id="site-plots-in-out", className="site-plots site-inner-cont p-05"),
-                             color='#00245A'),
-                        width=12)
-                    ],   className='site boxwithshadow page-cont mb-2 g-0', justify="center", align="center"),
+                        dbc.Col(
+                            [
+                                html.Div(children=statusTable, id='site-status', className='datatables-cont'),
+                            ],  md=5, xs=12, className='page-cont pl-1'
+                        ),
+                        dbc.Col(dcc.Graph(figure=builMap(sitesDf), id='site-map',
+                                  className='cls-site-map  page-cont'),  md=7, xs=12
+                        ),
+                    ], className='boxwithshadow page-cont mb-1 g-0 p-1', justify="center", align="center"),
                 html.Div(id='page-content-noloading'),
                 html.Br(),
                 
@@ -366,22 +178,24 @@ def layout(**other_unknown_query_strings):
 
 
 
+# # # '''Takes selected site from the Geo map and displays the relevant information'''
+# @dash.callback(
+#     [
+#         Output('datatables', 'children'),
+#         Output('selected-site', 'children'),
+#         Output('site-plots-in-out', 'figure'),
+#     ],
+#     Input('site-map', 'clickData')
+# )
+# def display_output(value):
+#     global eventCnt
 
-# # '''Takes selected site from the Geo map and displays the relevant information'''
-@dash.callback(
-    [
-        Output('datatables', 'children'),
-        Output('selected-site', 'children'),
-        Output('site-plots-in-out', 'figure'),
-    ],
-    Input('site-map', 'clickData')
-)
-def display_output(value):
-    global eventCnt
+#     if value is not None:
+#         location = value['points'][0]['customdata'][0]
+#     # else:
+#     #     location = eventCnt[eventCnt['cnt'] == eventCnt['cnt'].max()]['site'].values[0]
 
-    if value is not None:
-        location = value['points'][0]['customdata'][0]
-    else:
-        location = eventCnt[eventCnt['cnt'] == eventCnt['cnt'].max()]['site'].values[0]
+#     # print(location)
     
-    return [generate_tables(location), html.H1(f'Selected site: {location}'), SitesOverviewPlots(location)]
+#         return []
+

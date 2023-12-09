@@ -6,8 +6,6 @@ import pandas as pd
 import utils.helpers as hp
 
 import urllib3
-from datetime import datetime
-import datetime
 urllib3.disable_warnings()
 
 
@@ -18,7 +16,7 @@ def convertDate(dt):
 # On 18 Nov 2023 all alarms moved to querying netsites instead of sites, 
 # but kept src_site and dest_site for backward compatibility
 def obtainFieldNames(dateFrom):
-  target_date = datetime.datetime(2023, 11, 18)
+  target_date = datetime(2023, 11, 18)
   target_milliseconds = target_date.timestamp() * 1000
 
   if dateFrom > target_milliseconds:
@@ -86,33 +84,33 @@ def queryThroughputIdx(dateFrom, dateTo):
             }
           },
           {
-            "src_host": {
+            "src_site": {
               "terms": {
                 "field": "src_host"
               }
             }
           },
           {
-            "dest_host": {
+            "dest_site": {
               "terms": {
                 "field": "dest_host"
               }
             }
           },
-          {
-            "src_site": {
-              "terms": {
-                "field": src_field_name
-              }
-            }
-          },
-          {
-            "dest_site": {
-              "terms": {
-                "field": dest_field_name
-              }
-            }
-          },
+          # {
+          #   "src_site": {
+          #     "terms": {
+          #       "field": src_field_name
+          #     }
+          #   }
+          # },
+          # {
+          #   "dest_site": {
+          #     "terms": {
+          #       "field": dest_field_name
+          #     }
+          #   }
+          # },
         ]
       },
       "aggs": {
@@ -198,8 +196,8 @@ def queryAlarms(dateFrom, dateTo):
                     {
                         "range": {
                             "created_at": {
-                                "from": period[0],
-                                "to": period[1],
+                                "gte": period[0],
+                                "lte": period[1],
                                 "format": "epoch_millis"
                             }
                         }
@@ -216,7 +214,7 @@ def queryAlarms(dateFrom, dateTo):
             }
         }
         }
-
+  # print(str(q).replace("\'", "\""))
   try:
     result = scan(client=hp.es, index='aaas_alarms', query=q)
     data = {}
@@ -235,8 +233,7 @@ def queryAlarms(dateFrom, dateTo):
             desc['tag'] = tags
 
           if 'to' not in desc.keys():
-            desc['to'] = datetime.fromtimestamp(
-                item['_source']['created_at']/1000.0)
+            desc['to'] = datetime.fromtimestamp(item['_source']['created_at']/1000.0)
 
           if 'from' in desc.keys() and 'to' in desc.keys():
             desc['from'] = desc['from'].replace('T', ' ')
@@ -323,6 +320,47 @@ def getCategory(event):
 
   for res in results['hits']['hits']:
     return res['_source']
+  
+
+def getSubcategories():
+  # TODO: query from aaas_categories when the alarms are reorganized
+  # q = {
+  #       "query": {
+  #           "term": {
+  #             "category": "Networking"
+  #         }
+  #       }
+  #     }
+
+  # results = scan(hp.es, index='aaas_categories', query=q)
+
+  # subcategories = []
+
+  # for res in results:
+  #     subcategories.append({'event': res['_source']['event'], 'category': res['_source']['subcategory']})
+  # # "path changed between sites" is not in aaas_alarms, because the alarms are too many
+  # # the are gouped under an ASN in path_changed alarm
+  # subcategories.append({'event': 'path changed between sites', 'category': 'RENs'})
+
+  # catdf = pd.DataFrame(subcategories)
+
+  description = {
+  'Infrastructure': 	['bad owd measurements','large clock correction', 'path changed between sites', 
+	 				            'destination cannot be reached from multiple', 'destination cannot be reached from any',
+			                'source cannot reach any', 'firewall issue'],
+  'Network': 		      ['bandwidth decreased from/to multiple sites', 'bandwidth decreased'],
+  'Other': 		      ['bandwidth increased from/to multiple sites', 'bandwidth increased',
+             		      'high packet loss', 'high packet loss on multiple links', 'complete packet loss']
+  }
+
+  subcategories = []
+  for cat, ev in description.items():
+    for e in ev:
+      subcategories.append({'category': cat, 'event': e})
+
+  catdf = pd.DataFrame(subcategories)
+
+  return catdf
 
 
 def queryTraceChanges(dateFrom, dateTo):
