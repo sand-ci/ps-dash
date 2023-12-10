@@ -15,6 +15,7 @@ import utils.helpers as hp
 from utils.helpers import timer
 import model.queries as qrs
 from utils.parquet import Parquet
+import pycountry
 
 
 @timer
@@ -145,6 +146,66 @@ def generate_status_table(alarmCnt):
     return element, pd.merge(df_pivot, alarmCnt[['site', 'lat', 'lon']].drop_duplicates(subset='site', keep='first'), on='site', how='left')
 
 
+def get_country_code(country_name):
+    try:
+        country = pycountry.countries.search_fuzzy(country_name)[0]
+        return country.alpha_2
+    except LookupError:
+        return ''
+
+
+def total_number_of_alarms(sitesDf):
+    metaDf = pq.readFile('parquet/raw/metaDf.parquet')
+    sitesDf = pd.merge(sitesDf, metaDf[['lat', 'lon', 'country']], on=['lat', 'lon'], how='left').drop_duplicates()
+    site_totals = sitesDf.groupby('site')[['Infrastructure', 'Network', 'Other']].sum()
+
+    highest_site = site_totals.sum(axis=1).idxmax()
+    highest_site_alarms = site_totals.sum(axis=1).max()
+    
+    country_totals = sitesDf.groupby('country')[['Infrastructure', 'Network', 'Other']].sum()
+    highest_country = country_totals.sum(axis=1).idxmax()
+    highest_country_alarms = country_totals.sum(axis=1).max()
+    
+    status = ['⚪', '🔴', '🟡', '🟢']
+    status_count = sitesDf[['Status', 'site']].groupby('Status').count().to_dict()['site']
+    for s in status:
+        if s not in status_count:
+            status_count[s] = 0
+
+    html_elements = []
+    # add the status count to the html
+    total_status = []
+    for s in status:
+        total_status.append(dbc.Col(html.H3(f'{s} {status_count[s]}', className='stat-number h-100'), width=2))
+
+    html_elements.append(dbc.Col([
+        dbc.Row(html.H3('Overall status', className='stat-title b flex'), justify="start"),
+        dbc.Row(children=total_status, justify="center", align="center", className='h-100')],
+        className='stat-box boxwithshadow', md=1, xs=3))
+
+    # # add the total number of alarms to the html
+    # for k,v in sitesDf.sum(numeric_only=True).to_dict().items():
+    #     html_elements.append(dbc.Col([
+    #         html.H3(f'Total number of {k} alarms', className='stat-title'),
+    #         html.H1(f'{v}', className='stat-number'),
+    #     ], className='stat-box boxwithshadow', md=2, xs=3))
+
+    # add the highest number of alarms based on site name to the html
+    country_code = get_country_code(sitesDf[sitesDf['site']==highest_site]['country'].values[0])
+    html_elements.append(dbc.Col([
+            html.H3(f'Highest number of alarms from site', className='stat-title'),
+            html.H1(f' {highest_site} ({country_code}): {highest_site_alarms}', className='stat-number'),
+        ], className='stat-box boxwithshadow', md=2, xs=6))
+
+    # add the highest number of alarms based on country to the html
+    html_elements.append(dbc.Col([
+            html.H3(f'Highest number of alarms from country', className='stat-title'),
+            html.H1(f'{highest_country}: {highest_country_alarms}', className='stat-number'),
+        ], className='stat-box boxwithshadow', md=3, xs=6))    
+
+    return html_elements
+
+
 dash.register_page(__name__, path='/')
 
 pq = Parquet()
@@ -158,8 +219,10 @@ def layout(**other_unknown_query_strings):
     print("Period:", dateFrom," - ", dateTo)
     print(f'Number of alarms: {len(alarmCnt)}')
 
-    return html.Div(
+    total_number = total_number_of_alarms(sitesDf)
 
+    return html.Div([
+            dbc.Row(children=total_number, className='g-0 h-100', align="center", justify='between',  style={"padding": "0.5% 1.5%"}),
             dbc.Row([
                 dbc.Row([
                         dbc.Col(
@@ -174,7 +237,8 @@ def layout(**other_unknown_query_strings):
                 html.Div(id='page-content-noloading'),
                 html.Br(),
                 
-            ], className='g-0', align="start", style={"padding": "0.5% 1.5%"}), className='main-cont')
+            ], className='g-0', align="start", style={"padding": "0.5% 1.5%"})
+            ], className='main-cont')
 
 
 
