@@ -38,6 +38,7 @@ class ParquetUpdater(object):
             self.cacheIndexData()
             self.storeAlarms()
             self.storePathChangeDescDf()
+            self.storeMetaData()
             self.storeThroughputDataAndModel()
             self.storePacketLossDataAndModel()
 
@@ -45,6 +46,7 @@ class ParquetUpdater(object):
             Scheduler(60*60, self.cacheIndexData)
             Scheduler(60*10, self.storeAlarms)
             Scheduler(60*30, self.storePathChangeDescDf)
+            Scheduler(int(60*60*12), self.storeMetaData)
 
             # Store the data for the Major Alarms analysis
             Scheduler(int(60*60*12), self.storeThroughputDataAndModel)
@@ -57,7 +59,7 @@ class ParquetUpdater(object):
     # taking into account the most recent 24 hours only
     def groupAlarms(self, pivotFrames):
         dateFrom, dateTo = hp.defaultTimeRange(1)
-        metaDf = qrs.getMetaData()
+        metaDf = self.pq.readFile('parquet/raw/metaDf.parquet')
 
         nodes = metaDf[~(metaDf['site'].isnull()) & ~(
             metaDf['site'] == '') & ~(metaDf['lat'] == '') & ~(metaDf['lat'].isnull())]
@@ -155,6 +157,12 @@ class ParquetUpdater(object):
     #     self.pq.writeToFile(posDf, f'{location}posDf.parquet')
     #     self.pq.writeToFile(baseline, f'{location}baseline.parquet')
     #     self.pq.writeToFile(altPaths, f'{location}altPaths.parquet')
+
+
+    @timer
+    def storeMetaData(self):
+        metaDf = qrs.getMetaData()
+        self.pq.writeToFile(metaDf, "parquet/raw/metaDf.parquet")
 
 
     @timer

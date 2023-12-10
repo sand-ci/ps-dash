@@ -18,6 +18,7 @@ import utils.helpers as hp
 from utils.helpers import timer
 from model.Alarms import Alarms
 import model.queries as qrs
+from utils.parquet import Parquet
 
 
 urllib3.disable_warnings()
@@ -50,7 +51,8 @@ def convertTime(ts):
 # TODO: move that query to queries.py
 @timer
 def getRawDataFromES(src, dest, ipv6, dateFrom, dateTo):
-    metaDf = qrs.getMetaData()
+    pq = Parquet()
+    metaDf = pq.readFile('parquet/raw/metaDf.parquet')
     sips = metaDf[(metaDf['site'] == src) | (metaDf['netsite'] == src)]['ip'].values.tolist()
     sips = [ip.upper() for ip in sips] + [ip.lower() for ip in sips]
     dips = metaDf[(metaDf['site'] == dest) | (metaDf['netsite'] == dest)]['ip'].values.tolist()

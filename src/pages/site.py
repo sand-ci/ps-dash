@@ -99,13 +99,6 @@ def generate_tables(site, dateFrom, dateTo, frames, pivotFrames, alarms4Site, al
     return out
 
 
-
-@lru_cache(maxsize=None)
-def getMetaData():
-    metaDf = qrs.getMetaData()
-    return metaDf
-
-
 @lru_cache(maxsize=None)
 def loadAllTests(pq):
     measures = pq.readFile('parquet/raw/measures.parquet')
@@ -113,7 +106,8 @@ def loadAllTests(pq):
 
 
 def SitesOverviewPlots(site_name, pq):
-    metaDf = getMetaData()
+    metaDf = pq.readFile('parquet/raw/metaDf.parquet')
+
     alltests = loadAllTests(pq)
 
     units = {
