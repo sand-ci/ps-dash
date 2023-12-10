@@ -43,15 +43,10 @@ def getStats(dateFrom, dateTo, site):
             "must": [
                 {
                 "range": {
-                    "from_date": {
-                    "gte": dateFrom
-                    }
-                }
-                },
-                {
-                "range": {
                     "to_date": {
-                    "lte": dateTo
+                    "gte": dateFrom,
+                    "lte": dateTo,
+                    "format": "strict_date_optional_time"
                     }
                 }
                 },
