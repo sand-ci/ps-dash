@@ -31,14 +31,14 @@ class ParquetUpdater(object):
         folders = ['raw', 'frames', 'pivot', 'ml-datasets'] 
         for folder in folders:
             self.createLocation(self.location + folder + '/')
-        
+
         # Prevent the data from being updated if it is fresh
         if self.__isDataFresh(self.location) == False:
             print("Data is too old or folders are empty. Updating...")
+            self.storeMetaData()
             self.cacheIndexData()
             self.storeAlarms()
             self.storePathChangeDescDf()
-            self.storeMetaData()
             self.storeThroughputDataAndModel()
             self.storePacketLossDataAndModel()
 
@@ -162,7 +162,7 @@ class ParquetUpdater(object):
     @timer
     def storeMetaData(self):
         metaDf = qrs.getMetaData()
-        self.pq.writeToFile(metaDf, "parquet/raw/metaDf.parquet")
+        self.pq.writeToFile(metaDf, f"{self.location}raw/metaDf.parquet")
 
 
     @timer
