@@ -10,6 +10,8 @@ import model.queries as qrs
 
 import urllib3
 from datetime import datetime
+
+from utils.parquet import Parquet
 urllib3.disable_warnings()
 
 
@@ -69,13 +71,17 @@ def layout(q=None, **other_unknown_query_strings):
       timeRange = f"(from:'{dates[0]}',to:'{dates[1]}')"
       fieldName = obtainFieldNames(dates[0]) 
 
+      pq = Parquet()
+      metaDf = pq.readFile('parquet/raw/metaDf.parquet')
+
       alarmsInst = Alarms()
       url = f'https://atlas-kibana.mwt2.org:5601/s/networking/app/dashboards?auth_provider_hint=anonymous1#/view/e015c210-65e2-11ed-afcf-d91dad577662?embed=true&_g=(filters%3A!()%2CrefreshInterval%3A(pause%3A!t%2Cvalue%3A0)%2Ctime%3A{timeRange})&show-query-input=true&show-time-filter=true&_a=(query:(language:kuery,query:\'{query}\'))'
       
       kibanaIframe = []
       if alarm['event'] == 'high packet loss on multiple links':
         if len(alrmContent["dest_sites"])>0:
-          dest_sites = str(list(s for s in set(alrmContent["dest_sites"]))).replace('\'', '"').replace('[','').replace(']','').replace(',', ' OR')
+          original_names = metaDf[metaDf['netsite'].isin(alrmContent["dest_sites"])]['netsite_original'].unique()
+          dest_sites = str(list(s for s in set(original_names))).replace('\'', '"').replace('[','').replace(']','').replace(',', ' OR')
           query = f'src_host: {alrmContent["host"]} and {fieldName["dest"]}:({dest_sites})'
           url = f'https://atlas-kibana.mwt2.org:5601/s/networking/app/dashboards?auth_provider_hint=anonymous1#/view/ee5a6310-8c40-11ed-8156-b9b28813464d?embed=true&_g=(filters%3A!()%2CrefreshInterval%3A(pause%3A!t%2Cvalue%3A0)%2Ctime%3A{timeRange})&show-query-input=true&show-time-filter=true&hide-filter-bar=true&_a=(query:(language:kuery,query:\'{query}\'))'
           # print('\n \n',url)
@@ -85,7 +91,8 @@ def layout(q=None, **other_unknown_query_strings):
             ], className="boxwithshadow pair-details g-0 mb-1"))
         
         if len(alrmContent["src_sites"]) > 0:
-          src_sites = str(list(s for s in set(alrmContent["src_sites"]))).replace('\'', '"').replace('[', '').replace(']', '').replace(',', ' OR')
+          original_names = metaDf[metaDf['netsite'].isin(alrmContent["src_sites"])]['netsite_original'].unique()
+          src_sites = str(list(s for s in set(original_names))).replace('\'', '"').replace('[','').replace(']','').replace(',', ' OR')
           query = f'dest_host: {alrmContent["host"]} and {fieldName["src"]}:({src_sites})'
           url = f'https://atlas-kibana.mwt2.org:5601/s/networking/app/dashboards?auth_provider_hint=anonymous1#/view/920cd1f0-8c41-11ed-8156-b9b28813464d?embed=true&_g=(filters%3A!()%2CrefreshInterval%3A(pause%3A!t%2Cvalue%3A0)%2Ctime%3A{timeRange})&show-query-input=true&show-time-filter=true&_a=(query:(language:kuery,query:\'{query}\'))'
           # print('\n \n',url)
