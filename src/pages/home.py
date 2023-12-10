@@ -174,12 +174,12 @@ def total_number_of_alarms(sitesDf):
 
     html_elements = []
     # add the status count to the html
-    total_status = []
+    total_status = [dbc.Col(html.H3(f'Status:', className='stat-number h-100'), width=2)]
     for s in status:
         total_status.append(dbc.Col(html.H3(f'{s} {status_count[s]}', className='stat-number h-100'), width=2))
 
     html_elements.append(dbc.Col([
-        dbc.Row(html.H3('Overall status', className='stat-title b flex'), justify="start"),
+        # dbc.Row(html.H3('Overall status', className='stat-title b flex'), justify="start"),
         dbc.Row(children=total_status, justify="center", align="center", className='h-100')],
         className='stat-box boxwithshadow', md=1, xs=3))
 
@@ -222,7 +222,7 @@ def layout(**other_unknown_query_strings):
     total_number = total_number_of_alarms(sitesDf)
 
     return html.Div([
-            dbc.Row(children=total_number, className='g-0 h-100', align="center", justify='between',  style={"padding": "0.5% 1.5%"}),
+            dbc.Row(children=total_number, className='g-0 d-flex align-items-stretch', align="center", justify='between',  style={"padding": "0.5% 1.5%"}),
             dbc.Row([
                 dbc.Row([
                         dbc.Col(
