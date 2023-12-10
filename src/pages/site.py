@@ -65,7 +65,7 @@ def generate_tables(site, dateFrom, dateTo, frames, pivotFrames, alarms4Site, al
 
                   if len(ids):
                       element = html.Div([
-                          html.H3(event.upper()),
+                          html.H2(event.upper()),
                           dash_table.DataTable(
                               data=dfr.to_dict('records'),
                               columns=[{"name": i, "id": i, "presentation": "markdown"} for i in dfr.columns],
@@ -90,7 +90,7 @@ def generate_tables(site, dateFrom, dateTo, frames, pivotFrames, alarms4Site, al
                               filter_action="native",
                               sort_action="native",
                           ),
-                      ], className='single-table')
+                      ], className='single-table mb-1')
 
                       out.append(element)
         else:
@@ -286,7 +286,7 @@ def layout(q=None, **other_unknown_query_strings):
                              dcc.Loading(
                                 html.Div(id='datatables',
                                          children=generate_tables(q, dateFrom, dateTo, frames, pivotFrames, alarmCnt, alarmsInst),
-                                         className='datatables-cont'),
+                                         className='datatables-cont p-2'),
                              color='#00245A'),
                         width=12)
                     ],   className='site boxwithshadow page-cont mb-1 g-0', justify="center", align="center"),
@@ -299,7 +299,6 @@ def layout(q=None, **other_unknown_query_strings):
                              color='#00245A'),
                         width=12)
                     ],   className='site boxwithshadow page-cont mb-1 g-0', justify="center", align="center"),
-                html.Div(id='page-content-noloading'),
                 html.Br(),
                 
             ], className='g-0', align="start", style={"padding": "0.5% 1.5%"}), className='main-cont')

@@ -324,7 +324,7 @@ def buildGraphComponents(alarmData, dateFrom, dateTo, event, pivotFrames):
           ], className="", justify="evenly"),
 
           dbc.Row(
-            html.Div(buildDataTable(df), className='single-table p-4'),
+            html.Div(buildDataTable(df), className='single-table p-2'),
           justify="evenly")
 
         ], className='boxwithshadow')
