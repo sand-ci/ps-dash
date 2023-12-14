@@ -345,12 +345,14 @@ def getSubcategories():
   # catdf = pd.DataFrame(subcategories)
 
   description = {
-  'Infrastructure': 	['bad owd measurements','large clock correction', 'path changed between sites', 
+  'Infrastructure': 	['bad owd measurements','large clock correction',
 	 				            'destination cannot be reached from multiple', 'destination cannot be reached from any',
-			                'source cannot reach any', 'firewall issue'],
-  'Network': 		      ['bandwidth decreased from/to multiple sites', 'bandwidth decreased'],
-  'Other': 		      ['bandwidth increased from/to multiple sites', 'bandwidth increased',
-             		      'high packet loss', 'high packet loss on multiple links', 'complete packet loss']
+			                'source cannot reach any', 'firewall issue', 'complete packet loss'],
+
+  'Network': 		      ['bandwidth decreased from/to multiple sites', 'path changed between sites'],
+
+  'Other': 		      ['bandwidth increased from/to multiple sites', 'bandwidth increased', 'bandwidth decreased',
+                      'high packet loss', 'high packet loss on multiple links']
   }
 
   subcategories = []

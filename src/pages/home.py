@@ -83,6 +83,16 @@ def builMap(mapDf):
 
 @timer
 def generate_status_table(alarmCnt):
+
+    red_sites = alarmCnt[(alarmCnt['event']=='bandwidth decreased from/to multiple sites')
+                & alarmCnt['cnt']>0]['site'].unique().tolist()
+
+    yellow_sites = alarmCnt[(alarmCnt['event']=='path changed between sites')
+                    & alarmCnt['cnt']>0]['site'].unique().tolist()
+
+    grey_sites = alarmCnt[(alarmCnt['event'].isin(['firewall issue', 'source cannot reach any', 'complete packet loss']))
+                    & (alarmCnt['cnt']>0)]['site'].unique().tolist()
+
     catdf = qrs.getSubcategories()
     catdf = pd.merge(alarmCnt, catdf, on='event', how='left')
 
@@ -93,19 +103,20 @@ def generate_status_table(alarmCnt):
 
     df_pivot.sort_values(by=['Network', 'Infrastructure', 'Other'], ascending=False, inplace=True)
 
-    def give_status(row):
-        if row['Network'] > 0:
 
-            if row['Infrastructure'] > 0:
-                return '⚪'
+    def give_status(site):
+        if site in red_sites:
             return '🔴'
 
-        elif row['Infrastructure'] == 0 and row['Network'] == 0:
-            return '🟢'
+        elif site in yellow_sites:
+            return '🟡'
         
-        else: return '🟡'
+        elif site in grey_sites:
+            return '⚪'
+        return '🟢'
 
-    df_pivot['Status'] = df_pivot.apply(give_status, axis=1)
+    df_pivot['Status'] = df_pivot['site'].apply(give_status)
+
     df_pivot = df_pivot[['site', 'Status', 'Network', 'Infrastructure', 'Other']]
 
     url = f'{request.host_url}site'
