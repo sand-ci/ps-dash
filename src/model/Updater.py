@@ -25,6 +25,7 @@ class ParquetUpdater(object):
     
     def __init__(self):
         self.pq = Parquet()
+        self.alarms = Alarms()
         self.location = 'parquet/'
         self.createLocation(self.location)
 
@@ -44,7 +45,7 @@ class ParquetUpdater(object):
 
         try:
             Scheduler(60*60, self.cacheIndexData)
-            Scheduler(60*10, self.storeAlarms)
+            Scheduler(60*30, self.storeAlarms)
             Scheduler(60*30, self.storePathChangeDescDf)
             Scheduler(int(60*60*12), self.storeMetaData)
 
@@ -57,9 +58,10 @@ class ParquetUpdater(object):
 
     # The following function is used to group alarms by site 
     # taking into account the most recent 24 hours only
-    def groupAlarms(self, pivotFrames):
+    def groupAlarms(self):
         dateFrom, dateTo = hp.defaultTimeRange(1)
         metaDf = self.pq.readFile('parquet/raw/metaDf.parquet')
+        frames, pivotFrames = self.alarms.getAllAlarms(dateFrom, dateTo)
 
         nodes = metaDf[~(metaDf['site'].isnull()) & ~(
             metaDf['site'] == '') & ~(metaDf['lat'] == '') & ~(metaDf['lat'].isnull())]
@@ -70,8 +72,7 @@ class ParquetUpdater(object):
                 # column "to" is closest to the time the alarms was generated, 
                 # thus we want to which approx. when the alarms was created,
                 # to be between dateFrom and dateTo
-
-                sdf = df[(df['tag'] == site) & ((df['to'] >= dateFrom) & (df['to'] <= dateTo))]
+                sdf = df[(df['tag'] == site)]
                 if len(sdf) > 0:
                     # sdf['id'].unique() returns the number of unique alarms for the given site
                     # those are the documents generated and stored in ES. They can be found in frames folder
@@ -169,12 +170,12 @@ class ParquetUpdater(object):
     def storeAlarms(self):
         dateFrom, dateTo = hp.defaultTimeRange(60)
         print("Update data. Get all alarms for the past 60 days...", dateFrom, dateTo)
-        oa = Alarms()
-        frames, pivotFrames = oa.getAllAlarms(dateFrom, dateTo)
-        self.groupAlarms(pivotFrames)
+        self.alarms = Alarms()
+        frames, pivotFrames = self.alarms.getAllAlarms(dateFrom, dateTo)
+        self.groupAlarms(oa)
 
         for event,df in pivotFrames.items():
-            filename = oa.eventCF(event)
+            filename = self.alarms.eventCF(event)
             fdf = frames[event]
             if len(fdf)>0:
                 self.pq.writeToFile(df, f"parquet/pivot/{filename}")
