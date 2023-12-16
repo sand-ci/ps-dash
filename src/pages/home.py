@@ -138,8 +138,12 @@ def generate_status_table(alarmCnt):
                     page_size=16,
                     style_cell={
                         'padding': '2px',
-                        'font-size': '15px',
-                        'textAlign': 'center'
+                        'font-size': '1.5em',
+                        'textAlign': 'center',
+                        'whiteSpace': 'normal',
+                        'minWidth': '80px',
+                        'width': '100px',
+                        'maxWidth': '250px'
                     },
                     style_header={
                         'backgroundColor': 'white',
@@ -148,13 +152,12 @@ def generate_status_table(alarmCnt):
                     style_data={
                         'height': 'auto',
                         'overflowX': 'auto',
-                        # 'whiteSpace': 'normal',
+                        'whiteSpace': 'normal',
                     },
                     style_table={'overflowY': 'auto', 'overflowX': 'auto'},
                     style_data_conditional=[],
                     id='status-tbl')
                 ], className='status-table')
-
     else:
         element = html.Div(html.H3('No alarms for this site in the past day'), style={'textAlign': 'center'})
 
@@ -181,42 +184,43 @@ def total_number_of_alarms(sitesDf):
     highest_country = country_totals.sum(axis=1).idxmax()
     highest_country_alarms = country_totals.sum(axis=1).max()
     
-    status = ['⚪', '🔴', '🟡', '🟢']
+    status = ['🔴', '🟡', '🟢', '⚪']
     status_count = sitesDf[['Status', 'site']].groupby('Status').count().to_dict()['site']
     for s in status:
         if s not in status_count:
             status_count[s] = 0
 
+
     html_elements = []
     # add the status count to the html
-    total_status = [dbc.Col(html.H3(f'Status:', className='stat-number h-100'), width=2)]
+    total_status = [dbc.Col(html.H3(f'Status:', className='status-number h-100 status-text'), md=4, xs=12)]
     for s in status:
-        total_status.append(dbc.Col(html.H3(f'{s} {status_count[s]}', className='stat-number h-100'), width=2))
+        total_status.append(dbc.Col(html.H3(f'{s} {status_count[s]}', className='status-number h-100'), md=2, xs=6))
 
     html_elements.append(dbc.Col([
         # dbc.Row(html.H3('Overall status', className='stat-title b flex'), justify="start"),
         dbc.Row(children=total_status, justify="center", align="center", className='h-100')],
-        className='stat-box boxwithshadow', md=1, xs=3))
+        className='status-box boxwithshadow col-md-auto', md=4, xs=12))
 
     # # add the total number of alarms to the html
     # for k,v in sitesDf.sum(numeric_only=True).to_dict().items():
     #     html_elements.append(dbc.Col([
     #         html.H3(f'Total number of {k} alarms', className='stat-title'),
-    #         html.H1(f'{v}', className='stat-number'),
-    #     ], className='stat-box boxwithshadow', md=2, xs=3))
+    #         html.H1(f'{v}', className='status-number'),
+    #     ], className='status-box boxwithshadow', md=2, xs=3))
 
     # add the highest number of alarms based on site name to the html
     country_code = get_country_code(sitesDf[sitesDf['site']==highest_site]['country'].values[0])
     html_elements.append(dbc.Col([
             html.H3(f'Highest number of alarms from site', className='stat-title'),
-            html.H1(f' {highest_site} ({country_code}): {highest_site_alarms}', className='stat-number'),
-        ], className='stat-box boxwithshadow', md=4, xs=12))
+            html.H1(f' {highest_site} ({country_code}): {highest_site_alarms}', className='status-number'),
+        ], className='status-box boxwithshadow', md=4, xs=12))
 
     # add the highest number of alarms based on country to the html
     html_elements.append(dbc.Col([
             html.H3(f'Highest number of alarms from country', className='stat-title'),
-            html.H1(f'{highest_country}: {highest_country_alarms}', className='stat-number'),
-        ], className='stat-box boxwithshadow', md=4, xs=12))
+            html.H1(f'{highest_country}: {highest_country_alarms}', className='status-number'),
+        ], className='status-box boxwithshadow', md=4, xs=12))
 
     return html_elements
 
@@ -228,7 +232,7 @@ def createTable(df, id):
                 markdown_options={"html": True},
                 style_cell={
                     'padding': '3px',
-                    'font-size': '13px',
+                    'font-size': '1.4em',
                     'whiteSpace': 'pre-line'
                     },
                 style_header={
@@ -327,26 +331,28 @@ def layout(**other_unknown_query_strings):
                         dbc.Col(
                             [
                                 html.Div(children=statusTable, id='site-status', className='datatables-cont'),
-                            ],  lg=5, md=12, className='page-cont pl-1'
+                            ], className='page-cont pl-1 sidebysite-cont'
                         ),
                         dbc.Col(dcc.Graph(figure=builMap(sitesDf), id='site-map',
-                                  className='cls-site-map  page-cont'),  lg=7, md=12
+                                  className='cls-site-map mb-1 page-cont sidebysite-cont'), 
                         ),
-                        html.Div(
-                            [
-                                dbc.Button(
-                                    "How was the status determined?",
-                                    id="how-status-collapse-button",
-                                    className="mb-3",
-                                    color="secondary",
-                                    n_clicks=0,
-                                ),
-                                dbc.Collapse(
-                                    id="how-status-collapse",
-                                    className="how-status-collapse",
-                                    is_open=False,
-                                ),
-                            ], className="how-status-div",
+                        dbc.Col(
+                            html.Div(
+                                [
+                                    dbc.Button(
+                                        "How was the status determined?",
+                                        id="how-status-collapse-button",
+                                        className="mb-3",
+                                        color="secondary",
+                                        n_clicks=0,
+                                    ),
+                                    dbc.Collapse(
+                                        id="how-status-collapse",
+                                        className="how-status-collapse",
+                                        is_open=False,
+                                    ),
+                                ], className="how-status-div",
+                            ), lg=12, md=12,
                         ),
                     ], className='boxwithshadow page-cont mb-1 g-0 p-1', justify="center", align="center"),
                 html.Div(id='page-content-noloading'),
@@ -367,14 +373,14 @@ def layout(**other_unknown_query_strings):
 )
 def toggle_collapse(n, is_open):
     catTable, statusExplainedTable = explainStatuses()
-    data = html.Div([
+    data = dbc.Row([
                     dbc.Col(children=[
-                        html.H3('Category & Event types', className='stat-title'),
-                        statusExplainedTable], lg=5, md=12, className='page-cont p-1'),
+                        html.H3('Category & Alarm types', className='stat-title'),
+                        statusExplainedTable], lg=6, md=12, sm=12, className='page-cont pr-1 how-status-table'),
                     dbc.Col(children=[
                         html.H3('Status color rules', className='stat-title'),
-                        catTable], lg=5, md=12, className='page-cont p-1')
-                ])
+                        catTable], lg=6, md=12, sm=12, className='page-cont how-status-table')
+                ], className='pt-1')
 
     if n:
         return not is_open, data

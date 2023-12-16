@@ -43,9 +43,10 @@ def layout(**other_unknown_query_strings):
     return \
     dbc.Nav(
         [
-            dbc.NavItem(dbc.NavLink("bandwidth alarms", href="/ml-alarms/throughput", id='')),
-            html.Div(style={'padding-left': '10px', 'background-color': 'white'}),
-            dbc.NavItem(dbc.NavLink("packet loss alarms", href="/ml-alarms/packet-loss", id='', style={'background-color': '#404f6e', 'pointer-events': 'none'})),
+            dbc.NavItem(dbc.NavLink("bandwidth alarms", href="/ml-alarms/throughput", className='major-alarms mt-2')),
+            html.Div(style={'padding-left': '10px', 'background-color': 'rgb(241, 239, 239)'}),
+            dbc.NavItem(dbc.NavLink("packet loss alarms", href="/ml-alarms/packet-loss", className='major-alarms mt-2',
+                                    style={'background-color': 'white', 'color': 'black', 'pointer-events': 'none'})),
         ], fill=True, justified=True, id='navbar',style={'margin-left': '10px', 'margin-right': '10px'}
     ), \
     dbc.Row([
