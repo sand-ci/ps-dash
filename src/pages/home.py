@@ -140,10 +140,6 @@ def generate_status_table(alarmCnt):
                         'padding': '2px',
                         'font-size': '1.5em',
                         'textAlign': 'center',
-                        'whiteSpace': 'normal',
-                        'minWidth': '80px',
-                        'width': '100px',
-                        'maxWidth': '250px'
                     },
                     style_header={
                         'backgroundColor': 'white',
@@ -152,7 +148,6 @@ def generate_status_table(alarmCnt):
                     style_data={
                         'height': 'auto',
                         'overflowX': 'auto',
-                        'whiteSpace': 'normal',
                     },
                     style_table={'overflowY': 'auto', 'overflowX': 'auto'},
                     style_data_conditional=[],
@@ -193,9 +188,22 @@ def total_number_of_alarms(sitesDf):
 
     html_elements = []
     # add the status count to the html
-    total_status = [dbc.Col(html.H3(f'Status:', className='status-number h-100 status-text'), md=4, xs=12)]
+    total_status = [dbc.Col(html.P('Status summary', className='status-number h-100 status-text'), md=4, xs=12)]
     for s in status:
-        total_status.append(dbc.Col(html.H3(f'{s} {status_count[s]}', className='status-number h-100'), md=2, xs=6))
+        total_status.append(
+            dbc.Col(
+                dbc.Card(
+                    dbc.CardBody(
+                        [
+                            html.H4(f'{s}', className='card-title'),
+                            html.P(f'{status_count[s]}', className='card-text'),
+                        ]
+                    ),
+                    className='mb-3',
+                ),
+                md=2, xs=6
+            )
+        )
 
     html_elements.append(dbc.Col([
         # dbc.Row(html.H3('Overall status', className='stat-title b flex'), justify="start"),
@@ -231,18 +239,19 @@ def createTable(df, id):
             columns=[{"name": i, "id": i, "presentation": "markdown"} for i in df.columns],
                 markdown_options={"html": True},
                 style_cell={
-                    'padding': '3px',
-                    'font-size': '1.4em',
-                    'whiteSpace': 'pre-line'
+                        'padding': '2px',
+                        'font-size': '1.5em',
+                        'textAlign': 'center',
+                        'whiteSpace': 'pre-line',
                     },
-                style_header={
-                    'backgroundColor': 'white',
-                    'fontWeight': 'bold'
-                },
-                style_data={
-                    'height': 'auto',
-                    'overflowX': 'auto'
-                },
+                    style_header={
+                        'backgroundColor': 'white',
+                        'fontWeight': 'bold'
+                    },
+                    style_data={
+                        'height': 'auto',
+                        'overflowX': 'auto',
+                    },
             id=id)
 
 
@@ -262,41 +271,42 @@ def explainStatuses():
 
   red_infrastructure = ['firewall issue', 'source cannot reach any', 'complete packet loss']
 
-  status = [{
-    'type': 'Infrastructure',
-      'status': '🔴',
-      'events': ',\n'.join(red_infrastructure),
-      'trigger': 'any > 0'
+  status = [
+  {
+    'status category': 'Global',
+      'resulted status': '🔴',
+      'considered alarm types': '\n'.join(['bandwidth decreased from multiple']),
+      'trigger': 'any type has > 0 alarms'
   },
   {
-    'type': 'Infrastructure',
-      'status': '🟡',
-      'events': ',\n'.join(list(set(categoryDf[categoryDf['category']=='Infrastructure']['event'].unique()) - set(red_infrastructure))),
-      'trigger': 'any > 0'
+    'status category': 'Global',
+      'resulted status': '🟡',
+      'considered alarm types': '\n'.join(['path changed']),
+      'trigger': 'any type has > 0 alarms'
   },
   {
-    'type': 'Global',
-      'status': '🔴',
-      'events': '\n'.join(['bandwidth decreased from multiple']),
-      'trigger': 'any > 0'
+    'status category': 'Global',
+      'resulted status': '⚪',
+      'considered alarm types': '\n'.join(['Infrastructure']),
+      'trigger': 'Infrastructure status is 🔴'
   },
   {
-    'type': 'Global',
-      'status': '🟡',
-      'events': '\n'.join(['path changed']),
-      'trigger': 'any > 0'
-  },
-  {
-    'type': 'Global',
-      'status': '⚪',
-      'events': '\n'.join(['Infrastructure']),
-      'trigger': 'status == red'
-  },
-  {
-    'type': 'Global',
-      'status': '🟢',
-      'events': '',
+    'status category': 'Global',
+      'resulted status': '🟢',
+      'considered alarm types': '',
       'trigger': 'otherwise'
+  },
+  {
+    'status category': 'Infrastructure',
+      'considered alarm types': ',\n'.join(red_infrastructure),
+      'trigger': 'any type has > 0 alarms',
+      'resulted status': '🔴',
+  },
+  {
+    'status category': 'Infrastructure',
+      'considered alarm types': ',\n'.join(list(set(categoryDf[categoryDf['category']=='Infrastructure']['event'].unique()) - set(red_infrastructure))),
+      'trigger': 'any type has > 0 alarms',
+      'resulted status': '🟡',
   }]
 
   status_explaned = pd.DataFrame(status)

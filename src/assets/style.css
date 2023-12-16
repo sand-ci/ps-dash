@@ -183,6 +183,14 @@ body{
     }
 }
 
+.card {
+    border-radius: 1rem;
+}
+
+.card-text {
+    font-size: 2em;
+}
+
 /**********   Loading   **********/
 
 
@@ -521,6 +529,7 @@ body{
 .status-text {
     display: flex;
     flex-direction: column;
+    color: #373737;
     /* Stack .status-text and .status-number vertically by default */
 }
 
