@@ -172,7 +172,7 @@ class ParquetUpdater(object):
         print("Update data. Get all alarms for the past 60 days...", dateFrom, dateTo)
         self.alarms = Alarms()
         frames, pivotFrames = self.alarms.getAllAlarms(dateFrom, dateTo)
-        self.groupAlarms(oa)
+        self.groupAlarms()
 
         for event,df in pivotFrames.items():
             filename = self.alarms.eventCF(event)
