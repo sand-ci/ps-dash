@@ -62,7 +62,7 @@ def builMap(mapDf):
     )
 
     fig.update_layout(
-        margin={'l': 10, 'b': 0, 'r': 5, 't': 50},
+        margin=dict(t=0, b=0, l=0, r=0),
         mapbox=dict(
             accesstoken='pk.eyJ1IjoicGV0eWF2IiwiYSI6ImNraDNwb3k2MDAxNnIyeW85MTMwYTU1eWoifQ.1QQ1E5mPh3hoZjK5X5LH7Q',
             bearing=0,
@@ -74,10 +74,10 @@ def builMap(mapDf):
             style='mapbox://styles/petyav/ckh3spvk002i419mzf8m9ixzi'
         ),
         showlegend=False,
-        title = 'Status of all sites in the past 24 hours'
+        title = 'Status of all sites in the past 24 hours',
+        template='plotly_white'
     )
 
-    fig.update_layout(template='plotly_white')
     return fig
 
 
@@ -122,6 +122,9 @@ def generate_status_table(alarmCnt):
     url = f'{request.host_url}site'
     df_pivot['url'] = df_pivot['site'].apply(lambda name: 
                                              f"<a class='btn btn-secondary' role='button' href='{url}/{name}' target='_blank'>See latest alarms</a>" if name else '-')
+
+    status_order = ['🔴', '🟡', '🟢', '⚪']
+    df_pivot = df_pivot.sort_values(by='Status', key=lambda x: x.map({status: i for i, status in enumerate(status_order)}))
 
     if len(df_pivot) > 0:
         element = html.Div([
@@ -318,6 +321,10 @@ def layout(**other_unknown_query_strings):
             dbc.Row([
                 dbc.Row([
                         dbc.Col(
+                            html.P(f'Status of all sites in the past 24 hours'),
+                            lg=12, md=12, className='status-title-cont'
+                        ),
+                        dbc.Col(
                             [
                                 html.Div(children=statusTable, id='site-status', className='datatables-cont'),
                             ],  lg=5, md=12, className='page-cont pl-1'
@@ -365,7 +372,7 @@ def toggle_collapse(n, is_open):
                         html.H3('Category & Event types', className='stat-title'),
                         statusExplainedTable], lg=5, md=12, className='page-cont p-1'),
                     dbc.Col(children=[
-                        html.H3('Status color rulles', className='stat-title'),
+                        html.H3('Status color rules', className='stat-title'),
                         catTable], lg=5, md=12, className='page-cont p-1')
                 ])
 
