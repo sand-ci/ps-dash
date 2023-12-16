@@ -2,7 +2,7 @@ import numpy as np
 import dash
 from dash import Dash, dash_table, dcc, html
 import dash_bootstrap_components as dbc
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 
 import plotly.graph_objects as go
 import plotly.express as px
@@ -128,6 +128,7 @@ def generate_status_table(alarmCnt):
                     dash_table.DataTable(
                     df_pivot.to_dict('records'),[{"name": i.upper(), "id": i, "presentation": "markdown"} for i in df_pivot.columns],
                     filter_action="native",
+                    filter_options={"case": "insensitive"},
                     sort_action="native",
                     is_focused=True,
                     markdown_options={"html": True},
@@ -206,15 +207,95 @@ def total_number_of_alarms(sitesDf):
     html_elements.append(dbc.Col([
             html.H3(f'Highest number of alarms from site', className='stat-title'),
             html.H1(f' {highest_site} ({country_code}): {highest_site_alarms}', className='stat-number'),
-        ], className='stat-box boxwithshadow', md=2, xs=6))
+        ], className='stat-box boxwithshadow', md=4, xs=12))
 
     # add the highest number of alarms based on country to the html
     html_elements.append(dbc.Col([
             html.H3(f'Highest number of alarms from country', className='stat-title'),
             html.H1(f'{highest_country}: {highest_country_alarms}', className='stat-number'),
-        ], className='stat-box boxwithshadow', md=3, xs=6))    
+        ], className='stat-box boxwithshadow', md=4, xs=12))
 
     return html_elements
+
+
+def createTable(df, id):
+    return dash_table.DataTable(
+            df.to_dict('records'),
+            columns=[{"name": i, "id": i, "presentation": "markdown"} for i in df.columns],
+                markdown_options={"html": True},
+                style_cell={
+                    'padding': '3px',
+                    'font-size': '13px',
+                    'whiteSpace': 'pre-line'
+                    },
+                style_header={
+                    'backgroundColor': 'white',
+                    'fontWeight': 'bold'
+                },
+                style_data={
+                    'height': 'auto',
+                    'overflowX': 'auto'
+                },
+            id=id)
+
+
+def explainStatuses():
+
+  # Infrastructure:
+  # if 'firewall issue' or 'source cannot reach any' -> red
+  # otherwise yellow
+
+  # this way we can then have network like this:
+  # if 'bandwidth decreased from multiple' -> red
+  # elif 'path changed' -> yellow
+  # elif Infrastructure = 'red' -> grey
+  # else -> green
+
+  categoryDf = qrs.getSubcategories()
+
+  red_infrastructure = ['firewall issue', 'source cannot reach any', 'complete packet loss']
+
+  status = [{
+    'type': 'Infrastructure',
+      'status': '🔴',
+      'events': ',\n'.join(red_infrastructure),
+      'trigger': 'any > 0'
+  },
+  {
+    'type': 'Infrastructure',
+      'status': '🟡',
+      'events': ',\n'.join(list(set(categoryDf[categoryDf['category']=='Infrastructure']['event'].unique()) - set(red_infrastructure))),
+      'trigger': 'any > 0'
+  },
+  {
+    'type': 'Global',
+      'status': '🔴',
+      'events': '\n'.join(['bandwidth decreased from multiple']),
+      'trigger': 'any > 0'
+  },
+  {
+    'type': 'Global',
+      'status': '🟡',
+      'events': '\n'.join(['path changed']),
+      'trigger': 'any > 0'
+  },
+  {
+    'type': 'Global',
+      'status': '⚪',
+      'events': '\n'.join(['Infrastructure']),
+      'trigger': 'status == red'
+  },
+  {
+    'type': 'Global',
+      'status': '🟢',
+      'events': '',
+      'trigger': 'otherwise'
+  }]
+
+  status_explaned = pd.DataFrame(status)
+  categoryDf = categoryDf.pivot_table(values='event', columns='category', aggfunc=lambda x: '\n'.join(x))
+
+  return createTable(status_explaned, 'status_explaned'), createTable(categoryDf, 'categoryDf')
 
 
 dash.register_page(__name__, path='/')
@@ -239,10 +320,26 @@ def layout(**other_unknown_query_strings):
                         dbc.Col(
                             [
                                 html.Div(children=statusTable, id='site-status', className='datatables-cont'),
-                            ],  md=5, xs=12, className='page-cont pl-1'
+                            ],  lg=5, md=12, className='page-cont pl-1'
                         ),
                         dbc.Col(dcc.Graph(figure=builMap(sitesDf), id='site-map',
-                                  className='cls-site-map  page-cont'),  md=7, xs=12
+                                  className='cls-site-map  page-cont'),  lg=7, md=12
+                        ),
+                        html.Div(
+                            [
+                                dbc.Button(
+                                    "How was the status determined?",
+                                    id="how-status-collapse-button",
+                                    className="mb-3",
+                                    color="secondary",
+                                    n_clicks=0,
+                                ),
+                                dbc.Collapse(
+                                    id="how-status-collapse",
+                                    className="how-status-collapse",
+                                    is_open=False,
+                                ),
+                            ], className="how-status-div",
                         ),
                     ], className='boxwithshadow page-cont mb-1 g-0 p-1', justify="center", align="center"),
                 html.Div(id='page-content-noloading'),
@@ -252,6 +349,29 @@ def layout(**other_unknown_query_strings):
             ], className='main-cont')
 
 
+
+@dash.callback(
+    [
+    Output("how-status-collapse", "is_open"),
+    Output("how-status-collapse", "children"),
+    ],
+    [Input("how-status-collapse-button", "n_clicks")],
+    [State("how-status-collapse", "is_open")],
+)
+def toggle_collapse(n, is_open):
+    catTable, statusExplainedTable = explainStatuses()
+    data = html.Div([
+                    dbc.Col(children=[
+                        html.H3('Category & Event types', className='stat-title'),
+                        statusExplainedTable], lg=5, md=12, className='page-cont p-1'),
+                    dbc.Col(children=[
+                        html.H3('Status color rulles', className='stat-title'),
+                        catTable], lg=5, md=12, className='page-cont p-1')
+                ])
+
+    if n:
+        return not is_open, data
+    return is_open, data
 
 # # # '''Takes selected site from the Geo map and displays the relevant information'''
 # @dash.callback(
