@@ -217,6 +217,7 @@ def generate_tables(frame, unpacked, event, alarmsInst):
                         'overflowX': 'auto'
                     },
                     filter_action="native",
+                    filter_options={"case": "insensitive"},
                     sort_action="native",
                 ),
             ], className='single-table')

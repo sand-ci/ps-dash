@@ -360,5 +360,6 @@ def buildDataTable(df):
                 'lineHeight': '15px',
             },
             filter_action="native",
+            filter_options={"case": "insensitive"},
             sort_action="native",
         ))

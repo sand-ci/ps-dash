@@ -11,6 +11,7 @@ import model.queries as qrs
 from model.Alarms import Alarms
 from utils.parquet import Parquet
 
+from utils.helpers import timer
 
 
 def title():
@@ -232,6 +233,7 @@ def generate_tables(frame, pivotFrames, event, alarmsInst):
                 'overflowX': 'auto'
             },
             filter_action="native",
+            filter_options={"case": "insensitive"},
             sort_action="native",
         ),
     ], className='single-table')
