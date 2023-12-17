@@ -43,58 +43,84 @@ dash.register_page(
 @timer
 # '''Takes selected site from the Geo map and generates a Dash datatable'''
 def generate_tables(site, dateFrom, dateTo, frames, pivotFrames, alarms4Site, alarmsInst):
+    
+    catdf = qrs.getSubcategories()
+    catdf = catdf.groupby('category')['event'].apply(list)
 
+    # reorder the categories
+    catdf = pd.concat([catdf.loc[['Network']], catdf.loc[['Infrastructure']], catdf.loc[~catdf.index.isin(['Network', 'Infrastructure'])]]).reset_index()
+    
     if site:
         out = []
 
         if alarms4Site['cnt'].sum() > 0:
-            for event in sorted(alarms4Site['event'].unique()):
-                eventDf = pivotFrames[event]
-                # find all cases where selected site was pinned in tag field
-                ids = eventDf[(eventDf['tag'] == site) & ((eventDf['to'] >= dateFrom) & (eventDf['to'] <= dateTo))]['id'].values
+            for cat, events in catdf.values:
+                category_list = []
 
-                tagsDf = frames[event]
-                dfr = tagsDf[tagsDf.index.isin(ids)]
+                for event in sorted(events):
+
+                    if event in pivotFrames.keys():
+                        eventDf = pivotFrames[event]
+                        # find all cases where selected site was pinned in tag field
+                        ids = eventDf[(eventDf['tag'] == site) & ((eventDf['to'] >= dateFrom) & (eventDf['to'] <= dateTo))]['id'].values
+
+                        tagsDf = frames[event]
+                        dfr = tagsDf[tagsDf.index.isin(ids)]
+                        
+                        if len(dfr)>0:
+                            dfr = alarmsInst.formatDfValues(dfr, event).sort_values('to', ascending=False)
+                            
+                            if event == 'path changed between sites':
+                                dfr.loc[:, 'alarm_link'] = f"<a class='btn btn-secondary' role='button' href='{request.host_url}paths-site/{site}?dateFrom={dateFrom}&dateTo={dateTo}' target='_blank'>VIEW IN A NEW TAB<</a>" if site else '-'
+
+                            if len(ids):
+                                element = html.Div([
+                                    html.H2(event.upper()),
+                                    dash_table.DataTable(
+                                        data=dfr.to_dict('records'),
+                                        columns=[{"name": i, "id": i, "presentation": "markdown"} for i in dfr.columns],
+                                        markdown_options={"html": True},
+                                        id='tbl',
+                                        page_size=20,
+                                        style_cell={
+                                            'padding': '2px',
+                                            'font-size': '14px',
+                                            'whiteSpace': 'pre-line'
+                                        },
+                                        style_header={
+                                            'backgroundColor': 'white',
+                                            'fontWeight': 'bold'
+                                        },
+                                        style_data={
+                                            'height': 'auto',
+                                            'lineHeight': '15px',
+                                            'overflowX': 'auto'
+                                        },
+                                        style_table={'overflowY': 'auto', 'overflowX': 'auto'},
+                                        filter_action="native",
+                                        sort_action="native",
+                                    ),
+                                ], className='single-table mb-1')
+
+                                category_list.append(element)
+                    
                 
-                if len(dfr)>0:
-                
-                  dfr = alarmsInst.formatDfValues(dfr, event).sort_values('to', ascending=False)
-                  
-                  if event == 'path changed between sites':
-                    dfr.loc[:, 'alarm_link'] = f"<a class='btn btn-secondary' role='button' href='{request.host_url}paths-site/{site}?dateFrom={dateFrom}&dateTo={dateTo}' target='_blank'>VIEW IN A NEW TAB<</a>" if site else '-'
+                if len(category_list) == 0:
+                    category_list.append(html.H2(f'No alarms in that category'))
 
-                  if len(ids):
-                      element = html.Div([
-                          html.H2(event.upper()),
-                          dash_table.DataTable(
-                              data=dfr.to_dict('records'),
-                              columns=[{"name": i, "id": i, "presentation": "markdown"} for i in dfr.columns],
-                              markdown_options={"html": True},
-                              id='tbl',
-                              page_size=20,
-                              style_cell={
-                                  'padding': '2px',
-                                  'font-size': '14px',
-                                  'whiteSpace': 'pre-line'
-                              },
-                              style_header={
-                                  'backgroundColor': 'white',
-                                  'fontWeight': 'bold'
-                              },
-                              style_data={
-                                  'height': 'auto',
-                                  'lineHeight': '15px',
-                                  'overflowX': 'auto'
-                              },
-                              style_table={'overflowY': 'auto', 'overflowX': 'auto'},
-                              filter_action="native",
-                              sort_action="native",
-                          ),
-                      ], className='single-table mb-1')
-
-                      out.append(element)
+                out.append(
+                    dbc.Row(
+                        dbc.Card([
+                            dbc.CardHeader(html.H4(f'{cat.upper()} ALARMS', className="card-title")),
+                            dbc.CardBody([
+                                html.Div(category_list)
+                            ], className="text-dark p-1"),
+                        ], className="mb-4 site-alarms-tables"
+                    ), className="boxwithshadow mb-1 g-0 align-items-start"))
+                    
+                    
         else:
-            out = html.Div(html.H3('No alarms for this site in the past day'), style={'textAlign': 'center'})
+            out = dbc.Row(html.H3('No alarms for this site in the past day'), style={'textAlign': 'center'})
 
     return out
 
@@ -229,16 +255,24 @@ def SitesOverviewPlots(site_name, pq):
 
 
     fig.update_layout(
+            margin=dict(t=20, b=20, l=0, r=0),
             showlegend=True,
-            title_text=f'{site_name} network measurements',
+            legend_orientation='h',
+            legend_title_text=f'IP addresses for site {site_name}',
             legend=dict(
                 traceorder="normal",
                 font=dict(
                     family="sans-serif",
-                    size=12,
+                    size=14,
                 ),
+                x=0.5,
+                y=1.2,
+                xanchor='center',
+                yanchor='top'
             ),
             height=900,
+            autosize=True,
+            width=None
         )
 
 
@@ -275,24 +309,24 @@ def layout(q=None, **other_unknown_query_strings):
                     dbc.Col(id='selected-site', className='cls-selected-site', children=html.H1(f'Site {q}'), align="start"),
                     dbc.Col(html.H2(f'Alarms reported in the past 24 hours (Current time: {dateTo} UTC)'), className='cls-selected-site')
                 ], align="start", className='boxwithshadow mb-1 g-0'),
-                dbc.Row([
-                         dbc.Col(
-                             dcc.Loading(
-                                html.Div(id='datatables',
-                                         children=generate_tables(q, dateFrom, dateTo, frames, pivotFrames, alarmCnt, alarmsInst),
-                                         className='datatables-cont p-2'),
-                             color='#00245A'),
-                        width=12)
-                    ],   className='site boxwithshadow page-cont mb-1 g-0', justify="center", align="center"),
-                dbc.Row([
-                         dbc.Col(
-                             dcc.Loading(
-                                 dcc.Graph(id="site-plots-in-out", 
-                                           figure=SitesOverviewPlots(q, pq),
-                                           className="site-plots site-inner-cont p-05"),
-                             color='#00245A'),
-                        width=12)
-                    ],   className='site boxwithshadow page-cont mb-1 g-0', justify="center", align="center"),
+
+                html.Div(id='datatables',
+                            children=generate_tables(q, dateFrom, dateTo, frames, pivotFrames, alarmCnt, alarmsInst),
+                            ),
+                dbc.Row(
+                    dbc.Card([
+                        dbc.CardHeader(html.H3(f'{q.upper()} network measurements',
+                                                className="card-title text-center")),
+                        dbc.CardBody([
+                            html.Div(
+                                dcc.Graph(id="site-plots-in-out", 
+                                figure=SitesOverviewPlots(q, pq),
+                                className="site-plots site-inner-cont p-05")
+                            )
+                        ], className="text-dark p-1")
+                    ]),
+                    className="mb-4 site-alarms-tables boxwithshadow page-cont mb-1 g-0"
+                ),
                 html.Br(),
                 
             ], className='g-0', align="start", style={"padding": "0.5% 1.5%"}), className='main-cont')

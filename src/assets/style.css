@@ -197,6 +197,12 @@ body{
     font-size: 2em;
 }
 
+.site-alarms-tables .card-title {
+    font-size: 2.4rem;
+    padding: 2rem;
+    text-align: center;
+}
+
 /**********   Loading   **********/
 
 
