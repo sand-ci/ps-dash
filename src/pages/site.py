@@ -120,7 +120,9 @@ def generate_tables(site, dateFrom, dateTo, frames, pivotFrames, alarms4Site, al
                     
                     
         else:
-            out = dbc.Row(html.H3('No alarms for this site in the past day'), style={'textAlign': 'center'})
+            out = dbc.Row(
+                    html.H3('No alarms for this site in the past day', className="mb-4 site-alarms-tables")
+                )
 
     return out
 
@@ -150,11 +152,11 @@ def SitesOverviewPlots(site_name, pq):
             '#1f77b4', '#ff7f0e', '#2ca02c','#00224e', '#123570', '#3b496c', '#575d6d', '#707173', '#8a8678', '#a59c74',
             '#c3b369', '#e1cc55', '#fee838', '#3e6595', '#4adfe1', '#b14ae1',]
 
-
+    
     fig = go.Figure()
-    fig = make_subplots(rows=3, cols=2, subplot_titles=("Throughput as source", "Throughput as destination",
-                                                        "Packet loss as source", "Packet loss as destination",
-                                                        "One-way delay as source", "One-way delay as destination"))
+    fig = make_subplots(rows=3, cols=2, subplot_titles=("Аs source: Throughput", "As destination: Throughput",
+                                                        "Аs source: Packet loss", "As destination: Packet loss",
+                                                        "Аs source: One-way delay", "As destination: One-way delay"))
 
     direction = {1: 'src', 2: 'dest'}
 
@@ -265,14 +267,14 @@ def SitesOverviewPlots(site_name, pq):
                     family="sans-serif",
                     size=14,
                 ),
-                x=0.5,
+                x=0,
                 y=1.2,
-                xanchor='center',
+                xanchor='left',
                 yanchor='top'
             ),
             height=900,
             autosize=True,
-            width=None
+            width=None,
         )
 
 
@@ -321,6 +323,7 @@ def layout(q=None, **other_unknown_query_strings):
                             html.Div(
                                 dcc.Graph(id="site-plots-in-out", 
                                 figure=SitesOverviewPlots(q, pq),
+                                config={'displayModeBar': False},# remove Plotly buttons so that they don't ovelap with the legend
                                 className="site-plots site-inner-cont p-05")
                             )
                         ], className="text-dark p-1")
