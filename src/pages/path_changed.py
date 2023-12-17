@@ -88,7 +88,7 @@ def layout(q=None, **other_unknown_query_strings):
                 dbc.Col([
                   html.H3(f"ASN {alarm['asn']}", className="text-center bold"),
                   html.H3(alarm['owner'], className="text-center")
-                ], width=2),
+                ], lg=2, md=12, className="p-4"),
                 dbc.Col(
                     html.Div(
                         [
@@ -105,17 +105,18 @@ def layout(q=None, **other_unknown_query_strings):
                               ], justify="start")
                             ], className="pair-details")
                         ],
-                    ), width=10
+                    ), lg=10, md=12
                   ),
               ], justify="between", align="center", className="boxwithshadow alarm-header pair-details")
-            ], style={"padding": "0.5% 1.5%"}, className='g-0'),
+            ], style={"padding": "0.5% 1.5%"}, className='g-0 mb-1'),
+            dcc.Store(id='window-width', storage_type='session'),
             dbc.Row([
               dbc.Row([
-                  dcc.Tabs(id="tabs-example-graph", value=selectedTab, parent_className='custom-tabs', className='custom-tabs-container col-2',
+                  dcc.Tabs(id="asn-site-tabs", value=selectedTab, parent_className='custom-tabs', className='custom-tabs-container h-100',
                       children=[
                         dcc.Tab(label=site.upper(), value=site, 
                         id=site,
-                        className='custom-tab text-center ', selected_className='custom-tab--selected rounded-border-1 mr-2 m-1',
+                        className='custom-tab text-center ', selected_className='custom-tab--selected rounded-border-1 p-1',
                         children=buildSiteBox(site,
                                               pairCount[pairCount['site']==site]['pair'].values[0], 
                                               chdf[(chdf['src_site']==site) | (chdf['dest_site']==site)],
@@ -124,15 +125,19 @@ def layout(q=None, **other_unknown_query_strings):
                                               altPaths[(altPaths['src_site']==site) | (altPaths['dest_site']==site)],
                                               alarm)
                                               ) for site in topDownList
-                        ], vertical=True)
+                        ], vertical=False, 
+                        style={
+                          # "width": "99%",
+                          # "display": "inline-block"
+                          }
+                        )
               ], className="boxwithshadow")
             ], style={"padding": "0.5% 1.5%"}, className='g-0'),
           ])
 
 
-
 def extractRelatedOnly(chdf, asn):
-  chdf['spair'] = chdf[['src_site', 'dest_site']].apply(lambda x: '->'.join(x), axis=1)
+  chdf.loc[:, 'spair'] = chdf[['src_site', 'dest_site']].apply(lambda x: ' -> '.join(x), axis=1)
 
   diffData = []
   for el in chdf[['pair','spair','diff']].to_dict('records'):
@@ -153,8 +158,8 @@ def buildSiteBox(site, cnt, chdf, posDf, baseline, altPaths, alarm):
       related2FlaggedASN = extractRelatedOnly(chdf, alarm['asn'])
       cntRelated = len(related2FlaggedASN)
       if len(related2FlaggedASN)>10:
-        showSample = "Bellow is a subset of 10."
-        related2FlaggedASN = related2FlaggedASN.sample(10)
+        showSample = "Bellow is a subset of 2."
+        related2FlaggedASN = related2FlaggedASN.sample(2)
       sitePairs = related2FlaggedASN['spair'].values
       nodePairs = related2FlaggedASN['pair'].values
       
@@ -172,41 +177,27 @@ def buildSiteBox(site, cnt, chdf, posDf, baseline, altPaths, alarm):
                 dbc.Row([
                   dbc.Col([
                     dbc.Row([
-                      dbc.Col([
-                        dbc.Row([
-                          dbc.Col(
-                            html.P(f"{cnt} is the total number of traceroute alarms which involve site {site}"),
-                          align='left', width=10, className='site-details'),
-                        ]),
-                        dbc.Row([
-                          dbc.Col(
-                            html.P(f"{cntRelated} (out of {cnt}) concern a path change to ASN {alarm['asn']}. {showSample}"
-                          ), align='left', width=10, className='site-details'),
-                        ]),
-                        dbc.Row([
-                          dbc.Col(
-                            html.P(f"Other flagged AS numbers:  {diffs_str}"
-                          ), align='left', width=10, className='site-details')
-                        ])
-                      ], width=10),
-                      dbc.Col(
-                        html.Div(
-                              html.A('View site in a new page', href=url, target='_blank',
-                                   className='btn btn-secondary site-btn', id={
-                                       'type': 'site-new-page-btn',
-                                       'index': site
-                                   }
-                              ),
-                        ), align='center'
-                      )
-                      ], className='m-2 mb-1 site-header-line rounded-border-1 p-2', justify="center", align="stretch"),
-                      
-                    dbc.Row([
-                      dbc.Row([
-                          html.P(f'Site {site} takes part in the following alarms in the period 24h prior and up to 24h after the current alarm end ({alarm["to"]})', className='subtitle'),
-                          html.B(otherAlarms, className='subtitle')
-                        ], justify="between", align="center"),
-                      ], className='m-2 mb-1 site-header-line rounded-border-1 p-2'),
+                       dbc.Col([
+                            dbc.Card([
+                                dbc.CardBody([
+                                    html.P(f"{cnt} is the total number of traceroute alarms which involve site {site}", className='card-text'),
+                                    html.P(f"{cntRelated} (out of {cnt}) concern a path change to ASN {alarm['asn']}. {showSample}", className='card-text'),
+                                    html.P(f"Other flagged AS numbers:  {diffs_str}", className='card-text')
+                                ])
+                            ], className='mb-3 h-100'),
+                       ], lg=6, md=12),
+                        dbc.Col([
+                            dbc.Card([
+                                dbc.CardBody([
+                                    html.P(f'Site {site} takes part in the following alarms in the period 24h prior and up to 24h after the current alarm end ({alarm["to"]})', className='card-text'),
+                                    html.B(otherAlarms, className='card-text')
+                                ])
+                            ], className='mb-3 h-100')
+                        ], lg=6, md=12)
+                      ], 
+                      className='site-header-line p-2 d-flex',
+                      justify="center", align="stretch"),
+
                     dbc.Row(
                     [
                       html.Div(id=f'pair-section{site+str(i)}',
@@ -233,6 +224,17 @@ def buildSiteBox(site, cnt, chdf, posDf, baseline, altPaths, alarm):
                         ]
                       ) for i, pair in enumerate(nodePairs)
                     ],),
+                    dbc.Row(
+                        html.Div(
+                              html.A('Show all "Path changed" alarms for that site in a new page', href=url, target='_blank',
+                                   className='btn btn-secondary site-btn mb-2',
+                                   id={
+                                       'type': 'site-new-page-btn',
+                                       'index': site
+                                   }
+                              ),
+                        ), align='center'
+                      )
                   ]),
                 ]),
               ])
@@ -314,11 +316,7 @@ def pairDetails(pair, alarm, chdf, baseline, altpaths, hopPositions):
 
                 dbc.Row([
                   html.H4(f"Total number of traceroute measures: {baseline['cnt_total_measures'].values[0]}", className="text-center"),
-                # align="left", justify="start", className="text-right mt-10"
-                # ),
-                # dbc.Row([
                   html.H4(f"Other networking alarms: {otherAlarms}", className="text-center"),
-                  # html.P(otherAlarms, className="text-left")
                 ], align="left", justify="start", className="more-alarms change-section rounded-border-1 mb-1 pb-4"
                 ),
 
@@ -332,10 +330,10 @@ def pairDetails(pair, alarm, chdf, baseline, altpaths, hopPositions):
                     dbc.Row([
                       dbc.Col([
                         dbc.Badge(f"Taken in {str(round(baseline['hash_freq'].values.tolist()[0]*100))}% of time", text_color="dark", color="#e9e9e9",  className="w-100")
-                        ], width=6),
+                        ], lg=6, md=12),
                       dbc.Col([
                         dbc.Badge(f"Always reaches destination: {['YES' if baseline['path_always_reaches_dest'].values[0] else 'NO'][0]}", text_color="dark", color="#e9e9e9",  className="w-100")
-                        ], width=6),
+                        ], lg=6, md=12),
                     ], justify="center", align="center", className="bg-gray rounded-border-1"),
                     dbc.Row([
                         html.Div(children=[
@@ -361,8 +359,8 @@ def pairDetails(pair, alarm, chdf, baseline, altpaths, hopPositions):
                         ], className="text-center mb-1") for path, hash_freq, path_always_reaches_dest in altpaths[["asns_updated","hash_freq","path_always_reaches_dest"]].values.tolist()
                     ])
                     ], justify="center", align="center")
-                ], className="bordered-box mt-1")
-              ], className="mlr-1"),
+                ], className="bordered-box p-1")
+              ], className="pl-1 pr-1"),
 
               dbc.Col([
                 dbc.Row([

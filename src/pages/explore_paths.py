@@ -41,7 +41,7 @@ def layout(**other_unknown_query_strings):
                 dcc.Loading(
                     html.Div(id="paths-alarms-sunburst"),
                     style={'height': '0.5rem'}, color='#00245A'),
-                align="start", width='8', className="mr-2"),
+                align="start", lg=7, md=12, className="pl-1 pr-1"),
             dbc.Col([
                 dbc.Row([
                     dbc.Col([
@@ -51,7 +51,7 @@ def layout(**other_unknown_query_strings):
                             f'Alarms generated in the period: {period[0]} - {period[1]} ',
                             style={"padding-left": "1.5%","font-size": "14px"}),
                         html.P('Rounded to the day', style={"padding-left": "1.5%"})
-                    ], width=10, align="center", className="text-left pair-details rounded-border-1"),
+                    ], align="center", className="text-left pair-details rounded-border-1"),
                     
                 ], justify="start", align="center"),
                 html.Br(),
@@ -61,17 +61,17 @@ def layout(**other_unknown_query_strings):
                     dbc.Col([
                         dcc.Dropdown(multi=True, id='paths-sites-dropdown',
                                      placeholder="Search for a site"),
-                    ], width=10),
+                    ]),
                 ]),
                 html.Br(),
                 dbc.Row([
                     dbc.Col([
                         dcc.Dropdown(multi=True, id='paths-asn-dropdown',
                                      placeholder="Search ASNs"),
-                    ], width=10),
+                    ]),
                 ]),
                 
-            ]),
+            ], lg=5, md=12, className="pl-1 pr-1 p-1"),
         ], className="p-1 site boxwithshadow page-cont mb-1 g-0", justify="center", align="center"),
         html.Br(),
         html.Br(),
@@ -232,6 +232,10 @@ def generate_tables(frame, pivotFrames, event, alarmsInst):
                 'lineHeight': '15px',
                 'overflowX': 'auto'
             },
+            style_table={
+                    'overflowY': 'auto',
+                    'overflowX': 'auto'
+            },
             filter_action="native",
             filter_options={"case": "insensitive"},
             sort_action="native",
@@ -358,7 +362,7 @@ def buildSankey(sitesState, asnState, df):
             'zeroline': False,  # thick line at x=0
             'visible': False,  # numbers below
         },
-
+        margin=dict(t=2, b=2, l=0, r=0),
         plot_bgcolor='rgba(0,0,0,0)', font_size=10)
 
     # fig.show()

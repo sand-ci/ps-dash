@@ -175,59 +175,60 @@ def layout(q=None, **other_unknown_query_strings):
                       chdf.to_dict(), posDf.to_dict(), baseline.to_dict(), altPaths.to_dict(),
                 ]),
             dcc.Store(id='site-local-store-pairs', data=[site, allPairs.to_dict()]),
+
             dbc.Row([
               dbc.Row([
                 dbc.Col([
                   html.H3('SITE', className="text-center bold"),
-                  html.H3(site.upper(), className="text-center bold"),
-                ], width=3),
+                  html.H3(site.upper(),className="text-center")
+                ], lg=2, md=12, className="p-4"),
                 dbc.Col(
                     html.Div(
                         [
                           dbc.Row([
                             dbc.Row([
                               html.H1(f"Summary", className="text-left"),
-                              html.Hr(className="my-2")
-                            ]),
+                              html.Hr(className="my-2")]),
                             dbc.Row(
-                                html.P(f"{cnt} traceroute alarms involve site {site} in the period between {dateFrom} and {dateTo}"), align='left', className='site-details'
+                              html.P(f"{cnt} traceroute alarms involve site {site} in the period between {dateFrom} and {dateTo}"),
+                              align='left', className='site-details'
                               ),
                             dbc.Row(
-                                html.P(f"Flagged AS numbers:  {diffs_str}"
-                                ), className='site-details'
-                            )], className="pair-details")
+                              html.P(f"Flagged AS numbers:  {diffs_str}", className='subtitle'),
+                              align='left', className='mb-1'
+                            ),
+                            dbc.Row([
+                                html.P(f'Site {site} takes part in the following alarms in the period 24h prior and up to 24h after the current alarm end ({dateTo})', className='subtitle'),
+                                html.B(otherAlarms, className='subtitle')
+                            ], align='left')
+                            ], className="pair-details"),
+                            
                         ],
-                    ), width=9
+                    ), lg=10, md=12
                   ),
               ], justify="between", align="center", className="boxwithshadow alarm-header pair-details")
-            ], style={"padding": "0.5% 1.5%"}, className='g-0'),
+            ], style={"padding": "0.5% 1.5%"}, className='g-0 mb-1'),
+
             dbc.Row([
-              dbc.Row([
-                    html.P(f'Site {site} takes part in the following alarms in the period 24h prior and up to 24h after the current alarm end ({dateTo})', className='subtitle'),
-                    html.B(otherAlarms, className='subtitle')
-                ], className="boxwithshadow alarm-header pair-details", justify="between", align="center"),
-              ], style={"padding": "0.5% 1.5%"}, className='g-0'),
-            dbc.Row([
-                
               dbc.Row([
                 dbc.Row([
-                  dbc.Col([
-                    dbc.Row([
-                      dbc.Col([
-                        html.Button('Get next 10 pairs', id='next-10-btn',
-                                    n_clicks=0, className="load-pairs-button",),
-                        ],
-                      ),
-                      dbc.Col([
-                          html.Button('Get all', id='all-btn',
-                                      n_clicks=0, className="load-pairs-button",),
-                      ], width="auto")
-                      ], justify='end', align='end'),
-                  ], width={"size": "auto"}),
 
-                  dbc.Col(html.P('Below is a list of site pairs which reported a changed path for the specified period', className='subtitle'),
-                            width={"size": "auto"}, align="center"),
-                ], justify="start", align='end', className="p-4"),
+                  dbc.Col([
+                    html.Button('Get next 10 pairs', id='next-10-btn',
+                                n_clicks=0, className="load-pairs-button w-100 p-1",),
+                    ]
+                  ),
+                  dbc.Col([
+                      html.Button('Get all', id='all-btn',
+                                  n_clicks=0, className="load-pairs-button w-100 p-1",),
+                  ]),
+
+                  dbc.Col(
+                     html.P('Below is a list of site pairs which reported a changed path for the specified period', className='subtitle'),
+                     md=12
+                  ),
+
+                ], className="p-1 d-flex"),
           
                 html.Div(id="site-pairs-div"),
 
@@ -395,10 +396,10 @@ def pairDetails(pair, period, chdf, baseline, altpaths, hopPositions, pivotFrame
                     dbc.Row([
                       dbc.Col([
                         dbc.Badge(f"Taken in {str(round(baseline['hash_freq'].values.tolist()[0]*100))}% of time", text_color="dark", color="#e9e9e9",  className="w-100")
-                        ], width=6),
+                        ], lg=6, md=12),
                       dbc.Col([
                         dbc.Badge(f"Always reaches destination: {['YES' if baseline['path_always_reaches_dest'].values[0] else 'NO'][0]}", text_color="dark", color="#e9e9e9",  className="w-100")
-                        ], width=6),
+                        ], lg=6, md=12),
                     ], justify="center", align="center", className="bg-gray rounded-border-1"),
                     dbc.Row([
                         html.Div(children=[

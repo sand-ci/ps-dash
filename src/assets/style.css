@@ -10,7 +10,7 @@ body{
 
 .subtitle {
     font-size: 1.8em !important;
-    margin-bottom: 0em;
+    margin-bottom: 1rem;
 }
 
 .status-table .cell-markdown>p {
@@ -80,6 +80,12 @@ body{
   background-color: #fff;
   border-color: #dfdfdf;
   width: 100%;
+}
+
+.external-button:hover {
+    color: #fff;
+    background-color: #00245a;
+    border-color: #00245a;
 }
 
 /**********   Sites   **********/
@@ -200,12 +206,6 @@ body{
     color: rgb(9, 9, 9);
 }
 
-.alarm-header col-2 {
-   width: 13% !important;
-}
-
-
-
 .site-title {
     font-size: 3rem !important;
 }
@@ -232,8 +232,15 @@ body{
 
 .pair-details {
     background-color: #F8FAFD !important;
-    padding: 1% 1%;
+    /* padding: 1% 1%; */
     color: black;
+}
+
+@media screen and (min-width: 800px) {
+    .tab-container.jsx-4017309047 {
+        margin-top: -2rem;
+        border-radius: 3rem !important;
+    }
 }
 
 .l-h-3 {
@@ -313,12 +320,24 @@ body{
     padding-left: 2% !important;
 }
 
+.pl-1 {
+    padding-left: 1% !important;
+}
+
+.pr-1 {
+    padding-right: 1% !important;
+}
+
 .p-1 {
     padding: 1% !important;
 }
 
 .p-2 {
     padding: 2% !important;
+}
+
+.p-4 {
+    padding: 4% !important;
 }
 
 .pb-4 {
@@ -392,24 +411,43 @@ body{
     margin: 0 1%;
 }
 
-.custom-tabs {
-    margin-top: 10px;
+.custom-tabs-container {
+    /* width: 85%; */
+    display: flex;
+    flex-wrap: wrap;
 }
+
+.custom-tabs {
+    /* border-top-left-radius: 3px; */
+    background-color: #ffffff;
+    /* padding: 0px 24px; */
+    border-bottom: 1px solid #d6d6d6;
+    display: flex !important;
+    /* flex-direction: row !important; */
+    align-items: stretch !important;
+    flex-grow: 1 !important;
+}
+
 
 
 .custom-tab {
-    background-color: white !important;
-    border: 0px !important;
-    font-size: 2rem !important;
-    text-align: right;
+    flex-grow: 1 !important;
+    flex-basis: 0 !important;
+    min-width: 200px !important;
+}
+
+.custom-tab {
+    background-color: #7f7f7f !important;
+    /* border: 0px !important; */
+    font-size: 1.5rem !important;
+    color: white;
 }
 
 .custom-tab--selected {
-    /* background-image: linear-gradient(to right, #fff , #ebebeb); */
-    background-color: #edf6fc !important;
     color: black !important;
-    font-size: 2rem !important;
-}
+    border-top: 3px solid #ffffff !important;
+    background-color: #ffffff !important;
+} 
 
 .site-header {
     padding: 20px 25px !important;
@@ -418,12 +456,13 @@ body{
     color: black;
 }
 
-.site-header-line {
-    background-color: #e9e9e9;
+.site-header-line .card-body {
+    padding: 2rem 2rem !important;
+    background-color: aliceblue;
 }
 
 .custom-tab:last-of-type {
-    border: 0px !important;
+    border-radius: 0px 3px 3px 0px !important;
 }
 
 .load-pairs-button {
@@ -440,6 +479,8 @@ body{
     margin-bottom: 1%;
     padding-left: 2%;
     text-align: left;
+    white-space: normal;
+    word-wrap: break-word;
 }
 
 .collapse-button:hover, .collapse-button:focus, .collapse-button:visited  {
@@ -498,16 +539,12 @@ body{
 
 .status-box {
     flex: 0.8;
-    /* Grow and shrink to take up all available space */
     margin: 0 2px;
-    /* Add a bit of space around each box */
-    /* Other styles for your status-box */
     min-height: 100px;
     padding: 30px;
     text-align: center;
     color: rgb(47, 46, 46);
     background-color: #ffffff;
-    /* width: 98%; */
 }
 
 @media (max-width: 1080.98px) {

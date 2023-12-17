@@ -239,19 +239,23 @@ def createTable(df, id):
             columns=[{"name": i, "id": i, "presentation": "markdown"} for i in df.columns],
                 markdown_options={"html": True},
                 style_cell={
-                        'padding': '2px',
-                        'font-size': '1.5em',
-                        'textAlign': 'center',
-                        'whiteSpace': 'pre-line',
+                    'padding': '2px',
+                    'font-size': '1.5em',
+                    'textAlign': 'center',
+                    'whiteSpace': 'pre-line',
                     },
-                    style_header={
-                        'backgroundColor': 'white',
-                        'fontWeight': 'bold'
-                    },
-                    style_data={
-                        'height': 'auto',
-                        'overflowX': 'auto',
-                    },
+                style_header={
+                    'backgroundColor': 'white',
+                    'fontWeight': 'bold'
+                },
+                style_data={
+                    'height': 'auto',
+                    'overflowX': 'auto',
+                },
+                style_table={
+                    'overflowY': 'auto',
+                    'overflowX': 'auto'
+                },
             id=id)
 
 
@@ -310,7 +314,7 @@ def explainStatuses():
   }]
 
   status_explaned = pd.DataFrame(status)
-  categoryDf = categoryDf.pivot_table(values='event', columns='category', aggfunc=lambda x: '\n'.join(x))
+  categoryDf = categoryDf.pivot_table(values='event', columns='category', aggfunc=lambda x: '\n \n'.join(x))
 
   return createTable(status_explaned, 'status_explaned'), createTable(categoryDf, 'categoryDf')
 
