@@ -149,7 +149,10 @@ def generate_status_table(alarmCnt):
                         'height': 'auto',
                         'overflowX': 'auto',
                     },
-                    style_table={'overflowY': 'auto', 'overflowX': 'auto'},
+                    style_table={
+                        'overflowY': 'auto',
+                        'overflowX': 'auto'
+                    },
                     style_data_conditional=[],
                     id='status-tbl')
                 ], className='status-table')
@@ -206,27 +209,27 @@ def total_number_of_alarms(sitesDf):
         )
 
     html_elements.append(dbc.Col([
-        # dbc.Row(html.H3('Overall status', className='stat-title b flex'), justify="start"),
+        # dbc.Row(html.H3('Overall status', className='status-title b flex'), justify="start"),
         dbc.Row(children=total_status, justify="center", align="center", className='h-100')],
         className='status-box boxwithshadow col-md-auto', md=4, xs=12))
 
     # # add the total number of alarms to the html
     # for k,v in sitesDf.sum(numeric_only=True).to_dict().items():
     #     html_elements.append(dbc.Col([
-    #         html.H3(f'Total number of {k} alarms', className='stat-title'),
+    #         html.H3(f'Total number of {k} alarms', className='status-title'),
     #         html.H1(f'{v}', className='status-number'),
     #     ], className='status-box boxwithshadow', md=2, xs=3))
 
     # add the highest number of alarms based on site name to the html
     country_code = get_country_code(sitesDf[sitesDf['site']==highest_site]['country'].values[0])
     html_elements.append(dbc.Col([
-            html.H3(f'Highest number of alarms from site', className='stat-title'),
+            html.H3(f'Highest number of alarms from site', className='status-title'),
             html.H1(f' {highest_site} ({country_code}): {highest_site_alarms}', className='status-number'),
         ], className='status-box boxwithshadow', md=4, xs=12))
 
     # add the highest number of alarms based on country to the html
     html_elements.append(dbc.Col([
-            html.H3(f'Highest number of alarms from country', className='stat-title'),
+            html.H3(f'Highest number of alarms from country', className='status-title'),
             html.H1(f'{highest_country}: {highest_country_alarms}', className='status-number'),
         ], className='status-box boxwithshadow', md=4, xs=12))
 
@@ -389,11 +392,12 @@ def toggle_collapse(n, is_open):
     catTable, statusExplainedTable = explainStatuses()
     data = dbc.Row([
                     dbc.Col(children=[
-                        html.H3('Category & Alarm types', className='stat-title'),
-                        statusExplainedTable], lg=6, md=12, sm=12, className='page-cont pr-1 how-status-table'),
+                        html.H3('Category & Alarm types', className='status-title'),
+                        html.Div(statusExplainedTable, className='how-status-table')
+                        ], lg=6, md=12, sm=12, className='page-cont pr-1 how-status-cont'),
                     dbc.Col(children=[
-                        html.H3('Status color rules', className='stat-title'),
-                        catTable], lg=6, md=12, sm=12, className='page-cont how-status-table')
+                        html.H3('Status color rules', className='status-title'),
+                        html.Div(catTable, className='how-status-table')], lg=6, md=12, sm=12, className='page-cont how-status-cont')
                 ], className='pt-1')
 
     if n:

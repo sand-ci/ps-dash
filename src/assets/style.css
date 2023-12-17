@@ -578,8 +578,12 @@ body{
     }
 }
 
+.how-status-table {
+    border: 1px solid #dfdfdf;
+}
+
 @media (max-width: 1200.98px) {
-    .how-status-table {
+    .how-status-cont {
         flex: 1 0 100%;
         /* Grow and shrink as needed, but don't allow multiple items on one line */
     }
