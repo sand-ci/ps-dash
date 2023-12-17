@@ -61,7 +61,7 @@ class ParquetUpdater(object):
     def groupAlarms(self):
         dateFrom, dateTo = hp.defaultTimeRange(1)
         metaDf = self.pq.readFile('parquet/raw/metaDf.parquet')
-        frames, pivotFrames = self.alarms.getAllAlarms(dateFrom, dateTo)
+        frames, pivotFrames = self.alarms.loadData(dateFrom, dateTo)
 
         nodes = metaDf[~(metaDf['site'].isnull()) & ~(
             metaDf['site'] == '') & ~(metaDf['lat'] == '') & ~(metaDf['lat'].isnull())]
@@ -72,7 +72,8 @@ class ParquetUpdater(object):
                 # column "to" is closest to the time the alarms was generated, 
                 # thus we want to which approx. when the alarms was created,
                 # to be between dateFrom and dateTo
-                sdf = df[(df['tag'] == site)]
+                sdf = df[(df['tag'] == site) & (df['to'] >= dateFrom) & (df['to'] <= dateTo)]
+                
                 if len(sdf) > 0:
                     # sdf['id'].unique() returns the number of unique alarms for the given site
                     # those are the documents generated and stored in ES. They can be found in frames folder
@@ -171,7 +172,7 @@ class ParquetUpdater(object):
         dateFrom, dateTo = hp.defaultTimeRange(60)
         print("Update data. Get all alarms for the past 60 days...", dateFrom, dateTo)
         self.alarms = Alarms()
-        frames, pivotFrames = self.alarms.getAllAlarms(dateFrom, dateTo)
+        frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
         self.groupAlarms()
 
         for event,df in pivotFrames.items():
