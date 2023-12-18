@@ -212,23 +212,21 @@ def layout(q=None, **other_unknown_query_strings):
             dbc.Row([
               dbc.Row([
                 dbc.Row([
-
-                  dbc.Col([
-                    html.Button('Get next 10 pairs', id='next-10-btn',
-                                n_clicks=0, className="load-pairs-button w-100 p-1",),
-                    ]
-                  ),
-                  dbc.Col([
-                      html.Button('Get all', id='all-btn',
-                                  n_clicks=0, className="load-pairs-button w-100 p-1",),
-                  ]),
-
                   dbc.Col(
                      html.P('Below is a list of site pairs which reported a changed path for the specified period', className='subtitle'),
-                     md=12
+                     lg=4, md=12, className="mb-1", align="center"
                   ),
+                  dbc.Col(
+                    html.Button('Get next 10 pairs', id='next-10-btn',
+                                n_clicks=0, className="next-10-btn load-pairs-button w-100 mb-1",),
+                    lg=4, md=6, 
+                  ),
+                  dbc.Col(
+                      html.Button('Get all', id='all-btn',
+                                  n_clicks=0, className="all-btn load-pairs-button w-100 mb-1",),
+                  lg=4, md=6),
 
-                ], className="p-1 d-flex"),
+                ], className="pl-1 mt-1", justify="end"),
           
                 html.Div(id="site-pairs-div"),
 
@@ -255,7 +253,7 @@ def load_site_pairs(next10_clicks, load_all_clicks, data):
     site = data[0]
     pages = [allPairs.iloc[i:i+page_limit] for i in range(0, len(allPairs), page_limit)]
 
-    if load_all_clicks == 0:
+    if load_all_clicks == 0 and len(pages)>next10_clicks+1:
       # adds dynamically new set of pairs on click
       patched_children = Patch()
       patched_children.append(html.Div([

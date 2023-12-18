@@ -85,10 +85,10 @@ def builMap(mapDf):
 def generate_status_table(alarmCnt):
 
     red_sites = alarmCnt[(alarmCnt['event']=='bandwidth decreased from/to multiple sites')
-                & alarmCnt['cnt']>0]['site'].unique().tolist()
+            & (alarmCnt['cnt']>0)]['site'].unique().tolist()
 
     yellow_sites = alarmCnt[(alarmCnt['event']=='path changed between sites')
-                    & alarmCnt['cnt']>0]['site'].unique().tolist()
+                    & (alarmCnt['cnt']>0)]['site'].unique().tolist()
 
     grey_sites = alarmCnt[(alarmCnt['event'].isin(['firewall issue', 'source cannot reach any', 'complete packet loss']))
                     & (alarmCnt['cnt']>0)]['site'].unique().tolist()

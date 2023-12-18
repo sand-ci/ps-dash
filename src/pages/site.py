@@ -70,36 +70,47 @@ def generate_tables(site, dateFrom, dateTo, frames, pivotFrames, alarms4Site, al
                         if len(dfr)>0:
                             dfr = alarmsInst.formatDfValues(dfr, event).sort_values('to', ascending=False)
                             
+                            button = ''
                             if event == 'path changed between sites':
-                                dfr.loc[:, 'alarm_link'] = f"<a class='btn btn-secondary' role='button' href='{request.host_url}paths-site/{site}?dateFrom={dateFrom}&dateTo={dateTo}' target='_blank'>VIEW IN A NEW TAB<</a>" if site else '-'
+                                button = dbc.Col(
+                                            dbc.Button('View path changed alarms in a new tab'.upper(), id='',
+                                                    href=f'{request.host_url}paths-site/{site}?dateFrom={dateFrom}&dateTo={dateTo}',
+                                                    target='_blank',
+                                                    className='btn btn-secondary w-100 p-1 load-pairs-button'),
+                                        lg=3, md=6)
 
                             if len(ids):
                                 element = html.Div([
-                                    html.H2(event.upper()),
-                                    dash_table.DataTable(
-                                        data=dfr.to_dict('records'),
-                                        columns=[{"name": i, "id": i, "presentation": "markdown"} for i in dfr.columns],
-                                        markdown_options={"html": True},
-                                        id='tbl',
-                                        page_size=20,
-                                        style_cell={
-                                            'padding': '2px',
-                                            'font-size': '14px',
-                                            'whiteSpace': 'pre-line'
-                                        },
-                                        style_header={
-                                            'backgroundColor': 'white',
-                                            'fontWeight': 'bold'
-                                        },
-                                        style_data={
-                                            'height': 'auto',
-                                            'lineHeight': '15px',
-                                            'overflowX': 'auto'
-                                        },
-                                        style_table={'overflowY': 'auto', 'overflowX': 'auto'},
-                                        filter_action="native",
-                                        sort_action="native",
-                                    ),
+                                    dbc.Row([
+                                        dbc.Col(html.H2(event.upper()), lg=9, md=6, align="center"),
+                                        button
+                                    ], className='mb-1', justify="between"),
+                                    dbc.Row(
+                                        dash_table.DataTable(
+                                            data=dfr.to_dict('records'),
+                                            columns=[{"name": i, "id": i, "presentation": "markdown"} for i in dfr.columns],
+                                            markdown_options={"html": True},
+                                            id='tbl',
+                                            page_size=20,
+                                            style_cell={
+                                                'padding': '2px',
+                                                'font-size': '14px',
+                                                'whiteSpace': 'pre-line'
+                                            },
+                                            style_header={
+                                                'backgroundColor': 'white',
+                                                'fontWeight': 'bold'
+                                            },
+                                            style_data={
+                                                'height': 'auto',
+                                                'lineHeight': '15px',
+                                                'overflowX': 'auto'
+                                            },
+                                            style_table={'overflowY': 'auto', 'overflowX': 'auto'},
+                                            filter_action="native",
+                                            sort_action="native",
+                                        ),
+                                    )
                                 ], className='single-table mb-1')
 
                                 category_list.append(element)
