@@ -232,7 +232,7 @@ class ParquetUpdater(object):
 
             df['jumpedFrom'] = df['jumpedFrom'].astype(int)
             df['diff'] = df['diff'].astype(int)
-            self.pq.writeToFile(df, f"parquet/frames/prev_next_asn")
+            self.pq.writeToFile(df, f"parquet/prev_next_asn")
 
 
     @staticmethod

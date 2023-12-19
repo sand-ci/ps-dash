@@ -1,5 +1,6 @@
 import glob
 import os
+import time
 from elasticsearch.helpers import scan
 import pandas as pd
 import traceback
@@ -171,34 +172,38 @@ class Alarms(object):
     print(f"loadData for {dateFrom}, {dateTo}")
     print('+++++++++++++++++++++')
     print()
-
+    current_time = time.time()
     pq = Parquet()
     folder = glob.glob("parquet/frames/*")
     isTooOld = False
     frames, pivotFrames = {}, {}
     try:
       if folder:
-        print("read stored data")
-        print('+++++++++++++++++++++')
         for f in folder:
             event = os.path.basename(f)
             event = self.eventUF(event)
             df = pq.readFile(f)
+            modification_time = os.path.getmtime(f)
 
-            if 'from' in df.columns.tolist():
+            # Calculate the time difference in seconds
+            time_difference = current_time - modification_time
+            time_difference_hours = time_difference / (60 * 60)
 
-              if dateFrom >= df[~df['from'].isnull()]['from'].min():
-                  frames[event] = df[(df['to']>=dateFrom) & (df['to'] <= dateTo)]
-                  pdf = pq.readFile(f"parquet/pivot/{os.path.basename(f)}")
+            # Check if the file was modified more than 1 hour ago
+            if time_difference_hours < 1:
+              # print("The file was modified within the last hour.")
+              frames[event] = df[(df['to']>=dateFrom) & (df['to'] <= dateTo)]
+              pdf = pq.readFile(f"parquet/pivot/{os.path.basename(f)}")
 
-                  pdf = pdf[(pdf['to'] >= dateFrom) & (pdf['to'] <= dateTo)]
-                  pivotFrames[event] = pdf
+              pdf = pdf[(pdf['to'] >= dateFrom) & (pdf['to'] <= dateTo)]
+              pivotFrames[event] = pdf
 
-              else:
-                  isTooOld = True
+            else:
+              print("The file was modified more than 1 hour ago.", f)
+              isTooOld = True
 
       if not folder or isTooOld:
-          # print('query', event)
+          print('Query ES')
           print('+++++++++++++++++++++')
           frames, pivotFrames = self.getAllAlarms(dateFrom, dateTo)
 
