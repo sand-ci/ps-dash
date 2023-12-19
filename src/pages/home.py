@@ -348,7 +348,7 @@ def layout(**other_unknown_query_strings):
                         dbc.Col(
                             [
                                 html.Div(children=statusTable, id='site-status', className='datatables-cont'),
-                            ], className='page-cont pl-1 sidebysite-cont'
+                            ], className='page-cont sidebysite-cont'
                         ),
                         dbc.Col(dcc.Graph(figure=builMap(sitesDf), id='site-map',
                                   className='cls-site-map mb-1 page-cont sidebysite-cont'), 
