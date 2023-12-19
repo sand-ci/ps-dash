@@ -48,12 +48,24 @@ def timer(func):
     return wrapper_timer
 
 
+def convertDate(dt):
+    try:
+        parsed_date = datetime.strptime(dt, "%Y-%m-%dT%H:%M:%S.000Z")
+        formatted_date = parsed_date.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    except ValueError:
+        parsed_date = datetime.strptime(dt, "%Y-%m-%d %H:%M")
+        formatted_date = parsed_date.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+    return formatted_date
+
+
 def getPriorNhPeriod(end, daysBefore=1, midPoint=True):
     daysAfter = daysBefore
     if not midPoint:
         daysAfter = 0
 
     fmt = '%Y-%m-%dT%H:%M:%S.000Z'
+    end = convertDate(end)
     endT = datetime.strptime(end, fmt)
     start = datetime.strftime(endT - timedelta(daysBefore), fmt)
     end = datetime.strftime(endT + timedelta(daysAfter), fmt)

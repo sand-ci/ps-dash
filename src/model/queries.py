@@ -10,8 +10,8 @@ urllib3.disable_warnings()
 
 
 
-def convertDate(dt):
-    return datetime.strptime(dt, "%Y-%m-%dT%H:%M:%S.000Z").strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+  
 
 # On 18 Nov 2023 all alarms moved to querying netsites instead of sites, 
 # but kept src_site and dest_site for backward compatibility
@@ -141,8 +141,8 @@ def queryThroughputIdx(dateFrom, dateTo):
   return aggrs
 
 def queryPathChanged(dateFrom, dateTo):
-    # start = datetime.strptime(dateFrom, '%Y-%m-%dT%H:%M:%S.000Z')
-    # end = datetime.strptime(dateTo, '%Y-%m-%dT%H:%M:%S.000Z')
+    dateFrom = hp.convertDate(dateFrom)
+    dateTo = hp.convertDate(dateTo)
     # if (end - start).days < 2:
     #   dateFrom, dateTo = hp.getPriorNhPeriod(dateTo)
     
@@ -302,7 +302,7 @@ def getAlarm(id):
   for res in results['hits']['hits']:
     data.append(res['_source'])
 
-  for d in data: print(d)
+  # for d in data: print(d)
   if len(data) >0:
     return data[0]
 
@@ -366,8 +366,8 @@ def getSubcategories():
 
 
 def queryTraceChanges(dateFrom, dateTo):
-  # dateFrom = convertDate(dateFrom)
-  # dateTo = convertDate(dateTo)
+  dateFrom = hp.convertDate(dateFrom)
+  dateTo = hp.convertDate(dateTo)
 
   q = {
     "query": {
