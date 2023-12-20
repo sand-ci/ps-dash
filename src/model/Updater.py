@@ -56,6 +56,7 @@ class ParquetUpdater(object):
             print(traceback.format_exc())
 
 
+
     # The following function is used to group alarms by site 
     # taking into account the most recent 24 hours only
     def groupAlarms(self, pivotFrames):
@@ -172,7 +173,7 @@ class ParquetUpdater(object):
     def storeAlarms(self):
         dateFrom, dateTo = hp.defaultTimeRange(60)
         print("Update data. Get all alarms for the past 60 days...", dateFrom, dateTo)
-        frames, pivotFrames = self.alarms.loadData(dateFrom, dateTo)
+        frames, pivotFrames = self.alarms.getAllAlarms(dateFrom, dateTo)
         self.groupAlarms(pivotFrames)
 
         for event,df in pivotFrames.items():
