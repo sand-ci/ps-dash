@@ -193,7 +193,7 @@ class Alarms(object):
             if time_difference_hours < 1:
               # print("The file was modified within the last hour.")
               frames[event] = df[(df['to']>=dateFrom) & (df['to'] <= dateTo)]
-              pdf = pq.readFile(f"parquet/pivot/{os.path.basename(f)}")
+              pdf = pq.readFile(f"parquet/pivot/{os.path.basename(f)}.parquet")
 
               pdf = pdf[(pdf['to'] >= dateFrom) & (pdf['to'] <= dateTo)]
               pivotFrames[event] = pdf

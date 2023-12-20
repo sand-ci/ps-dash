@@ -171,7 +171,7 @@ def update_output(asn, asnState, sites, sitesState):
 
     # graph
     pq = Parquet()
-    changeDf = pq.readFile('parquet/prev_next_asn')
+    changeDf = pq.readFile('parquet/prev_next_asn.parquet')
     asnsDropdownData = []
 
     if len(changeDf) == 0:
