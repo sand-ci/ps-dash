@@ -181,7 +181,10 @@ class Alarms(object):
       if folder:
         for f in folder:
             event = os.path.basename(f)
+            # remove the extension (.parquet)
+            event = os.path.splitext(event)[0]
             event = self.eventUF(event)
+
             df = pq.readFile(f)
             modification_time = os.path.getmtime(f)
 
@@ -193,7 +196,7 @@ class Alarms(object):
             if time_difference_hours < 1:
               # print("The file was modified within the last hour.")
               frames[event] = df[(df['to']>=dateFrom) & (df['to'] <= dateTo)]
-              pdf = pq.readFile(f"parquet/pivot/{os.path.basename(f)}.parquet")
+              pdf = pq.readFile(f"parquet/pivot/{os.path.basename(f)}")
 
               pdf = pdf[(pdf['to'] >= dateFrom) & (pdf['to'] <= dateTo)]
               pivotFrames[event] = pdf
@@ -292,6 +295,7 @@ class Alarms(object):
           df = self.replaceCol('sites', df, '\n')
         if 'diff' in df.columns:
             df = self.replaceCol('diff', df)
+            df.rename(columns={'diff': 'ASN-diff'}, inplace=True)
         if 'hosts' in df.columns:
             df = self.replaceCol('hosts', df, '\n')
         if 'cannotBeReachedFrom' in df.columns:
