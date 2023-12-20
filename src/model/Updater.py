@@ -58,10 +58,10 @@ class ParquetUpdater(object):
 
     # The following function is used to group alarms by site 
     # taking into account the most recent 24 hours only
-    def groupAlarms(self):
+    def groupAlarms(self, pivotFrames):
         dateFrom, dateTo = hp.defaultTimeRange(1)
         metaDf = self.pq.readFile('parquet/raw/metaDf.parquet')
-        frames, pivotFrames = self.alarms.loadData(dateFrom, dateTo)
+        # frames, pivotFrames = self.alarms.loadData(dateFrom, dateTo)
 
         nodes = metaDf[~(metaDf['site'].isnull()) & ~(
             metaDf['site'] == '') & ~(metaDf['lat'] == '') & ~(metaDf['lat'].isnull())]
@@ -86,6 +86,7 @@ class ParquetUpdater(object):
                 alarmCnt.append(entry)
 
         alarmsGrouped = pd.DataFrame(alarmCnt)
+        print('Number of site-alarms:', len(alarmsGrouped[alarmsGrouped['cnt']>0]))
 
         self.pq.writeToFile(alarmsGrouped, f'{self.location}alarmsGrouped.parquet')
 
@@ -93,7 +94,7 @@ class ParquetUpdater(object):
     @staticmethod
     def __isDataFresh(folder_path):
         total_size = 0
-        twenty_five_hours_ago = datetime.now() - timedelta(hours=25)
+        two_hours_ago = datetime.now() - timedelta(hours=2)
 
         if os.path.exists(folder_path):
             for path, dirs, files in os.walk(folder_path):
@@ -105,7 +106,7 @@ class ParquetUpdater(object):
                     file_date_created = datetime.fromtimestamp(os.path.getctime(file_path))
                     total_size += os.path.getsize(file_path)
 
-                    if total_size <= 10 or file_date_created <= twenty_five_hours_ago:
+                    if total_size <= 10 or file_date_created <= two_hours_ago:
                         return False
 
         return True
@@ -172,14 +173,14 @@ class ParquetUpdater(object):
         dateFrom, dateTo = hp.defaultTimeRange(60)
         print("Update data. Get all alarms for the past 60 days...", dateFrom, dateTo)
         frames, pivotFrames = self.alarms.loadData(dateFrom, dateTo)
-        self.groupAlarms()
+        self.groupAlarms(pivotFrames)
 
         for event,df in pivotFrames.items():
             filename = self.alarms.eventCF(event)
             fdf = frames[event]
             if len(fdf)>0:
-                self.pq.writeToFile(df, f"parquet/pivot/{filename}")
-                self.pq.writeToFile(fdf, f"parquet/frames/{filename}")
+                self.pq.writeToFile(df, f"parquet/pivot/{filename}.parquet")
+                self.pq.writeToFile(fdf, f"parquet/frames/{filename}.parquet")
 
 
     @staticmethod
@@ -232,7 +233,7 @@ class ParquetUpdater(object):
 
             df['jumpedFrom'] = df['jumpedFrom'].astype(int)
             df['diff'] = df['diff'].astype(int)
-            self.pq.writeToFile(df, f"parquet/prev_next_asn")
+            self.pq.writeToFile(df, f"parquet/prev_next_asn.parquet")
 
 
     @staticmethod

@@ -362,7 +362,7 @@ def buildSankey(sitesState, asnState, df):
             'zeroline': False,  # thick line at x=0
             'visible': False,  # numbers below
         },
-        margin=dict(t=2, b=2, l=0, r=0),
+        margin=dict(b=2, l=0, r=0),
         plot_bgcolor='rgba(0,0,0,0)', font_size=10)
 
     # fig.show()

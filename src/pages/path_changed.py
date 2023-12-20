@@ -158,8 +158,8 @@ def buildSiteBox(site, cnt, chdf, posDf, baseline, altPaths, alarm):
       related2FlaggedASN = extractRelatedOnly(chdf, alarm['asn'])
       cntRelated = len(related2FlaggedASN)
       if len(related2FlaggedASN)>10:
-        showSample = "Bellow is a subset of 2."
-        related2FlaggedASN = related2FlaggedASN.sample(2)
+        showSample = "Bellow is a subset of 5."
+        related2FlaggedASN = related2FlaggedASN.sample(5)
       sitePairs = related2FlaggedASN['spair'].values
       nodePairs = related2FlaggedASN['pair'].values
       
