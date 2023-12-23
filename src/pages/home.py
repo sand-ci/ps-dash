@@ -197,7 +197,7 @@ def total_number_of_alarms(sitesDf):
             , align="center", justify='center', className='h-100'),
         ], className='status-box boxwithshadow', md=3, xs=12)]
     # add the status count to the html
-    total_status = [dbc.Col(html.P('Summary', className='status-number h-100 status-text'), md=3, xs=12)]
+    total_status = [dbc.Col(html.H1('Summary', className='h-100'), md=3, xs=12)]
     for s in status:
         total_status.append(
             dbc.Col(
