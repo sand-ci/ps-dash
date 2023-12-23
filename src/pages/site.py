@@ -126,8 +126,8 @@ def generate_tables(site, dateFrom, dateTo, frames, pivotFrames, alarms4Site, al
                             dbc.CardBody([
                                 html.Div(category_list)
                             ], className="text-dark p-1"),
-                        ], className="mb-4 site-alarms-tables"
-                    ), className="boxwithshadow mb-1 g-0 align-items-start"))
+                        ], className="mb-4 site-alarms-tables boxwithshadow"
+                    ), className="mb-1 g-0 align-items-start"))
                     
                     
         else:
@@ -319,9 +319,14 @@ def layout(q=None, **other_unknown_query_strings):
     return html.Div(
             dbc.Row([
                 dbc.Row([
-                    dbc.Col(id='selected-site', className='cls-selected-site', children=html.H1(f'Site {q}'), align="start"),
-                    dbc.Col(html.H2(f'Alarms reported in the past 24 hours (Current time: {dateTo} UTC)'), className='cls-selected-site')
-                ], align="start", className='boxwithshadow mb-1 g-0'),
+                    dbc.Col(
+                        children=html.H1(f'{q}'), 
+                    id='selected-site', className='cls-selected-site', align="center"),
+                    dbc.Col([
+                        html.H2(f'Alarms reported in the past 24 hours', className='pb-1'),         
+                        dbc.Button('Download as image', id='download-image', className='btn btn-secondary load-pairs-button dowload-page-button'),
+                    ], className='cls-selected-site w-100')
+                ], align="center", justify="center", className='boxwithshadow mb-1 g-0'),
 
                 html.Div(id='datatables',
                             children=generate_tables(q, dateFrom, dateTo, frames, pivotFrames, alarmCnt, alarmsInst),
@@ -338,8 +343,8 @@ def layout(q=None, **other_unknown_query_strings):
                                 className="site-plots site-inner-cont p-05")
                             )
                         ], className="text-dark p-1")
-                    ]),
-                    className="mb-4 site-alarms-tables boxwithshadow page-cont mb-1 g-0"
+                    ], className="boxwithshadow"),
+                    className="mb-4 site-alarms-tables page-cont mb-1 g-0"
                 ),
                 html.Br(),
                 

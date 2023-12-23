@@ -88,7 +88,7 @@ def layout(q=None, **other_unknown_query_strings):
           kibanaIframe.append(dbc.Row([
               dbc.Row(html.H3(f"Issues from {alrmContent['site']}")),
               dbc.Row(html.Iframe(src=url, style={"height": "600px"}))
-            ], className="boxwithshadow pair-details g-0 mb-1"))
+            ], className="boxwithshadow pair-details g-0 mb-1 p-3"))
         
         if len(alrmContent["src_sites"]) > 0:
           original_names = metaDf[metaDf['netsite'].isin(alrmContent["src_sites"])]['netsite_original'].unique()
@@ -99,7 +99,7 @@ def layout(q=None, **other_unknown_query_strings):
           kibanaIframe.append(dbc.Row([
               dbc.Row(html.H3(f"Issues to {alrmContent['site']}")),
               dbc.Row(html.Iframe(src=url, style={"height": "600px"}))
-            ], className="boxwithshadow pair-details g-0 mb-1"))
+            ], className="boxwithshadow pair-details g-0 mb-1 p-3"))
       else:
         kibanaIframe = dbc.Row([html.Iframe(src=url, style={"height": "1000px"})], className="boxwithshadow pair-details g-0")
 
@@ -129,7 +129,7 @@ def layout(q=None, **other_unknown_query_strings):
                 ], className="boxwithshadow alarm-header pair-details g-0", justify="between", align="center")
               ], style={"padding": "0.5% 1.5%"}, className='g-0'),
             dbc.Row(
-                kibanaIframe, style={"padding": "0.5% 1.5%"}, className='g-0')
+                kibanaIframe, style={"padding": "0.5% 1.5%"}, className='g-0 p-3')
       ], className='mb-5')
 
 

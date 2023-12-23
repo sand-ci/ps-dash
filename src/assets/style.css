@@ -13,7 +13,7 @@ body{
     margin-bottom: 1rem;
 }
 
-.status-table .cell-markdown>p {
+.table-container .cell-markdown>p {
     display: flex;
     height: 100%;
     justify-content: center;
@@ -26,6 +26,10 @@ body{
 .logo {
     text-align: left;
     padding: 0 40px;
+}
+
+.navbar {
+    min-height: 5.5rem;
 }
 
 .major-alarms.nav-link {
@@ -159,6 +163,10 @@ body{
     margin: 2%;
 }
 
+.cls-selected-site h1 {
+    font-size: 2.5rem !important;
+}
+
 .cls-site-map {
     height: 750px;
     padding: 20px;
@@ -166,7 +174,7 @@ body{
     border-radius: 1rem
 }
 
-.status-table th {
+.table-container th {
     border-left: 0px !important;
     border-right: 0px !important;
     border-top-color: white !important;
@@ -175,12 +183,18 @@ body{
     color: rgb(45, 44, 44);
 }
 
-.status-table {
+.table-container {
     border: 1px solid #dfdfdf;
 }
 
-.status-table .previous-next-container {
+.table-container .previous-next-container {
     padding-top: 1% !important;
+}
+
+.dowload-page-button {
+    color: rgb(45, 44, 44);
+    background-color: #ebf1fd;
+    border-color: #cbd4e7;
 }
 
 @media (max-width: 1080px) {

@@ -221,7 +221,8 @@ def generate_tables(frame, pivotFrames, event, alarmsInst):
             page_size=20,
             style_cell={
                 'padding': '2px',
-                'whiteSpace': 'pre-line'
+                'whiteSpace': 'pre-line',
+                "font-size": "1.4rem",
             },
             style_header={
                 'backgroundColor': 'white',
@@ -229,7 +230,7 @@ def generate_tables(frame, pivotFrames, event, alarmsInst):
             },
             style_data={
                 'height': 'auto',
-                'lineHeight': '15px',
+                'lineHeight': '1.5rem',
                 'overflowX': 'auto'
             },
             style_table={

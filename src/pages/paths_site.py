@@ -204,7 +204,7 @@ def layout(q=None, **other_unknown_query_strings):
                             ], className="pair-details"),
                             
                         ],
-                    ), lg=10, md=12
+                    ), lg=10, md=12, className="p-3"
                   ),
               ], justify="between", align="center", className="boxwithshadow alarm-header pair-details")
             ], style={"padding": "0.5% 1.5%"}, className='g-0 mb-1'),

@@ -155,7 +155,7 @@ def generate_status_table(alarmCnt):
                     },
                     style_data_conditional=[],
                     id='status-tbl')
-                ], className='status-table')
+                ], className='table-container')
     else:
         element = html.Div(html.H3('No alarms for this site in the past day'), style={'textAlign': 'center'})
 
@@ -192,7 +192,7 @@ def total_number_of_alarms(sitesDf):
     html_elements = [dbc.Col([
             dbc.Row(
                 dbc.Col(
-                    html.H1('Status of all sites in the past 24 hours', className='status-number')
+                    html.H1('Status of all sites in the past 24 hours')
                 , align="center")
             , align="center", justify='center', className='h-100'),
         ], className='status-box boxwithshadow', md=3, xs=12)]
@@ -215,7 +215,6 @@ def total_number_of_alarms(sitesDf):
         )
 
     html_elements.append(dbc.Col([
-        # dbc.Row(html.H3('Overall status', className='status-title b flex'), justify="start"),
         dbc.Row(children=total_status, justify="center", align="center", className='h-100')],
         className='status-box boxwithshadow col-md-auto', md=3, xs=12))
 

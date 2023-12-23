@@ -15,7 +15,11 @@ ParquetUpdater()
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP]
 
-app = Dash(__name__, external_stylesheets=external_stylesheets, suppress_callback_exceptions=True, use_pages=True)
+app = Dash(__name__, external_stylesheets=external_stylesheets, 
+           external_scripts=[
+                {'src': 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.0/html2canvas.min.js'}
+            ],
+           suppress_callback_exceptions=True, use_pages=True)
 
 # 
 server = app.server
@@ -113,10 +117,10 @@ app.layout = html.Div(children=[
                 color="#00245a",
                 class_name="justify-content-between nav-conatiner",
             ),
-	        dash.page_container
+            dash.page_container
         ]
     )
-])
+], id="component-to-save")
 
 
 @app.callback(
@@ -160,6 +164,26 @@ def toggle_navbar_collapse(n, is_open):
     if n:
         return not is_open
     return is_open
+
+
+app.clientside_callback(
+    """
+    function(n_clicks){
+        if(n_clicks > 0){
+            html2canvas(document.getElementById("component-to-save"), {useCORS: true}).then(function (canvas) {
+                var anchorTag = document.createElement("a");
+                document.body.appendChild(anchorTag);
+                anchorTag.download = "download.png";
+                anchorTag.href = canvas.toDataURL();
+                anchorTag.target = '_blank';
+                anchorTag.click();
+            });
+        }
+    }
+    """,
+    Output('download-image', 'n_clicks'),
+    Input('download-image', 'n_clicks')
+)
 
 
 if __name__ == '__main__':
