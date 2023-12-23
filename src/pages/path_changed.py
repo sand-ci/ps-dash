@@ -86,9 +86,10 @@ def layout(q=None, **other_unknown_query_strings):
             dbc.Row([
               dbc.Row([
                 dbc.Col([
-                  html.H3(f"ASN {alarm['asn']}", className="text-center bold"),
-                  html.H3(alarm['owner'], className="text-center")
-                ], lg=2, md=12, className="p-4"),
+                    html.H3(f"ASN {alarm['asn']}", className="text-center bold"),
+                    html.H3(alarm['owner'], className="text-center")
+                  ], lg=2, md=12, className="p-3"
+                ),
                 dbc.Col(
                     html.Div(
                         [
@@ -105,7 +106,7 @@ def layout(q=None, **other_unknown_query_strings):
                               ], justify="start")
                             ], className="pair-details")
                         ],
-                    ), lg=10, md=12
+                    ), lg=10, md=12, className="p-3"
                   ),
               ], justify="between", align="center", className="boxwithshadow alarm-header pair-details")
             ], style={"padding": "0.5% 1.5%"}, className='g-0 mb-1'),

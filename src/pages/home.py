@@ -189,9 +189,15 @@ def total_number_of_alarms(sitesDf):
             status_count[s] = 0
 
 
-    html_elements = []
+    html_elements = [dbc.Col([
+            dbc.Row(
+                dbc.Col(
+                    html.H1('Status of all sites in the past 24 hours', className='status-number')
+                , align="center")
+            , align="center", justify='center', className='h-100'),
+        ], className='status-box boxwithshadow', md=3, xs=12)]
     # add the status count to the html
-    total_status = [dbc.Col(html.P('Status summary', className='status-number h-100 status-text'), md=4, xs=12)]
+    total_status = [dbc.Col(html.P('Summary', className='status-number h-100 status-text'), md=3, xs=12)]
     for s in status:
         total_status.append(
             dbc.Col(
@@ -211,7 +217,7 @@ def total_number_of_alarms(sitesDf):
     html_elements.append(dbc.Col([
         # dbc.Row(html.H3('Overall status', className='status-title b flex'), justify="start"),
         dbc.Row(children=total_status, justify="center", align="center", className='h-100')],
-        className='status-box boxwithshadow col-md-auto', md=4, xs=12))
+        className='status-box boxwithshadow col-md-auto', md=3, xs=12))
 
     # # add the total number of alarms to the html
     # for k,v in sitesDf.sum(numeric_only=True).to_dict().items():
@@ -223,15 +229,19 @@ def total_number_of_alarms(sitesDf):
     # add the highest number of alarms based on site name to the html
     country_code = get_country_code(sitesDf[sitesDf['site']==highest_site]['country'].values[0])
     html_elements.append(dbc.Col([
+        dbc.Row([
             html.H3(f'Highest number of alarms from site', className='status-title'),
-            html.H1(f' {highest_site} ({country_code}): {highest_site_alarms}', className='status-number'),
-        ], className='status-box boxwithshadow', md=4, xs=12))
+            html.H1(f' {highest_site} ({country_code}): {highest_site_alarms}', className='status-number')
+        ], align="center", className='h-100'),
+        ], className='status-box boxwithshadow', md=3, xs=12))
 
-    # add the highest number of alarms based on country to the html
+    # add the highest number of alarms based on country to the html    
     html_elements.append(dbc.Col([
+        dbc.Row([
             html.H3(f'Highest number of alarms from country', className='status-title'),
             html.H1(f'{highest_country}: {highest_country_alarms}', className='status-number'),
-        ], className='status-box boxwithshadow', md=4, xs=12))
+        ], align="center", className='h-100'),
+        ], className='status-box boxwithshadow', md=3, xs=12))
 
     return html_elements
 
@@ -338,13 +348,10 @@ def layout(**other_unknown_query_strings):
     total_number = total_number_of_alarms(sitesDf)
 
     return html.Div([
-            dbc.Row(children=total_number, className='g-0 d-flex align-items-stretch', align="center", justify='between',  style={"padding": "0.5% 1.5%"}),
+            dbc.Row(
+                children=total_number, className='g-0 d-flex align-items-stretch h-100', align="center", justify='center',  style={"padding": "0.5% 1.5%"}),
             dbc.Row([
                 dbc.Row([
-                        dbc.Col(
-                            html.P(f'Status of all sites in the past 24 hours'),
-                            lg=12, md=12, className='status-title-cont'
-                        ),
                         dbc.Col(
                             [
                                 html.Div(children=statusTable, id='site-status', className='datatables-cont'),

@@ -194,7 +194,7 @@ def layout(q=None, **other_unknown_query_strings):
                             html.P(f'Site {alarmData["site"]} takes part in the following alarms in the period 24h prior \
                               and up to 24h after the current alarm end ({alarmData["to"]})', className='subtitle'),
                             html.B(otherAlarms, className='subtitle')
-                        ], className="boxwithshadow alarm-header pair-details g-0", justify="between", align="center"),
+                        ], className="boxwithshadow alarm-header pair-details g-0 p-3", justify="between", align="center"),
                     ], style={"padding": "0.5% 1.5%"}, className='g-0')
 
 
@@ -202,9 +202,9 @@ def layout(q=None, **other_unknown_query_strings):
             dbc.Row([
               dbc.Row([
                 dbc.Col([
-                  html.H3(alarm['event'].upper(), className="text-center bold p-4"),
+                  html.H3(alarm['event'].upper(), className="text-center bold p-3"),
                   html.H5(alarmData['to'], className="text-center bold"),
-                ], width=2),
+                ], lg=2, md=12, className="p-3"),
                 dbc.Col(
                     html.Div(
                       [
@@ -218,7 +218,7 @@ def layout(q=None, **other_unknown_query_strings):
                           ])
                       ],
                     ),
-                width=10)
+                lg=10, md=12, className="p-3")
               ], className="boxwithshadow alarm-header pair-details g-0", justify="between", align="center")                
             ], style={"padding": "0.5% 1.5%"}, className='g-0'),
           alarmsIn48h,

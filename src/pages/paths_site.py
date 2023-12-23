@@ -181,7 +181,7 @@ def layout(q=None, **other_unknown_query_strings):
                 dbc.Col([
                   html.H3('SITE', className="text-center bold"),
                   html.H3(site.upper(),className="text-center")
-                ], lg=2, md=12, className="p-4"),
+                ], lg=2, md=12, className="p-3"),
                 dbc.Col(
                     html.Div(
                         [
