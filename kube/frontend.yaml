@@ -47,7 +47,12 @@ metadata:
   labels:
     k8s-app: ps-dash
 spec:
-  replicas: 1
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
   selector:
     matchLabels:
       k8s-app: ps-dash
@@ -56,24 +61,29 @@ spec:
       labels:
         k8s-app: ps-dash
     spec:
+      terminationGracePeriodSeconds: 900  # wait for 15 minuted before forcibly terminating the pod
       containers:
         - name: ps-dash
           image: sandci/ps-dash:latest
-          # command: ["sleep"]
-          # args: ["36500000"]
+          imagePullPolicy: Always
           ports:
             - containerPort: 8050
-          # livenessProbe:
-          #   httpGet:
-          #     scheme: HTTP
-          #     path: /healthz
-          #     port: 80
-          #   periodSeconds: 60
-          #   initialDelaySeconds: 60
-          #   timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8050
+            initialDelaySeconds: 200
+            periodSeconds: 10
           volumeMounts:
             - name: frontend-conf-volume
               mountPath: "/etc/ps-dash/"
+          resources:
+            requests:
+              cpu: "1000m"
+              memory: "4Gi"
+            limits:
+              cpu: "4000m"
+              memory: "12Gi"
       volumes:
         - name: frontend-conf-volume
           secret:
