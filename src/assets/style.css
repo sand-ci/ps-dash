@@ -197,7 +197,7 @@ body{
     border-color: #cbd4e7;
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 1680px) {
     .sidebysite-cont {
         width: 100% !important;
     }
@@ -568,12 +568,12 @@ body{
     background-color: #ffffff;
 }
 
-@media (max-width: 1080.98px) {
+@media (max-width: 1380.98px) {
     .status-box {
         flex: 1 0 100%;
         /* Grow and shrink as needed, but don't allow multiple items on one line */
         margin-right: 0 2px;
-        /* Add a bit of space below each box on small screens */
+        margin-bottom: 1rem;
     }
 }
 
@@ -583,19 +583,15 @@ body{
     margin-bottom: 0;
 }
 
+@media (min-width: 2000px) {
+    .status-count-header {
+        flex: 0 0 33.33% !important;
+        max-width: 33.33% !important;
+    }
 
-.status-text {
-    display: flex;
-    flex-direction: column;
-    color: #373737;
-    /* Stack .status-text and .status-number vertically by default */
-}
-
-@media (min-width: 1092px) {
-    /* Large screens in Bootstrap are ≥992px */
-    .status-text {
-        flex-direction: row important!;
-        /* Place .status-text and .status-number side by side on large screens */
+    .status-count-numbers {
+        flex: 0 0 16.66% !important;
+        max-width: 16.66% !important;
     }
 }
 
@@ -603,7 +599,7 @@ body{
     border: 1px solid #dfdfdf;
 }
 
-@media (max-width: 1200.98px) {
+@media (max-width: 1500.98px) {
     .how-status-cont {
         flex: 1 0 100%;
         /* Grow and shrink as needed, but don't allow multiple items on one line */

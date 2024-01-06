@@ -197,7 +197,8 @@ def total_number_of_alarms(sitesDf):
             , align="center", justify='center', className='h-100'),
         ], className='status-box boxwithshadow', md=3, xs=12)]
     # add the status count to the html
-    total_status = [dbc.Col(html.H1('Summary', className='h-100'), md=3, xs=12)]
+    total_status = [dbc.Col(html.H1('Summary', className='h-100'),
+                            md=12, className='status-count-header')]
     for s in status:
         total_status.append(
             dbc.Col(
@@ -210,9 +211,10 @@ def total_number_of_alarms(sitesDf):
                     ),
                     className='mb-3',
                 ),
-                md=2, xs=6
+                md=3, className='status-count-numbers'
             )
         )
+
 
     html_elements.append(dbc.Col([
         dbc.Row(children=total_status, justify="center", align="center", className='h-100')],
@@ -354,10 +356,10 @@ def layout(**other_unknown_query_strings):
                         dbc.Col(
                             [
                                 html.Div(children=statusTable, id='site-status', className='datatables-cont'),
-                            ], className='page-cont sidebysite-cont'
+                            ], className='page-cont sidebysite-cont', lg=6
                         ),
                         dbc.Col(dcc.Graph(figure=builMap(sitesDf), id='site-map',
-                                  className='cls-site-map mb-1 page-cont sidebysite-cont'), 
+                                  className='cls-site-map mb-1 page-cont sidebysite-cont'), lg=6
                         ),
                         dbc.Col(
                             html.Div(
@@ -381,7 +383,7 @@ def layout(**other_unknown_query_strings):
                 html.Div(id='page-content-noloading'),
                 html.Br(),
                 
-            ], className='g-0', align="start", style={"padding": "0.5% 1.5%"})
+            ], className='g-0', align="start", style={"padding": "0 1.5%"})
             ], className='main-cont')
 
 
