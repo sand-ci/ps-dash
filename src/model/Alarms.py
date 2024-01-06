@@ -302,7 +302,6 @@ class Alarms(object):
           df = self.replaceCol('cannotBeReachedFrom', df, '\n')
 
         if 'dest_change' in df.columns:
-            
             df['dest_change'] = df[['dest_sites', 'dest_change']].apply(lambda x: self.list2str(x, sign[event]), axis=1)
             # df.drop('dest_change', axis=1, inplace=True)
             df.drop('dest_sites', axis=1, inplace=True)
@@ -340,6 +339,10 @@ class Alarms(object):
           df['alarm_link'] = df['alarm_id']
           df.drop('alarm_id', axis=1, inplace=True)
         df = df[['from','to'] + [col for col in df.columns if not col in ['from', 'to']]]
+
+        if event == 'complete packet loss':
+          df.drop(columns=['avg_value'], inplace=True)
+
         
         df = self.createAlarmURL(df, event)
     except Exception as e:

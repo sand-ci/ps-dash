@@ -21,7 +21,8 @@ app = Dash(__name__, external_stylesheets=external_stylesheets,
             ],
            suppress_callback_exceptions=True, use_pages=True)
 
-# 
+
+# Kubernetes rediness probe
 server = app.server
 @server.route('/ready')
 def ready():
