@@ -211,7 +211,7 @@ def total_number_of_alarms(sitesDf):
                     ),
                     className='mb-3',
                 ),
-                md=3, className='status-count-numbers'
+                md=3, xs=3, className='status-count-numbers'
             )
         )
 
