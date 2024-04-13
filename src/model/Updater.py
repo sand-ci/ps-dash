@@ -60,7 +60,7 @@ class ParquetUpdater(object):
     # The following function is used to group alarms by site 
     # taking into account the most recent 24 hours only
     def groupAlarms(self, pivotFrames):
-        dateFrom, dateTo = hp.defaultTimeRange(1)
+        dateFrom, dateTo = hp.defaultTimeRange(2)
         metaDf = self.pq.readFile('parquet/raw/metaDf.parquet')
         # frames, pivotFrames = self.alarms.loadData(dateFrom, dateTo)
 
@@ -276,6 +276,7 @@ class ParquetUpdater(object):
 
         plsDf = createPcktDataset(start_date, end_date)
         self.pq.writeToFile(plsDf, f'{self.location}ml-datasets/packet_loss_Df.parquet')
+        print('packet_loss_Df.parquet created', len(plsDf))
 
         # onehot encode the whole dataset and leave only one month for further ML training
         plsDf_onehot_month, plsDf_onehot = one_month_data(plsDf)

@@ -74,7 +74,7 @@ def builMap(mapDf):
             style='mapbox://styles/petyav/ckh3spvk002i419mzf8m9ixzi'
         ),
         showlegend=False,
-        title = 'Status of all sites in the past 24 hours',
+        title = 'Status of all sites in the past 48 hours',
         template='plotly_white'
     )
 
@@ -192,7 +192,8 @@ def total_number_of_alarms(sitesDf):
     html_elements = [dbc.Col([
             dbc.Row(
                 dbc.Col(
-                    html.H1('Status of all sites in the past 24 hours')
+                    html.H1('Status of all sites in the past 48 hours', 
+                            className='card-title')
                 , align="center")
             , align="center", justify='center', className='h-100'),
         ], className='status-box boxwithshadow', md=3, xs=12)]
@@ -211,7 +212,7 @@ def total_number_of_alarms(sitesDf):
                     ),
                     className='mb-3',
                 ),
-                md=3, xs=3, className='status-count-numbers'
+                md=3, xs=6, className='status-count-numbers'
             )
         )
 
@@ -356,11 +357,11 @@ def layout(**other_unknown_query_strings):
                         dbc.Col(
                             [
                                 html.Div(children=statusTable, id='site-status', className='datatables-cont'),
-                            ], className='page-cont sidebysite-cont', xl=6
+                            ], className='page-cont sidebysite-cont column-margin', xl=6
                         ),
                         dbc.Col(dcc.Graph(figure=builMap(sitesDf), id='site-map',
-                                  className='cls-site-map'),
-                            className='mb-1 page-cont sidebysite-cont', xl=6
+                                        className='cls-site-map'),
+                                className='page-cont sidebysite-cont', xl=6
                         ),
                         dbc.Col(
                             html.Div(
