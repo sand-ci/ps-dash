@@ -117,7 +117,7 @@ body{
 }
 
 .datatables-cont {
-    padding: 20px;
+    padding: 0 20px;
 }
 
 .single-table {
@@ -168,10 +168,10 @@ body{
 }
 
 .cls-site-map {
-    height: 750px;
-    padding: 20px;
+    height: 740px;
+    /* padding: 20px;
     border: 1px solid rgba(0, 0, 0, .125);
-    border-radius: 1rem
+    border-radius: 1rem */
 }
 
 .table-container th {
@@ -197,7 +197,7 @@ body{
     border-color: #cbd4e7;
 }
 
-@media (max-width: 1680px) {
+@media (max-width: 1580px) {
     .sidebysite-cont {
         width: 100% !important;
     }
@@ -568,7 +568,13 @@ body{
     background-color: #ffffff;
 }
 
-@media (max-width: 1380.98px) {
+@media (max-width: 1076px) {
+    .column-margin {
+        margin-bottom: 10px;
+    }
+}
+
+@media (max-width: 1380px) {
     .status-box {
         flex: 1 0 100%;
         /* Grow and shrink as needed, but don't allow multiple items on one line */
@@ -578,12 +584,22 @@ body{
 }
 
 .status-number {
-    font-size: 2.5em;
+    font-size: 2em;
     font-weight: 600;
     margin-bottom: 0;
 }
 
-@media (min-width: 2000px) {
+@media (max-width: 1400px) {
+    h1 {
+        font-size: 2rem !important;
+    }
+}
+
+.status-count-header {
+    display: none;
+}
+
+@media (min-width: 1880px) {
     .status-count-header {
         flex: 0 0 33.33% !important;
         max-width: 33.33% !important;
@@ -592,6 +608,14 @@ body{
     .status-count-numbers {
         flex: 0 0 16.66% !important;
         max-width: 16.66% !important;
+    }
+
+    .status-number {
+        font-size: 2.5em !important;
+    }
+
+    .status-count-header {
+        display: inline;
     }
 }
 
@@ -608,6 +632,7 @@ body{
 
 .how-status-div {
     padding: 0 20px;
+    margin-top: 10px;
 }
 
 .how-status-div button {
