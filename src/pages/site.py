@@ -77,12 +77,12 @@ def generate_tables(site, dateFrom, dateTo, frames, pivotFrames, alarms4Site, al
                                                     href=f'{request.host_url}paths-site/{site}?dateFrom={dateFrom}&dateTo={dateTo}',
                                                     target='_blank',
                                                     className='btn btn-secondary w-100 p-1 load-pairs-button'),
-                                        lg=3, md=6)
+                                        lg=4, md=6)
 
                             if len(ids):
                                 element = html.Div([
                                     dbc.Row([
-                                        dbc.Col(html.H2(event.upper()), lg=9, md=6, align="center"),
+                                        dbc.Col(html.H2(event.upper()), lg=8, md=6, align="center"),
                                         button
                                     ], className='mb-1', justify="between"),
                                     dbc.Row(
