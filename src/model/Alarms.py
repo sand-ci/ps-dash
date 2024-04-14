@@ -58,7 +58,7 @@ class Alarms(object):
             # df = df.drop('tags', axis=1)
             df['site'] = df['tag'].apply(lambda x: x[1] if len(x) > 1 else x[0])
             df['tag'] = df['site']
-            df = df.round(2)
+            df = df.round(3)
             # df['tags'] = df['tag']
 
           elif event in ['high packet loss',
@@ -205,7 +205,7 @@ class Alarms(object):
               print("The file was modified more than 1 hour ago.", f)
               isTooOld = True
 
-      if not folder or isTooOld:
+      if len(folder)==0 or isTooOld == True:
           print('Query ES')
           print('+++++++++++++++++++++')
           frames, pivotFrames = self.getAllAlarms(dateFrom, dateTo)

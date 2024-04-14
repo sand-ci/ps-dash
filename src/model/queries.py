@@ -175,7 +175,7 @@ def queryPathChanged(dateFrom, dateTo):
     data = []
 
     for item in result:
-      temp = item['_source']
+      temp = item['_source'].copy()
       temp['tag'] = [temp['src_site'], temp['dest_site']]
       temp['from'] = temp['from_date']
       temp['to'] = temp['to_date']
@@ -268,12 +268,16 @@ def getASNInfo(ids):
 
     # print(str(query).replace("\'", "\""))
     asnDict = {}
-    data = scan(hp.es, index='ps_asns', query=query)
-    if data:
-      for item in data:
-          asnDict[str(item['_id'])] = item['_source']['owner']
-    else:
-        print(ids, 'Not found')
+    try:
+      data = scan(hp.es, index='ps_asns', query=query)
+      if data:
+        for item in data:
+            asnDict[str(item['_id'])] = item['_source']['owner']
+      else:
+          print(ids, 'Not found')
+    except Exception as e:
+      print('Exception:', e)
+      print(traceback.format_exc())
 
     return asnDict
 
@@ -365,26 +369,34 @@ def getSubcategories():
   return catdf
 
 
-def queryTraceChanges(dateFrom, dateTo):
+def queryTraceChanges(dateFrom, dateTo, asn=None):
   dateFrom = hp.convertDate(dateFrom)
   dateTo = hp.convertDate(dateTo)
 
   q = {
-    "query": {
-      "bool": {
-        "must": [
-          {
-            "range": {
-              "to_date": {
-                "from": dateFrom,
-                "to": dateTo,
-                "format": "strict_date_optional_time"
-              }
-            }
+      "query": {
+          "bool": {
+              "must": [
+                  {
+                      "range": {
+                          "from_date": {
+                              "gte": dateFrom,
+                              "format": "strict_date_optional_time"
+                          }
+                      }
+                  },
+                  {
+                      "range": {
+                          "to_date": {
+                              "lte": dateTo,
+                              "format": "strict_date_optional_time"
+                          }
+                      }
+                  },
+                  asn_filter
+              ]
           }
-        ]
       }
-    }
   }
 
   # print(str(q).replace("\'", "\""))

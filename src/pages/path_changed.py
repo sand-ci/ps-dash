@@ -62,7 +62,7 @@ def layout(q=None, **other_unknown_query_strings):
         print()
         print('Alarm content:', alarm)
 
-        chdf, posDf, baseline, altPaths = qrs.queryTraceChanges(alarm['from'], alarm['to'])
+        chdf, posDf, baseline, altPaths = qrs.queryTraceChanges(alarm['from'], alarm['to'], alarm['asn'])
         dateFrom, dateTo = hp.getPriorNhPeriod(alarm["to"])
         frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
         posDf['asn'] = posDf['asn'].astype(int)
@@ -72,7 +72,7 @@ def layout(q=None, **other_unknown_query_strings):
         pairCount = pd.concat([dsts, srcs]).groupby(['site']).sum().reset_index().sort_values('pair', ascending=False)
         topDownList = pairCount[pairCount['site'].isin(alarm['sites'])]['site'].values.tolist()
 
-        affected = '  |  '.join(alarm["sites"])
+        # affected = '  |  '.join(alarm["sites"])
 
         selectedTab = topDownList[0]
         if 'site' in other_unknown_query_strings.keys():
@@ -101,8 +101,8 @@ def layout(q=None, **other_unknown_query_strings):
                               html.P(f"During the period {alarm['from']} - {alarm['to']}, path between {alarm['num_pairs']} source-destination pairs diverged through ASN {alarm['asn']}.", className='subtitle'),
                               ], justify="start"),
                               dbc.Row([
-                                dbc.Col(html.P(f"The change affected the following sites: ", className='subtitle'), width='auto', align="center"),
-                                dbc.Col(html.B(affected, className='subtitle'), align="center"),
+                                dbc.Col(html.P(f"The change affected the sites bellow ", className='subtitle'), width='auto', align="center"),
+                                # dbc.Col(html.B(affected, className='subtitle'), align="center"),
                               ], justify="start")
                             ], className="pair-details")
                         ],
