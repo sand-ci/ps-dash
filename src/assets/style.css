@@ -568,13 +568,14 @@ body{
     background-color: #ffffff;
 }
 
-@media (max-width: 1076px) {
+@media (max-width: 1500px) {
     .column-margin {
-        margin-bottom: 10px;
+        margin-top: 10px;
+        padding: 0 20px;
     }
 }
 
-@media (max-width: 1380px) {
+@media (max-width: 1340px) {
     .status-box {
         flex: 1 0 100%;
         /* Grow and shrink as needed, but don't allow multiple items on one line */
@@ -589,7 +590,7 @@ body{
     margin-bottom: 0;
 }
 
-@media (max-width: 1400px) {
+@media (max-width: 1340px) {
     h1 {
         font-size: 2rem !important;
     }
