@@ -373,31 +373,55 @@ def queryTraceChanges(dateFrom, dateTo, asn=None):
   dateFrom = hp.convertDate(dateFrom)
   dateTo = hp.convertDate(dateTo)
 
-  q = {
+  if asn:
+    q = {
+        "query": {
+            "bool": {
+                "must": [
+                    {
+                        "range": {
+                            "from_date": {
+                                "gte": dateFrom,
+                                "format": "strict_date_optional_time"
+                            }
+                        }
+                    },
+                    {
+                        "range": {
+                            "to_date": {
+                                "lte": dateTo,
+                                "format": "strict_date_optional_time"
+                            }
+                        }
+                    },
+                    {
+                      "terms": {
+                            "diff": [asn]
+                        }
+                    }
+                ]
+            }
+        }
+    }
+
+  else:
+    q = {
       "query": {
-          "bool": {
-              "must": [
-                  {
-                      "range": {
-                          "from_date": {
-                              "gte": dateFrom,
-                              "format": "strict_date_optional_time"
-                          }
-                      }
-                  },
-                  {
-                      "range": {
-                          "to_date": {
-                              "lte": dateTo,
-                              "format": "strict_date_optional_time"
-                          }
-                      }
-                  },
-                  asn_filter
-              ]
-          }
+        "bool": {
+          "must": [
+            {
+              "range": {
+                "to_date": {
+                  "from": dateFrom,
+                  "to": dateTo,
+                  "format": "strict_date_optional_time"
+                }
+              }
+            }
+          ]
+        }
       }
-  }
+    }
 
   # print(str(q).replace("\'", "\""))
   result = scan(client=hp.es,index='ps_traces_changes',query=q)
