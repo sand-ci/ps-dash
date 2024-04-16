@@ -61,7 +61,7 @@ spec:
       labels:
         k8s-app: ps-dash
     spec:
-      terminationGracePeriodSeconds: 900  # wait for 15 minuted before forcibly terminating the pod
+      terminationGracePeriodSeconds: 200  # wait for 15 minuted before forcibly terminating the pod
       containers:
         - name: ps-dash
           image: sandci/ps-dash:latest
@@ -79,10 +79,10 @@ spec:
               mountPath: "/etc/ps-dash/"
           resources:
             requests:
-              cpu: "1000m"
+              cpu: "4000m"
               memory: "10Gi"
             limits:
-              cpu: "4000m"
+              cpu: "8000m"
               memory: "20Gi"
       volumes:
         - name: frontend-conf-volume
