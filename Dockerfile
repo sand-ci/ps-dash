@@ -19,8 +19,6 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     zip \
     vim 
 
-RUN python3 -m pip3 install --upgrade pip3
-
 COPY src /src/
 
 RUN pip3 install --no-cache-dir -r /src/requirements.txt
