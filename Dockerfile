@@ -12,7 +12,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     build-essential \
     git \
     python3 \
-    python3-pip \
+    python3-full \
     rsync \
     software-properties-common \
     unzip \
