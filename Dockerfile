@@ -1,4 +1,4 @@
-FROM ubuntu:focal
+FROM ubuntu
 
 LABEL maintainer="Ilija Vukotic"
 

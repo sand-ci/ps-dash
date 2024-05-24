@@ -10,10 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4.1.6
 
       - name: Docker Build & Push Action
-        uses: mr-smithers-excellent/docker-build-push@v5.6
+        uses: mr-smithers-excellent/docker-build-push@v6.4
         with:
           image: sandci/ps-dash
           tags: latest
