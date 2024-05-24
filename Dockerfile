@@ -21,7 +21,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
 
 COPY src /src/
 
-RUN pip3 install --no-cache-dir -r /src/requirements.txt
+RUN pip3 install --no-cache-dir --break-system-packages -r /src/requirements.txt
 
 EXPOSE 8050
 
