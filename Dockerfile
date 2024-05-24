@@ -1,4 +1,4 @@
-FROM ubuntu
+FROM ubuntu:noble
 
 LABEL maintainer="Ilija Vukotic"
 
@@ -12,18 +12,18 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     build-essential \
     git \
     python3 \
-    python3-full \
+    python3-pip \
     rsync \
     software-properties-common \
     unzip \
     zip \
     vim 
 
-RUN python3 -m pip install --upgrade pip
+RUN pip3 install --upgrade pip
 
 COPY src /src/
 
-RUN python3 -m pip install --no-cache-dir -r /src/requirements.txt
+RUN pip3 install --no-cache-dir -r /src/requirements.txt
 
 EXPOSE 8050
 
