@@ -19,11 +19,11 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     zip \
     vim 
 
-RUN python -m pip install --upgrade pip
+RUN python3 -m pip install --upgrade pip
 
 COPY src /src/
 
-RUN python -m pip install --no-cache-dir -r /src/requirements.txt
+RUN python3 -m pip install --no-cache-dir -r /src/requirements.txt
 
 EXPOSE 8050
 
