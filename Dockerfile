@@ -11,6 +11,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     curl wget \
     build-essential \
     git \
+    python3-pip \
     python3-full \
     rsync \
     software-properties-common \
