@@ -11,15 +11,14 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     curl wget \
     build-essential \
     git \
-    python3 \
-    python3-pip \
+    python3-full \
     rsync \
     software-properties-common \
     unzip \
     zip \
     vim 
 
-RUN pip3 install --upgrade pip
+RUN python3 -m pip install --upgrade pip
 
 COPY src /src/
 
