@@ -348,7 +348,7 @@ def pairDetails(pair, alarm, chdf, baseline, altpaths, hopPositions):
                         html.Div(children=[
                           dbc.Row([
                             dbc.Col([
-                              dbc.Badge(f"Taken in {str(round(hash_freq*100,2))}% of time", text_color="dark", color="rgb(255, 255, 255)",  className="w-100")
+                              dbc.Badge(f"Taken in {str(round(hash_freq*100,3))}% of time", text_color="dark", color="rgb(255, 255, 255)",  className="w-100")
                               ]),
                             dbc.Col([
                               dbc.Badge(f"Always reaches destination: {['YES' if path_always_reaches_dest else 'NO'][0]}", text_color="dark", color="rgb(255, 255, 255))",  className="w-100")
