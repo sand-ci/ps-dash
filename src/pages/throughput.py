@@ -41,13 +41,6 @@ dash.register_page(
     description=description,
 )
 
-
-
-def convertTime(ts):
-    stripped = datetime.strptime(ts, '%Y-%m-%dT%H:%M:%S.000Z')
-    return int((stripped - datetime(1970, 1, 1)).total_seconds()*1000)
-
-
 # TODO: move that query to queries.py
 @timer
 def getRawDataFromES(src, dest, ipv6, dateFrom, dateTo):
@@ -66,9 +59,9 @@ def getRawDataFromES(src, dest, ipv6, dateFrom, dateTo):
                     {
                       "range": {
                           "timestamp": {
-                          "gte": convertTime(dateFrom),
-                          "lte": convertTime(dateTo),
-                          "format": "epoch_millis"
+                          "gte": dateFrom,
+                          "lte": dateTo,
+                          "format": "strict_date_optional_time"
                           }
                         }
                     },

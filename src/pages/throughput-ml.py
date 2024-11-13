@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import pickle
 
 import utils.helpers as hp
+from utils.helpers import DATE_FORMAT
 from utils.parquet import Parquet
 
 import urllib3
@@ -404,8 +405,8 @@ def update_output(start_date, end_date, sensitivity, sitesState):
     State("sites-dropdown-thrpt", "value"))
 def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
     start_date, end_date = [f'{start_date} 00:01', f'{end_date} 23:59']
-    start_date = datetime.strptime(start_date, '%Y-%m-%d %H:%M')
-    end_date = datetime.strptime(end_date, '%Y-%m-%d %H:%M')
+    start_date = datetime.strptime(start_date, DATE_FORMAT)
+    end_date = datetime.strptime(end_date, DATE_FORMAT)
 
     # creating a global layout for the plots
     global layout, layout_mean

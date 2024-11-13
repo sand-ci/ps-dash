@@ -3,13 +3,12 @@ from dash import html
 import dash_bootstrap_components as dbc
 
 from datetime import datetime
+import urllib3
 
 import utils.helpers as hp
+from utils.helpers import DATE_FORMAT
 from model.Alarms import Alarms
 import model.queries as qrs
-
-import urllib3
-from datetime import datetime
 
 from utils.parquet import Parquet
 urllib3.disable_warnings()
@@ -38,7 +37,7 @@ def obtainFieldNames(dateFrom):
   # Date when all latency alarms started netsites instead of sites
   target_date = datetime(2023, 9, 21)
   
-  date_from = datetime.strptime(dateFrom, "%Y-%m-%dT%H:%M:%S.000Z")
+  date_from = datetime.strptime(dateFrom, DATE_FORMAT)
   
   if date_from > target_date:
     return {'src': 'src_netsite', 'dest': 'dest_netsite'}

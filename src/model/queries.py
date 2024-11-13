@@ -2,6 +2,7 @@ import traceback
 from elasticsearch.helpers import scan
 from datetime import datetime
 import pandas as pd
+from dateutil.parser import parse
 
 import utils.helpers as hp
 
@@ -16,10 +17,11 @@ urllib3.disable_warnings()
 # On 18 Nov 2023 all alarms moved to querying netsites instead of sites, 
 # but kept src_site and dest_site for backward compatibility
 def obtainFieldNames(dateFrom):
-  target_date = datetime(2023, 11, 18)
-  target_milliseconds = target_date.timestamp() * 1000
+  dateFrom = parse(dateFrom)
 
-  if dateFrom > target_milliseconds:
+  target_date = datetime(2023, 11, 18, tzinfo=dateFrom.tzinfo)
+
+  if dateFrom > target_date:
     return 'src_netsite', 'dest_netsite'
   else:
     return 'src_site', 'dest_site'
@@ -36,7 +38,7 @@ def queryThroughputIdx(dateFrom, dateTo):
             "timestamp": {
               "gt": dateFrom,
               "lte": dateTo,
-              "format": "epoch_millis"
+              "format": "strict_date_optional_time"
             }
           }
         },
@@ -198,7 +200,7 @@ def queryAlarms(dateFrom, dateTo):
                             "created_at": {
                                 "gte": period[0],
                                 "lte": period[1],
-                                "format": "epoch_millis"
+                                "format": "strict_date_optional_time"
                             }
                         }
                     },
@@ -506,7 +508,7 @@ def query4Avg(idx, dateFrom, dateTo):
                       "timestamp" : {
                         "gt" : dateFrom,
                         "lte": dateTo,
-                        "format": "epoch_millis"
+                        "format": "strict_date_optional_time"
                       }
                     }
                   },

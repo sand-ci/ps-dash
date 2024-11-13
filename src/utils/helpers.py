@@ -10,7 +10,7 @@ import functools
 from elasticsearch import Elasticsearch
 import getpass
 
-
+DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.000Z"
 INDICES = ['ps_packetloss', 'ps_owd', 'ps_throughput', 'ps_trace']
 
 user, passwd, mapboxtoken = None, None, None
@@ -50,11 +50,11 @@ def timer(func):
 
 def convertDate(dt):
     try:
-        parsed_date = datetime.strptime(dt, "%Y-%m-%dT%H:%M:%S.000Z")
-        formatted_date = parsed_date.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        parsed_date = datetime.strptime(dt, DATE_FORMAT)
+        formatted_date = parsed_date.strftime(DATE_FORMAT)
     except ValueError:
-        parsed_date = datetime.strptime(dt, "%Y-%m-%d %H:%M")
-        formatted_date = parsed_date.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        parsed_date = datetime.strptime(dt, DATE_FORMAT)
+        formatted_date = parsed_date.strftime(DATE_FORMAT)
 
     return formatted_date
 
@@ -64,11 +64,10 @@ def getPriorNhPeriod(end, daysBefore=1, midPoint=True):
     if not midPoint:
         daysAfter = 0
 
-    fmt = '%Y-%m-%dT%H:%M:%S.000Z'
     end = convertDate(end)
-    endT = datetime.strptime(end, fmt)
-    start = datetime.strftime(endT - timedelta(daysBefore), fmt)
-    end = datetime.strftime(endT + timedelta(daysAfter), fmt)
+    endT = datetime.strptime(end, DATE_FORMAT)
+    start = datetime.strftime(endT - timedelta(daysBefore), DATE_FORMAT)
+    end = datetime.strftime(endT + timedelta(daysAfter), DATE_FORMAT)
     return start, end
 
 
@@ -82,20 +81,19 @@ def getValueUnit(test_type):
 
 
 def defaultTimeRange(days=3, datesOnly=False):
-    format = '%Y-%m-%dT%H:%M:%S.000Z'
+    format = DATE_FORMAT
     if datesOnly:
         format = '%Y-%m-%d'
     
-    now = roundTime(datetime.utcnow())  # 1 hour
+    now = roundTime(datetime.now())  # 1 hour
     defaultEnd = datetime.strftime(now, format)
     defaultStart = datetime.strftime(now - timedelta(days), format)
-
     return [defaultStart, defaultEnd]
 
 
 def roundTime(dt=None, round_to=60*60):
     if dt == None:
-        dt = datetime.utcnow()
+        dt = datetime.now()
     seconds = (dt - dt.min).seconds
     rounding = (seconds+round_to/2) // round_to * round_to
     return dt + timedelta(0,rounding-seconds,-dt.microsecond)
@@ -103,30 +101,21 @@ def roundTime(dt=None, round_to=60*60):
 
 # Expected values: time in miliseconds or string (%Y-%m-%dT%H:%M:%S.000Z')
 def FindPeriodDiff(dateFrom, dateTo):
-    if (isinstance(dateFrom, int) and isinstance(dateTo, int)):
-        d1 = datetime.fromtimestamp(dateTo/1000)
-        d2 = datetime.fromtimestamp(dateFrom/1000)
-        time_delta = (d1 - d2)
-    else:
-        fmt = '%Y-%m-%dT%H:%M:%S.000Z'
-        d1 = datetime.strptime(dateFrom, fmt)
-        d2 = datetime.strptime(dateTo, fmt)
-        time_delta = d2-d1
+    d1 = datetime.strptime(dateFrom, DATE_FORMAT)
+    d2 = datetime.strptime(dateTo, DATE_FORMAT)
+    time_delta = d2-d1
     return time_delta
 
 
 def GetTimeRanges(dateFrom, dateTo, intv=1):
     diff = FindPeriodDiff(dateFrom, dateTo) / intv
-    t_format = "%Y-%m-%dT%H:%M:%S.000Z"
     tl = []
     for i in range(intv+1):
-        if (isinstance(dateFrom, int)):
-            t = (datetime.fromtimestamp(dateFrom/1000) + diff * i)
-            tl.append(int(time.mktime(t.timetuple())*1000))
+        if isinstance(dateFrom, int):
+            t = (datetime.fromtimestamp(dateFrom/1000) + diff * i).strftime(DATE_FORMAT)
         else:
-            t = (datetime.strptime(dateFrom,t_format) + diff * i).strftime(t_format)
-            tl.append(int(time.mktime(datetime.strptime(t, t_format).timetuple())*1000))
-
+            t = (datetime.strptime(dateFrom, DATE_FORMAT) + diff * i).strftime(DATE_FORMAT)
+        tl.append(t)
     return tl
 
 

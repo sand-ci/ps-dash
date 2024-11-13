@@ -73,6 +73,7 @@ class ParquetUpdater(object):
                 # column "to" is closest to the time the alarms was generated, 
                 # thus we want to which approx. when the alarms was created,
                 # to be between dateFrom and dateTo
+                df['to'] = pd.to_datetime(df['to'], utc=True)
                 sdf = df[(df['tag'] == site) & (df['to'] >= dateFrom) & (df['to'] <= dateTo)]
                 
                 if len(sdf) > 0:

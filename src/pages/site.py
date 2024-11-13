@@ -171,7 +171,7 @@ def SitesOverviewPlots(site_name, pq):
 
     direction = {1: 'src', 2: 'dest'}
 
-    alltests['dt'] = pd.to_datetime(alltests['from'], unit='ms')
+    alltests['dt'] = pd.to_datetime(alltests['from'])
 
     # convert throughput bites to MB
     alltests.loc[alltests['idx']=='ps_throughput', 'value'] = alltests[alltests['idx']=='ps_throughput']['value'].apply(lambda x: round(x/1e+6, 2))
