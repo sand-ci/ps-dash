@@ -38,7 +38,7 @@ dash.register_page(
 )
 
 def layout(**other_unknown_query_strings):
-    now = hp.defaultTimeRange(days=60, datesOnly=True)
+    now = hp.defaultTimeRange(days=60)
 
     #Packet loss alarms page
     return \
@@ -274,15 +274,11 @@ def colorMap(eventTypes):
     State("sites-dropdown-pl", "value"))
 def update_output(start_date, end_date, sensitivity, sitesState):
 
-    if start_date and end_date:
-        start_date, end_date = [f'{start_date}T00:01:00.000Z', f'{end_date}T00:01:00.000Z']
-    else:
-        start_date, end_date = hp.defaultTimeRange(days=60, datesOnly=True)
-        start_date, end_date = [f'{start_date}T00:01:00.000Z', f'{end_date}T00:01:00.000Z']
+    if not start_date and not end_date:
+        start_date, end_date = hp.defaultTimeRange(days=90)
 
     # check if the date range is default
-    start_date_check, end_date_check = hp.defaultTimeRange(days=60, datesOnly=True)
-    start_date_check, end_date_check = [f'{start_date_check}T00:01:00.000Z', f'{end_date_check}T00:01:00.000Z']
+    start_date_check, end_date_check = hp.defaultTimeRange(days=60)
 
     # query for the dataset
     if (start_date, end_date) == (start_date_check, end_date_check):
@@ -406,8 +402,6 @@ def update_output(start_date, end_date, sensitivity, sitesState):
     ],
     State("sites-dropdown-pl", "value"))
 def update_analysis(start_date, end_date, allsites, src_sites, sitesState):
-
-    start_date, end_date = [f'{start_date} 00:01', f'{end_date} 23:59']
     start_date = datetime.strptime(start_date, DATE_FORMAT)
     end_date = datetime.strptime(end_date, DATE_FORMAT)
 
