@@ -2,6 +2,7 @@ import glob
 import os
 import time
 from elasticsearch.helpers import scan
+import numpy as np
 import pandas as pd
 import traceback
 from flask import request
@@ -54,12 +55,10 @@ class Alarms(object):
           elif event in ['high packet loss on multiple links', 'bandwidth increased from/to multiple sites', 'bandwidth decreased from/to multiple sites']:
             df = self.oneInBothWaysUnfold(df)
 
-          elif event == 'large clock correction':
-            # df = df.drop('tags', axis=1)
+          elif event in ['large clock correction']:
             df['site'] = df['tag'].apply(lambda x: x[1] if len(x) > 1 else x[0])
             df['tag'] = df['site']
             df = df.round(3)
-            # df['tags'] = df['tag']
 
           elif event in ['high packet loss',
                          'path changed',
@@ -68,20 +67,18 @@ class Alarms(object):
                          'bandwidth decreased',
                          'bandwidth increased',
                          'complete packet loss',
-                         'path changed between sites']:
-            
-            
+                         'path changed between sites',
+                         'hosts not found',
+                         'unresolvable host']:
             df = self.list2rows(df)
 
-    
           pivotFrames[event] = df
+
+      return [frames, pivotFrames]
 
     except Exception as e:
       print('Issue with', event, df.columns)
       print(e, traceback.format_exc())
-
-    return [frames, pivotFrames]
-
 
 
   # code friendly event name
@@ -186,6 +183,7 @@ class Alarms(object):
             event = self.eventUF(event)
 
             df = pq.readFile(f)
+            df['to'] = pd.to_datetime(df['to'], utc=True)
             modification_time = os.path.getmtime(f)
 
             # Calculate the time difference in seconds
@@ -193,7 +191,9 @@ class Alarms(object):
             time_difference_hours = time_difference / (60 * 60)
 
             # Check if the file was modified more than 1 hour ago
-            if time_difference_hours < 1:
+            if time_difference_hours <                                              12:
+              # print('--------', event, f, len(df))
+              # print('>>>>>>>', df['to'].min(), df['to'].max() , dateFrom, dateTo)
               # print("The file was modified within the last hour.")
               frames[event] = df[(df['to']>=dateFrom) & (df['to'] <= dateTo)]
               pdf = pq.readFile(f"parquet/pivot/{os.path.basename(f)}")
@@ -284,6 +284,32 @@ class Alarms(object):
       return dd
 
 
+  @staticmethod
+  def convertListOfDict(column_name, df):
+    def convert_to_string(value):
+            if isinstance(value, dict):
+                result = []
+                for key, val in value.items():
+                    if val is not None:
+                        if isinstance(val, np.ndarray):
+                            val_str = ', '.join(val)
+                        else:
+                            val_str = str(val)
+                        result.append(f"<b>{key}</b>: {val_str}")
+                return '\n'.join(result)
+            return str(value)
+        
+    df[column_name] = df[column_name].apply(convert_to_string)
+    return df
+
+
+  @staticmethod
+  def reorder_columns(df, columns):
+      existing_columns = [col for col in columns if col in df.columns]
+      remaining_columns = [col for col in df.columns if col not in existing_columns]
+      return df[existing_columns + remaining_columns]
+
+
   # Format, hide or edit anything displayed in the datatables
   def formatDfValues(self, df, event):
     try:
@@ -338,19 +364,31 @@ class Alarms(object):
         if 'alarm_id' in df.columns:
           df['alarm_link'] = df['alarm_id']
           df.drop('alarm_id', axis=1, inplace=True)
-        df = df[['from','to'] + [col for col in df.columns if not col in ['from', 'to']]]
+
+        if 'configurations' in df.columns:
+            df = self.replaceCol('configurations', df, '\n')
+        if 'hosts_not_found' in df.columns:
+            df = self.convertListOfDict('hosts_not_found', df)
 
         if event == 'complete packet loss':
           df.drop(columns=['avg_value'], inplace=True)
 
-        
-        df = self.createAlarmURL(df, event)
+        # TODO: create pages/visualizatios for the following events then remove the df.drop('alarm_link') below
+        if event not in ['unresolvable host', 'hosts not found']:
+          df = self.createAlarmURL(df, event)
+        else:
+          df.drop('alarm_link', axis=1, inplace=True)
+          df['site'] = df['site'].fillna("Unknown site")
+
+        # Reorder 'from' and 'to' columns to be the first two columns if they exist
+        df = self.reorder_columns(df, ['from', 'to'])
+
+        return df
     except Exception as e:
         print('Exception ------- ', event)
         print(df.head())
         print(e, traceback.format_exc())
 
-    return df
 
   @staticmethod
   # Create dynamically the URLs leading to a page for a specific alarm
@@ -362,6 +400,8 @@ class Alarms(object):
     elif event in ['firewall issue', 'complete packet loss', 'bandwidth decreased from/to multiple sites',
                     'high packet loss on multiple links', 'high packet loss']:
         page = 'loss-delay/'
+    # else:
+    #     page = 'alarms/'
 
     # create clickable cells leading to alarm pages
     if 'alarm_link' in df.columns:
