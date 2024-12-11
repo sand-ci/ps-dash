@@ -23,38 +23,32 @@ from datetime import datetime, timedelta
 @timer
 class ParquetUpdater(object):
     
-    def __init__(self):
+    def __init__(self, location='parquet/'):
         self.pq = Parquet()
         self.alarms = Alarms()
-        self.location = 'parquet/'
-        self.createLocation(self.location)
-
-        folders = ['raw', 'frames', 'pivot', 'ml-datasets'] 
-        for folder in folders:
-            self.createLocation(self.location + folder + '/')
-
-        # Prevent the data from being updated if it is fresh
-        if self.__isDataFresh(self.location) == False:
-            print("Data is too old or folders are empty. Updating...")
-            self.storeMetaData()
-            self.cacheIndexData()
-            self.storeAlarms()
-            self.storePathChangeDescDf()
-            self.storeThroughputDataAndModel()
-            self.storePacketLossDataAndModel()
+        self.location = location
+        required_folders = ['raw', 'frames', 'pivot', 'ml-datasets']
+        self.createLocation(required_folders)
 
         try:
+            if not self.__isDataFresh(required_folders):
+                print("Updating...")
+                self.storeMetaData()
+                self.cacheIndexData()
+                self.storeAlarms()
+                self.storePathChangeDescDf()
+                self.storeThroughputDataAndModel()
+                self.storePacketLossDataAndModel()
+
+            # Set the schedulers
             Scheduler(60*60, self.cacheIndexData)
             Scheduler(60*30, self.storeAlarms)
             Scheduler(60*30, self.storePathChangeDescDf)
-            Scheduler(int(60*60*12), self.storeMetaData)
-
-            # Store the data for the Major Alarms analysis
-            Scheduler(int(60*60*12), self.storeThroughputDataAndModel)
-            Scheduler(int(60*60*12), self.storePacketLossDataAndModel)
+            Scheduler(60*60*12, self.storeMetaData)
+            Scheduler(60*60*12, self.storeThroughputDataAndModel)
+            Scheduler(60*60*12, self.storePacketLossDataAndModel)
         except Exception as e:
             print(traceback.format_exc())
-
 
 
     # The following function is used to group alarms by site 
@@ -63,11 +57,11 @@ class ParquetUpdater(object):
         dateFrom, dateTo = hp.defaultTimeRange(2)
         metaDf = self.pq.readFile('parquet/raw/metaDf.parquet')
         # frames, pivotFrames = self.alarms.loadData(dateFrom, dateTo)
-
+        print(111, len(metaDf), len(pivotFrames))
         nodes = metaDf[~(metaDf['site'].isnull()) & ~(
             metaDf['site'] == '') & ~(metaDf['lat'] == '') & ~(metaDf['lat'].isnull())]
         alarmCnt = []
-
+        
         for site, lat, lon in nodes[['site', 'lat', 'lon']].drop_duplicates().values.tolist():
             for e, df in pivotFrames.items():
                 # column "to" is closest to the time the alarms was generated, 
@@ -87,30 +81,40 @@ class ParquetUpdater(object):
                             "lat": lat, "lon": lon}
                 alarmCnt.append(entry)
 
+        print('Number of sites:', len(alarmCnt))
         alarmsGrouped = pd.DataFrame(alarmCnt)
         print('Number of site-alarms:', len(alarmsGrouped[alarmsGrouped['cnt']>0]))
 
         self.pq.writeToFile(alarmsGrouped, f'{self.location}alarmsGrouped.parquet')
 
 
-    @staticmethod
-    def __isDataFresh(folder_path):
-        total_size = 0
-        two_hours_ago = datetime.now() - timedelta(hours=2)
+    def __isDataFresh(self, required_folders, freshness_threshold=1*60*60): # 1 hour
+        """
+        Check if the data in the specified location is fresh.
+        :param location: The directory to check.
+        :param freshness_threshold: The freshness threshold in seconds (default is 1 hour).
+        :return: True if the data is fresh, False otherwise.
+        """
+        current_time = time.time()
+        
+        for folder in required_folders:
+            folder_path = os.path.join(self.location, folder)
+            print(f"Checking folder: {folder_path}")
+            if not os.listdir(folder_path):
+                print(f"Folder {folder_path} is empty.")
+                return False
 
-        if os.path.exists(folder_path):
-            for path, dirs, files in os.walk(folder_path):
-                if not dirs and not files:
+        for root, dirs, files in os.walk(self.location):
+            for file in files:
+                file_path = os.path.join(root, file)
+                file_mod_time = os.path.getmtime(file_path)
+                file_age = current_time - file_mod_time
+                print(f"File: {file_path}, Age: {file_age} seconds")
+                if file_age > freshness_threshold:
+                    print(f"File {file_path} is older than the freshness threshold.")
                     return False
 
-                for file in files:
-                    file_path = os.path.join(path, file)
-                    file_date_created = datetime.fromtimestamp(os.path.getctime(file_path))
-                    total_size += os.path.getsize(file_path)
-
-                    if total_size <= 10 or file_date_created <= two_hours_ago:
-                        return False
-
+        print("All files are fresh.")
         return True
 
 
@@ -132,7 +136,6 @@ class ParquetUpdater(object):
 
     @timer
     def cacheIndexData(self):
-        location = 'parquet/raw/'
         dateFrom, dateTo = hp.defaultTimeRange(1)
         INDICES = ['ps_packetloss', 'ps_owd', 'ps_throughput']
         measures = pd.DataFrame()
@@ -145,7 +148,7 @@ class ParquetUpdater(object):
             df.loc[:, 'dest_site'] = df['dest_site'].str.upper()
             df['idx'] = idx
             measures = pd.concat([measures, df])
-        self.pq.writeToFile(measures, f'{location}measures.parquet')
+        self.pq.writeToFile(measures, f'{self.location}raw/measures.parquet')
 
 
     # @timer  
@@ -230,21 +233,32 @@ class ParquetUpdater(object):
                 temp = self.descChange(chdf[chdf['pair'] == p], posDf[posDf['pair'] == p])
                 temp['src_site'] = baseline[baseline['pair'] == p]['src_site'].values[0]
                 temp['dest_site'] = baseline[baseline['pair'] == p]['dest_site'].values[0]
-                temp['count'] = len(chdf[chdf['pair'] == p])
-                df = pd.concat([df, temp])
+                temp = self.descChange(chdf[chdf['pair'] == p], posDf[posDf['pair'] == p])
+                if not temp.empty:
+                    temp['src_site'] = baseline[baseline['pair'] == p]['src_site'].values[0]
+                    temp['dest_site'] = baseline[baseline['pair'] == p]['dest_site'].values[0]
+                    temp['count'] = len(chdf[chdf['pair'] == p])
+                    df = pd.concat([df, temp])
 
             df['jumpedFrom'] = df['jumpedFrom'].astype(int)
             df['diff'] = df['diff'].astype(int)
             self.pq.writeToFile(df, f"parquet/prev_next_asn.parquet")
 
 
-    @staticmethod
-    def createLocation(location):
-        if os.path.isdir(location):
-            print(location,"exists.")
+    def createLocation(self, required_folders):
+
+        if os.path.isdir(self.location):
+            print(self.location,"exists.")
         else:
-            print(location, "doesn't exists. Creating...")
-            os.mkdir(location)
+            print(self.location, "doesn't exists. Creating...")
+            os.mkdir(self.location)
+
+        for folder in required_folders:
+            folder_path = os.path.join(self.location, folder)
+            if not os.path.isdir(folder_path):
+                print(folder_path, "doesn't exists. Creating...")
+                os.mkdir(folder_path)
+
 
     @timer
     def storeThroughputDataAndModel(self):
@@ -309,7 +323,7 @@ class Scheduler(object):
     def _run(self):
         self.is_running = False
         self.start()
-        self.function(*self.args, **self.kwargs)
+        self.function(*self.args, self.kwargs)
 
     def start(self):
         if not self.is_running:
@@ -319,5 +333,6 @@ class Scheduler(object):
             self.is_running = True
 
     def stop(self):
-        self._timer.cancel()
+        if self._timer:
+            self._timer.cancel()
         self.is_running = False
