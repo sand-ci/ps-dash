@@ -12,7 +12,7 @@ def packet_loss_preprocess(plsDf_custom_x, model):
 
     df_to_plot = plsDf_custom_x.copy()
     df_to_plot['flag'] = y
-    df_to_plot['dt'] = (pd.to_datetime(df_to_plot['dt'], unit='ms'))
+    df_to_plot['dt'] = (pd.to_datetime(df_to_plot['dt'], utc=True))
 
     print('df_to_plot', df_to_plot.shape)
 
@@ -21,7 +21,7 @@ def packet_loss_preprocess(plsDf_custom_x, model):
     # convert timestamp back to datetime
     plsDf_onehot_plot = df_to_plot.copy()
     plsDf_onehot_plot['flag'] = plsDf_custom_y.copy()
-    plsDf_onehot_plot['dt'] = (pd.to_datetime(plsDf_onehot_plot['dt'], unit='ms'))
+    plsDf_onehot_plot['dt'] = (pd.to_datetime(plsDf_onehot_plot['dt'], utc=True))
 
     print('plsDf_onehot_plot', plsDf_onehot_plot.shape)
 

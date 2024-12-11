@@ -24,7 +24,7 @@ def createThrptDataset(dateFrom, dateTo):
     # get the data
     rawDf = pd.DataFrame(queryData(dateFrom, dateTo))
     print(rawDf.head())
-    rawDf['dt'] = pd.to_datetime(rawDf['from'], unit='ms')
+    rawDf['dt'] = pd.to_datetime(rawDf['from'], utc=True)
     rawDf['src_site'] = rawDf['src_site'].str.upper()
     rawDf['dest_site'] = rawDf['dest_site'].str.upper()
 

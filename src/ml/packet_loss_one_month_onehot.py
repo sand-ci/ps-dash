@@ -13,11 +13,11 @@ def one_month_data(plsDf_custom):
     plsDf_onehot = pd.get_dummies(plsDf_custom,dtype=int)
 
     # taking the index of the first 28 days for further training
-    date_s = list(pd.to_datetime(plsDf_onehot['dt'],unit='ms')[:1])[0]
+    date_s = list(pd.to_datetime(plsDf_onehot['dt'], utc=True)[:1])[0]
     date_s = date_s.date()
     date_s = (date_s + datetime.timedelta(days=28))
     try:
-        end_index = plsDf_onehot.loc[(pd.to_datetime(plsDf_onehot['dt'],unit='ms').dt.date == date_s)][:1].index[0]
+        end_index = plsDf_onehot.loc[(pd.to_datetime(plsDf_onehot['dt'], utc=True).dt.date == date_s)][:1].index[0]
         percentile = plsDf_onehot.index.get_loc(end_index) / len(plsDf_onehot)
     except:
         percentile = 0.8
