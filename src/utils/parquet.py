@@ -1,3 +1,4 @@
+import logging
 import dask.dataframe as dd
 import traceback
 import glob
@@ -11,11 +12,15 @@ class Parquet(object):
     
     @staticmethod
     def writeToFile(df, filename):
-        # Convert date columns to the desired format
-        for col in df.select_dtypes(include=['datetime']):
-            df[col] = df[col].dt.strftime(DATE_FORMAT)
-        table = pa.Table.from_pandas(df, preserve_index=True)
-        pq.write_table(table, filename)
+        try:
+            # Convert date columns to the desired format
+            for col in df.select_dtypes(include=['datetime']):
+                df[col] = df[col].dt.strftime(DATE_FORMAT)
+            table = pa.Table.from_pandas(df, preserve_index=True)
+            pq.write_table(table, filename)
+            logging.info(f"Successfully wrote to file: {filename}")
+        except Exception as e:
+            logging.error(f"Error writing to file: {filename}, Exception: {e}")
 
     @staticmethod
     def readSequenceOfFiles(location, prefix):
@@ -35,11 +40,19 @@ class Parquet(object):
     @staticmethod
     def readFile(filename):
         try:
-            df = dd.read_parquet(filename).compute()
+            # df = dd.read_parquet(filename).compute()
+            df = pq.read_table(filename).to_pandas()
             # Convert date columns to datetime objects
-            for col in df.select_dtypes(include=['object']):
+            if 'to' in df.columns:
                 try:
-                    df[col] = pd.to_datetime(df[col], format=DATE_FORMAT)
+                    df['to'] = pd.to_datetime(df['to'], utc=True)
+                    df['to'] = df['to'].dt.strftime(DATE_FORMAT)
+                except ValueError:
+                    pass
+            if 'from' in df.columns:
+                try:
+                    df['from'] = pd.to_datetime(df['from'], utc=True)
+                    df['from'] = df['from'].dt.strftime(DATE_FORMAT)
                 except ValueError:
                     pass
             return df
