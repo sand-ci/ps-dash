@@ -57,7 +57,7 @@ class ParquetUpdater(object):
         dateFrom, dateTo = hp.defaultTimeRange(2)
         metaDf = self.pq.readFile('parquet/raw/metaDf.parquet')
         # frames, pivotFrames = self.alarms.loadData(dateFrom, dateTo)
-        print(111, len(metaDf), len(pivotFrames))
+
         nodes = metaDf[~(metaDf['site'].isnull()) & ~(
             metaDf['site'] == '') & ~(metaDf['lat'] == '') & ~(metaDf['lat'].isnull())]
         alarmCnt = []
