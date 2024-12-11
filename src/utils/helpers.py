@@ -59,7 +59,7 @@ def convertDate(dt):
     return formatted_date
 
 
-def getPriorNhPeriod(end, daysBefore=1, midPoint=True):
+def getPriorNhPeriod(end, daysBefore=2, midPoint=True):
     daysAfter = daysBefore
     if not midPoint:
         daysAfter = 0
