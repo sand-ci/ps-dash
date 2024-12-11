@@ -38,7 +38,7 @@ dash.register_page(
 
 
 def layout(**other_unknown_query_strings):
-    now = hp.defaultTimeRange(days=1, datesOnly=True)
+    now = hp.defaultTimeRange(days=2, datesOnly=True)
 
     return dbc.Row([
         
@@ -136,33 +136,37 @@ def update_output(start_date, end_date, sites, all, events, allevents, sitesStat
 
     if start_date and end_date:
         start_date, end_date = [f'{start_date}T00:01:00.000Z', f'{end_date}T23:59:59.000Z']
-    else: start_date, end_date = hp.defaultTimeRange(1)
-
+    else: start_date, end_date = hp.defaultTimeRange(2)
     alarmsInst = Alarms()
     frames, pivotFrames = alarmsInst.loadData(start_date, end_date)
 
     scntdf = pd.DataFrame()
     for e, df in pivotFrames.items():
-        df = df[df['tag'] != ''].groupby('tag')[['id']].count().reset_index().rename(columns={'id': 'cnt', 'tag': 'site'})
-        df['event'] = e
-        scntdf = pd.concat([scntdf, df])
+        if len(df) > 0:
+            if e != 'unresolvable host': # the tag is hostname for unresolvable hosts
+                df = df[df['tag'] != ''].groupby('tag')[['id']].count().reset_index().rename(columns={'id': 'cnt', 'tag': 'site'})
+            else: df = df[df['site'] != ''].groupby('site')[['id']].count().reset_index().rename(columns={'id': 'cnt'})
+            
+            df['event'] = e
+            scntdf = pd.concat([scntdf, df])
 
     # sites
     graphData = scntdf.copy()
     if (sitesState is not None and len(sitesState) > 0):
         graphData = graphData[graphData['site'].isin(sitesState)]
 
-    sdropdown_items = []
+    sites_dropdown_items = []
     for s in sorted(scntdf['site'].unique()):
-        sdropdown_items.append({"label": s.upper(), "value": s.upper()})
+        if s:
+            sites_dropdown_items.append({"label": s.upper(), "value": s.upper()})
 
     # events
     if eventsState is not None and len(eventsState) > 0:
         graphData = graphData[graphData['event'].isin(eventsState)]
 
-    edropdown_items = []
+    events_dropdown_items = []
     for e in sorted(scntdf['event'].unique()):
-        edropdown_items.append({"label": e, "value": e})
+        events_dropdown_items.append({"label": e, "value": e})
 
 
     fig = px.treemap(graphData, path=[px.Constant("All alarms"), 'event', 'site'], values='cnt',
@@ -176,13 +180,13 @@ def update_output(start_date, end_date, sites, all, events, allevents, sitesStat
 
     for event in sorted(events):
         df = pivotFrames[event]
-        df = df[df['tag'].isin(sitesState)] if sitesState is not None and len(sitesState) > 0 else df
+        df = df[df['site'].isin(sitesState)] if sitesState is not None and len(sitesState) > 0 else df
         if len(df) > 0:
             dataTables.append(generate_tables(frames[event], df, event, alarmsInst))
     dataTables = html.Div(dataTables)
 
 
-    return [sdropdown_items, edropdown_items, dcc.Graph(figure=fig), dataTables]
+    return [sites_dropdown_items, events_dropdown_items, dcc.Graph(figure=fig), dataTables]
 
 
 
@@ -190,42 +194,46 @@ def update_output(start_date, end_date, sites, all, events, allevents, sitesStat
 def generate_tables(frame, unpacked, event, alarmsInst):
     ids = unpacked['id'].values
     dfr = frame[frame.index.isin(ids)]
-    dfr = alarmsInst.formatDfValues(dfr, event).sort_values('to', ascending=False)
+    dfr = alarmsInst.formatDfValues(dfr, event)
+    dfr.sort_values('to', ascending=False, inplace=True)
 
-    element = html.Div([
-                html.Br(),
-                html.H3(event.upper()),
-                dash_table.DataTable(
-                    data=dfr.to_dict('records'),
-                    columns=[{"name": i, "id": i, "presentation": "markdown"} for i in dfr.columns],
-                    markdown_options={"html": True},
-                    id=f'search-tbl-{event}',
-                    page_current=0,
-                    page_size=10,
-                    style_cell={
-                        'padding': '2px',
-                        'font-size': '13px',
-                        'whiteSpace': 'pre-line'
+    try:
+        element = html.Div([
+                    html.Br(),
+                    html.H3(event.upper()),
+                    dash_table.DataTable(
+                        data=dfr.to_dict('records'),
+                        columns=[{"name": i, "id": i, "presentation": "markdown"} for i in dfr.columns],
+                        markdown_options={"html": True},
+                        id=f'search-tbl-{event}',
+                        page_current=0,
+                        page_size=10,
+                        style_cell={
+                            'padding': '2px',
+                            'font-size': '13px',
+                            'whiteSpace': 'pre-line'
+                            },
+                        style_header={
+                            'backgroundColor': 'white',
+                            'fontWeight': 'bold'
                         },
-                    style_header={
-                        'backgroundColor': 'white',
-                        'fontWeight': 'bold'
-                    },
-                    style_data={
-                        'height': 'auto',
-                        'lineHeight': '15px',
+                        style_data={
+                            'height': 'auto',
+                            'lineHeight': '15px',
+                            'overflowX': 'auto'
+                        },
+                        style_table={
+                        'overflowY': 'auto',
                         'overflowX': 'auto'
-                    },
-                    style_table={
-                    'overflowY': 'auto',
-                    'overflowX': 'auto'
-                    },
-                    filter_action="native",
-                    filter_options={"case": "insensitive"},
-                    sort_action="native",
-                ),
-            ], className='single-table')
-
-    return element
+                        },
+                        filter_action="native",
+                        filter_options={"case": "insensitive"},
+                        sort_action="native",
+                    ),
+                ], className='single-table')
+        return element
+    except Exception as e:
+        print('dash_table.DataTable expects each cell to contain a string, number, or boolean value', e)
+        return html.Div()    
 
     
