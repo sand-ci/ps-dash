@@ -143,8 +143,6 @@ def queryThroughputIdx(dateFrom, dateTo):
   return aggrs
 
 def queryPathChanged(dateFrom, dateTo):
-    dateFrom = hp.convertDate(dateFrom)
-    dateTo = hp.convertDate(dateTo)
     # if (end - start).days < 2:
     #   dateFrom, dateTo = hp.getPriorNhPeriod(dateTo)
     
@@ -353,7 +351,8 @@ def getSubcategories():
   description = {
   'Infrastructure': 	['bad owd measurements','large clock correction',
 	 				            'destination cannot be reached from multiple', 'destination cannot be reached from any',
-			                'source cannot reach any', 'firewall issue', 'complete packet loss'],
+			                'source cannot reach any', 'firewall issue', 'complete packet loss',
+                       'unresolvable host', 'hosts not found'],
 
   'Network': 		      ['bandwidth decreased from/to multiple sites', 'path changed between sites'],
 
