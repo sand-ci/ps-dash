@@ -128,43 +128,45 @@ def update_output(asn, asnState, sites, sitesState):
 
     alarmsInst = Alarms()
     frames, pivotFrames = alarmsInst.loadData(period[0], period[1])
-    frames = {'path changed between sites': frames['path changed between sites'],
-              'path changed': frames['path changed']}
-    pivotFrames = {'path changed between sites': pivotFrames['path changed between sites'],
-                   'path changed': pivotFrames['path changed'], }
-
-
-    df =  pivotFrames['path changed between sites']
-    scntdf = df[df['tag'] != ''].groupby('tag')[['id']].count().reset_index().rename(columns={'id': 'cnt', 'tag': 'site'})
-
-    # sites
-    graphData = scntdf.copy()
-    graphData = graphData[graphData['site'].isin(sitesState)]
-
-    sitesDropdownData = []
-    for s in sorted(pivotFrames['path changed'].tag.unique().tolist()):
-        sitesDropdownData.append({"label": s.upper(), "value": s.upper()})
-
-    # data tables
     dataTables = []
-    for event in sorted(['path changed','path changed between sites']):
-        df = pivotFrames[event]
-        
-        df = df[df['tag'].isin(sitesState)] if len(sitesState) > 0 else df
-        if 'diff' in df.columns and len(asnState) > 0:
-            df = df[df['diff'].isin(asnState)]
-        elif 'asn' in df.columns and len(asnState) > 0:
-            df = df[df['asn'].isin(asnState)]
-        
-        if 'src_site' in df.columns and 'dest_site' in df.columns and len(sitesState) > 0:
-            df = df[(df['src_site'].isin(sitesState)) | (df['dest_site'].isin(sitesState))]
 
-        if len(df) > 0:
-            dataTables.append(generate_tables(frames[event], df, event, alarmsInst))
-    
-    if len(dataTables)==0:
-        dataTables.append(html.P(f'There are no alarms related to the selected criteria', 
-                                style={"padding-left": "1.5%", "font-size": "14px"}))
+    if 'path changed between sites' in frames.keys() and 'path changed' in frames.keys():
+        frames = {'path changed between sites': frames['path changed between sites'],
+                'path changed': frames['path changed']}
+        pivotFrames = {'path changed between sites': pivotFrames['path changed between sites'],
+                    'path changed': pivotFrames['path changed'], }
+
+
+        df =  pivotFrames['path changed between sites']
+        scntdf = df[df['tag'] != ''].groupby('tag')[['id']].count().reset_index().rename(columns={'id': 'cnt', 'tag': 'site'})
+
+        # sites
+        graphData = scntdf.copy()
+        graphData = graphData[graphData['site'].isin(sitesState)]
+
+        sitesDropdownData = []
+        for s in sorted(pivotFrames['path changed'].tag.unique().tolist()):
+            sitesDropdownData.append({"label": s.upper(), "value": s.upper()})
+
+        # data tables
+        for event in sorted(['path changed','path changed between sites']):
+            df = pivotFrames[event]
+            
+            df = df[df['tag'].isin(sitesState)] if len(sitesState) > 0 else df
+            if 'diff' in df.columns and len(asnState) > 0:
+                df = df[df['diff'].isin(asnState)]
+            elif 'asn' in df.columns and len(asnState) > 0:
+                df = df[df['asn'].isin(asnState)]
+            
+            if 'src_site' in df.columns and 'dest_site' in df.columns and len(sitesState) > 0:
+                df = df[(df['src_site'].isin(sitesState)) | (df['dest_site'].isin(sitesState))]
+
+            if len(df) > 0:
+                dataTables.append(generate_tables(frames[event], df, event, alarmsInst))
+        
+        if len(dataTables)==0:
+            dataTables.append(html.P(f'There are no alarms related to the selected criteria', 
+                                    style={"padding-left": "1.5%", "font-size": "14px"}))
     
     dataTables = html.Div(dataTables)
 
