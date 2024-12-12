@@ -5,15 +5,18 @@ import utils.helpers as hp
 from utils.helpers import timer
 
 @timer
-def loadPacketLossData(dateFrom, dateTo):
+def loadPacketLossData(dateFrom, dateTo, batch_size=10000):
     data = []
     intv = int(hp.CalcMinutes4Period(dateFrom, dateTo) / 60)
     time_list = hp.GetTimeRanges(dateFrom, dateTo, intv)
     for i in range(len(time_list) - 1):
         print(f' {i+1}/{len(time_list)-1} packetloss query', time_list[i], time_list[i + 1])
         data.extend(qrs.query4Avg('ps_packetloss', time_list[i], time_list[i + 1]))
-
-    return pd.DataFrame(data)
+        if len(data) >= batch_size:
+            yield pd.DataFrame(data)
+            data = []
+    if data:
+        yield pd.DataFrame(data)
 
 
 def getPercentageMeasuresDone(df, dateFrom, dateTo):
@@ -34,24 +37,22 @@ def getPercentageMeasuresDone(df, dateFrom, dateTo):
     return df
 
 
+def setFlag(x):
+    if x >= 0 and x < 0.02:
+        return 0
+    elif x >= 0.02 and x < 1:
+        return 1
+    elif x == 1:
+        return 2
+    return 'something is wrong'
+
+
 @timer
 def markPairs(dateFrom, dateTo):
     dataDf = loadPacketLossData(dateFrom, dateTo)
     dataDf = dataDf[~dataDf['value'].isnull()]
     df = getPercentageMeasuresDone(dataDf, dateFrom, dateTo)
 
-    # set value to 0 - we consider there is no issue bellow 2% loss
-    # set value to 1 - the pair is marked problematic between 2% and 100% loss
-    # set value to 2 - the pair shows 100% loss
-    def setFlag(x):
-        if x >= 0 and x < 0.02:
-            return 0
-        elif x >= 0.02 and x < 1:
-            return 1
-        elif x == 1:
-            return 2
-        return 'something is wrong'
-    
     df['flag'] = df['value'].apply(lambda val: setFlag(val))
     df.rename(columns={'value': 'avg_value'}, inplace=True)
     df = df.round({'avg_value': 3})
@@ -67,12 +68,17 @@ def markPairs(dateFrom, dateTo):
                                     that there should be 1 measure per minute
 """
 @timer
-def createPcktDataset(dateFrom, dateTo):
-    # dateFrom, dateTo = ['2023-10-01 03:00', '2023-10-03 03:00']
-    plsDf = markPairs(dateFrom, dateTo)
+def createPcktDataset(dateFrom, dateTo, batch_size=10000):
+    all_data = []
+    for batch in loadPacketLossData(dateFrom, dateTo, batch_size):
+        batch = batch[~batch['value'].isnull()]
+        batch = getPercentageMeasuresDone(batch, dateFrom, dateTo)
+        batch['flag'] = batch['value'].apply(lambda val: setFlag(val))
+        batch.rename(columns={'value': 'avg_value'}, inplace=True)
+        batch = batch.round({'avg_value': 3})
+        all_data.append(batch)
+    plsDf = pd.concat(all_data)
     plsDf = plsDf[plsDf['tests_done'] != '0%']
-
     plsDf['src_site'] = plsDf['src_site'].str.upper()
     plsDf['dest_site'] = plsDf['dest_site'].str.upper()
-
     return plsDf
