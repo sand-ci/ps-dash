@@ -22,7 +22,7 @@ def preprocess(rawDf_custom):
 
     #onehot encoding the dataset
     rawDf_onehot = pd.get_dummies(rawDf_custom,dtype=int)
-    rawDf_onehot.ipv6 = rawDf_onehot.ipv6.replace({True: 1, False: 0})
+    rawDf_onehot.ipv6 = rawDf_onehot.ipv6.replace({True: 1, False: 0}).infer_objects(copy=False)
     return rawDf_onehot
 
 def trainMLmodel(rawDf):

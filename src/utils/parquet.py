@@ -18,9 +18,9 @@ class Parquet(object):
                 df[col] = df[col].dt.strftime(DATE_FORMAT)
             table = pa.Table.from_pandas(df, preserve_index=True)
             pq.write_table(table, filename)
-            logging.info(f"Successfully wrote to file: {filename}")
+            print(f"Successfully wrote to file: {filename}")
         except Exception as e:
-            logging.error(f"Error writing to file: {filename}, Exception: {e}")
+            print(f"Error writing to file: {filename}, Exception: {e}")
 
     @staticmethod
     def readSequenceOfFiles(location, prefix):

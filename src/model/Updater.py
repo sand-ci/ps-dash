@@ -242,7 +242,7 @@ class ParquetUpdater(object):
 
             df['jumpedFrom'] = df['jumpedFrom'].astype(int)
             df['diff'] = df['diff'].astype(int)
-            self.pq.writeToFile(df, f"parquet/prev_next_asn.parquet")
+            self.pq.writeToFile(df, f"{self.location}prev_next_asn.parquet")
 
 
     def createLocation(self, required_folders):
@@ -291,7 +291,6 @@ class ParquetUpdater(object):
 
         plsDf = createPcktDataset(start_date, end_date)
         self.pq.writeToFile(plsDf, f'{self.location}ml-datasets/packet_loss_Df.parquet')
-        print('packet_loss_Df.parquet created', len(plsDf))
 
         # onehot encode the whole dataset and leave only one month for further ML training
         plsDf_onehot_month, plsDf_onehot = one_month_data(plsDf)
