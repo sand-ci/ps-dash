@@ -80,10 +80,10 @@ spec:
           resources:
             requests:
               cpu: "4000m"
-              memory: "10Gi"
+              memory: "15Gi"
             limits:
               cpu: "8000m"
-              memory: "20Gi"
+              memory: "30Gi"
       volumes:
         - name: frontend-conf-volume
           secret:
