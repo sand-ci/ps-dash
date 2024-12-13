@@ -25,6 +25,9 @@ def packet_loss_preprocess(plsDf_custom_x, model):
 
     print('plsDf_onehot_plot', plsDf_onehot_plot.shape)
 
+    del plsDf_custom_y
+    del y
+
     return df_to_plot, plsDf_onehot_plot
 
 

@@ -278,15 +278,12 @@ def colorMap(eventTypes):
     ],
     State("sites-dropdown-thrpt", "value"))
 def update_output(start_date, end_date, sensitivity, sitesState):
-    print('11111 start_date', start_date, 'end_date', end_date)
     if not start_date and not end_date:
         start_date, end_date = hp.defaultTimeRange(days=90)
 
-    print('22222 start_date', start_date, 'end_date', end_date)
     # check if the date range is default
     start_date_check, end_date_check = hp.defaultTimeRange(days=90)
     # start_date_check, end_date_check = [f'{start_date_check}T00:01:00.000Z', f'{end_date_check}T23:59:59.000Z']
-    print('start_date_check', start_date_check, 'end_date_check', end_date_check)
     # query for the dataset
     if (start_date, end_date) == (start_date_check, end_date_check):
         pq = Parquet()
@@ -306,7 +303,7 @@ def update_output(start_date, end_date, sensitivity, sitesState):
     # predict the data on the model and return the dataset with original alarms and the ML alarms
     global rawDf_onehot_plot, df_to_plot
     rawDf_onehot_plot, df_to_plot = predictData(rawDf_onehot, model)
-    del rawDf_onehot
+    del rawDf_onehot, model
 
     # create a list with all sites as sources
     src_sites = rawDf_onehot_plot.loc[:, rawDf_onehot_plot.columns.str.startswith("src_site")].columns.values.tolist()
@@ -339,7 +336,7 @@ def update_output(start_date, end_date, sensitivity, sitesState):
 
             for date, alarm_num in alarm_nums.items():
                 # use the sensitivity chosen by user (default 5)
-                if alarm_num > alarm_nums_mean * sensitivity:
+                if (alarm_num > alarm_nums_mean * sensitivity):
                     # print(site_name, 'alarm mean:', alarm_nums_mean)
                     # print(alarm_num, 'alarms on', site_name, date)
                     in_a_row += 1
@@ -359,8 +356,8 @@ def update_output(start_date, end_date, sensitivity, sitesState):
         except:
             j += 1
 
-    print("\nnumber of successful occurrences of host being both a src and dest:", i)
-    print("number of unsuccessful occurrences of host being both a src and dest:", j)
+    print('number of successful occurrences of host being both a src and dest: %d', i)
+    print('number of unsuccessful occurrences of host being both a src and dest: %d', j)
 
     # making a pretty df and preparing it for converting to a plotly DataTable
     data = pd.DataFrame(alarms_list).fillna(value='-')

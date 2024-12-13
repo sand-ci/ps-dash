@@ -26,6 +26,7 @@ def preprocess(rawDf_custom):
     return rawDf_onehot
 
 def trainMLmodel(rawDf):
+    print('Starting trainMLmodel')
     #taking the index of the first 50 days for further training
     rawDf['dt'] = pd.to_datetime(rawDf['dt'].astype(str))
     date_s = list(rawDf['dt'][:1])[0]
@@ -39,6 +40,7 @@ def trainMLmodel(rawDf):
 
     #preprocessing the dataset
     rawDf_onehot = preprocess(rawDf)
+    print('Preprocessed dataset')
 
     # preparing the datasets for ml training
     rawDf_custom_y = rawDf_onehot['alarm_created']
@@ -56,14 +58,13 @@ def trainMLmodel(rawDf):
     y_pred = model.predict(X_test)
 
     # evaluation metrics of the model
-    print("Accuracy of the XGBClassifier classifier:", round(accuracy_score(y_test, y_pred)*100,2), "%")
-    print("F1 score of the XGB Classifier:", f1_score(y_test, y_pred), "\n")
+    print('Trained XGBClassifier model')
+    print("Accuracy of the XGBClassifier classifier: %.2f %%", round(accuracy_score(y_test, y_pred)*100,2))
+    print("F1 score of the XGB Classifier: %f", f1_score(y_test, y_pred))
     print(classification_report(y_test, y_pred))
-    confusion_matrix_data = confusion_matrix(y_test, y_pred, labels = model.classes_)
-    print(confusion_matrix_data, "\n")
-    # disp = ConfusionMatrixDisplay(confusion_matrix = confusion_matrix_data, display_labels = model.classes_)
-    # disp = disp.plot(cmap=plt.cm.YlGnBu,values_format='g')
-    # plt.show()
+    print(confusion_matrix(y_test, y_pred))
+
+    del X_train, X_test, y_train, y_test
 
     return rawDf_onehot, model
 

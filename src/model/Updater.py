@@ -1,3 +1,4 @@
+import gc
 import os
 import os.path
 import time
@@ -19,6 +20,7 @@ from ml.packet_loss_one_month_onehot import one_month_data
 from ml.packet_loss_train_model import packet_loss_train_model
 import os
 from datetime import datetime, timedelta
+
 
 @timer
 class ParquetUpdater(object):
@@ -262,6 +264,7 @@ class ParquetUpdater(object):
 
     @timer
     def storeThroughputDataAndModel(self):
+        print('Starting storeThroughputDataAndModel')
         now = hp.defaultTimeRange(days=90, datesOnly=True)
         start_date = now[0]
         end_date = now[1]
@@ -274,16 +277,22 @@ class ParquetUpdater(object):
         # train the ML model on the loaded dataset
         rawDf_onehot, model = trainMLmodel(rawDf)
         del rawDf
+        print('Trained ML model')
 
         self.pq.writeToFile(rawDf_onehot, f'{self.location}ml-datasets/throughput_onehot_Df.parquet')
         # save the classification model as a pickle file
         model_pkl_file = f'{self.location}ml-datasets/XGB_Classifier_model_throughput.pkl'
         with open(model_pkl_file, 'wb') as file:
             pickle.dump(model, file)
+        print('Saved XGB_Classifier_model_throughput.pkl')
+        del rawDf_onehot, model
+        gc.collect()
 
 
     @timer
     def storePacketLossDataAndModel(self):
+        start_time = time.time()
+        print("Starting storePacketLossDataAndModel")
         now = hp.defaultTimeRange(days=60, datesOnly=True)
         start_date = now[0]
         end_date = now[1]
@@ -292,20 +301,23 @@ class ParquetUpdater(object):
         plsDf = createPcktDataset(start_date, end_date)
         self.pq.writeToFile(plsDf, f'{self.location}ml-datasets/packet_loss_Df.parquet')
 
-        # onehot encode the whole dataset and leave only one month for further ML training
+        print("One-hot encoding the dataset")
         plsDf_onehot_month, plsDf_onehot = one_month_data(plsDf)
         self.pq.writeToFile(plsDf_onehot, f'{self.location}ml-datasets/packet_loss_onehot_Df.parquet')
         del plsDf_onehot
 
-        # train the model on one month data
+        print("Training the model on one month data")
         model = packet_loss_train_model(plsDf_onehot_month)
         del plsDf_onehot_month
 
-        # save the classification model as a pickle file
+        print("Saving the classification model as a pickle file")
         model_pkl_file = f'{self.location}ml-datasets/XGB_Classifier_model_packet_loss.pkl'
         with open(model_pkl_file, 'wb') as file:
             pickle.dump(model, file)
-
+        del plsDf_onehot, model
+        gc.collect()
+        end_time = time.time()
+        print(f"Finished storePacketLossDataAndModel in {end_time - start_time} seconds")
 
 
 class Scheduler(object):
