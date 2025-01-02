@@ -106,9 +106,9 @@ app.layout = html.Div(children=[
                                 dbc.NavItem(dbc.NavLink("EXPLORE PATHS", href="/explore-paths",
                                                         id='paths-tab', class_name="nav-item-cls"
                                                         )),
-                                dbc.NavItem(dbc.NavLink("MAJOR ALARMS", href="/ml-alarms/throughput",
-                                                        id='major-alarms-tab', class_name="nav-item-cls"
-                                                        )),
+                                # dbc.NavItem(dbc.NavLink("MAJOR ALARMS", href="/ml-alarms/throughput",
+                                #                         id='major-alarms-tab', class_name="nav-item-cls"
+                                #                         )),
                             ], class_name="navbar-nav justify-content-around flex-grow-1"
                         ),
                         id="navbar-collapse",

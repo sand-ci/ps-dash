@@ -39,16 +39,16 @@ class ParquetUpdater(object):
                 self.cacheIndexData()
                 self.storeAlarms()
                 self.storePathChangeDescDf()
-                self.storeThroughputDataAndModel()
-                self.storePacketLossDataAndModel()
+                # self.storeThroughputDataAndModel()
+                # self.storePacketLossDataAndModel()
 
             # Set the schedulers
             Scheduler(60*60, self.cacheIndexData)
             Scheduler(60*30, self.storeAlarms)
             Scheduler(60*30, self.storePathChangeDescDf)
             Scheduler(60*60*12, self.storeMetaData)
-            Scheduler(60*60*12, self.storeThroughputDataAndModel)
-            Scheduler(60*60*12, self.storePacketLossDataAndModel)
+            # Scheduler(60*60*12, self.storeThroughputDataAndModel)
+            # Scheduler(60*60*12, self.storePacketLossDataAndModel)
         except Exception as e:
             print(traceback.format_exc())
 
