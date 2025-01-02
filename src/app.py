@@ -128,14 +128,15 @@ app.layout = html.Div(children=[
     [Output('sites-tab', 'active'),
      Output('search-tab', 'active'),
      Output('paths-tab', 'active'),
-     Output('major-alarms-tab', 'active')],
+    #  Output('major-alarms-tab', 'active')
+     ],
     [Input('url', 'pathname')]
 )
 def update_active_tab(pathname):
     url = ''
     if pathname.startswith('/ml-alarms'):
         url = pathname
-    return pathname == "/", pathname == "/search-alarms", pathname == "/explore-paths", pathname == url
+    return pathname == "/", pathname == "/search-alarms", pathname == "/explore-paths"
 
 
 
