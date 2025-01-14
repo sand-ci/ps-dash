@@ -13,7 +13,9 @@ from model.Updater import ParquetUpdater
 # cache the data in /parquet.
 ParquetUpdater()
 
-external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP]
+external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css',
+                        "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css",
+                        dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP]
 
 app = Dash(__name__, external_stylesheets=external_stylesheets, 
            external_scripts=[

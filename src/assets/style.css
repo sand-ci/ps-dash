@@ -16,8 +16,7 @@ body{
 .table-container .cell-markdown>p {
     display: flex;
     height: 100%;
-    justify-content: center;
-    align-items: center;
+    text-align: center;
 }
 
 
@@ -138,6 +137,11 @@ body{
     --selected-background: rgb(227, 234, 244) !important;
 }
 
+.dash-spreadsheet-container.dash-spreadsheet.dash-empty-01.dash-fill-width {
+    border: none !important;
+    box-shadow: none !important;
+}
+
 .container {
     margin-bottom: 20px;
     max-width: 1550px !important;
@@ -168,10 +172,14 @@ body{
 }
 
 .cls-site-map {
-    height: 740px;
+    height: 640px;
     /* padding: 20px;
     border: 1px solid rgba(0, 0, 0, .125);
     border-radius: 1rem */
+}
+
+.mapboxgl-ctrl-bottom-right {
+    display: none;
 }
 
 .table-container th {
@@ -179,13 +187,10 @@ body{
     border-right: 0px !important;
     border-top-color: white !important;
     border-bottom-color: white !important;
-    background-color: #bac4d4 !important;
+    background-color: #f1f1f1 !important;
     color: rgb(45, 44, 44);
 }
 
-.table-container {
-    border: 1px solid #dfdfdf;
-}
 
 .table-container .previous-next-container {
     padding-top: 1% !important;
@@ -195,12 +200,6 @@ body{
     color: rgb(45, 44, 44);
     background-color: #ebf1fd;
     border-color: #cbd4e7;
-}
-
-@media (max-width: 1580px) {
-    .sidebysite-cont {
-        width: 100% !important;
-    }
 }
 
 .card {
@@ -568,12 +567,17 @@ body{
     background-color: #ffffff;
 }
 
+count-box {
+    padding: 30px;
+    text-align: center;
+}
+/* 
 @media (max-width: 1500px) {
     .column-margin {
         margin-top: 10px;
         padding: 0 20px;
     }
-}
+} */
 
 @media (max-width: 1340px) {
     .status-box {
@@ -633,7 +637,6 @@ body{
 
 .how-status-div {
     padding: 0 20px;
-    margin-top: 10px;
 }
 
 .how-status-div button {
@@ -650,4 +653,13 @@ body{
 .next-10-btn:disabled, .all-btn:disabled {
     background-color: gray;
     color: white;
+}
+
+.fa-search {
+    font-size: 1em;
+    color: white;
+    background-color: #7f7f7f;
+    padding: 10px;
+    margin-right: 10px;
+    border-radius: 5px;
 }

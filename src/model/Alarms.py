@@ -62,6 +62,7 @@ class Alarms(object):
 
           elif event in ['high packet loss',
                          'path changed',
+                         'path changed v2',
                          'destination cannot be reached from any',
                          'source cannot reach any',
                          'bandwidth decreased',
@@ -374,11 +375,15 @@ class Alarms(object):
           df.drop(columns=['avg_value'], inplace=True)
 
         # TODO: create pages/visualizatios for the following events then remove the df.drop('alarm_link') below
-        if event not in ['unresolvable host', 'hosts not found']:
+        if event not in ['unresolvable host', 'hosts not found', 'path changed v2']:
           df = self.createAlarmURL(df, event)
         else:
           df.drop('alarm_link', axis=1, inplace=True)
-          df['site'] = df['site'].fillna("Unknown site")
+          if 'asn_list' in df.columns:
+             df = self.replaceCol('asn_list', df, '\n')
+
+          if 'site' in df.columns:
+              df['site'] = df['site'].fillna("Unknown site")
 
         # Reorder 'from' and 'to' columns to be the first two columns if they exist
         df = self.reorder_columns(df, ['from', 'to'])

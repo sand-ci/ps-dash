@@ -1,15 +1,13 @@
 import dash
-from dash import Dash, dash_table, dcc, html
+from dash import dash_table, dcc, html
 import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, State
 
-
-import plotly.graph_objects as go
 import plotly.express as px
-from datetime import datetime
+
 from datetime import date
 import pandas as pd
-from elasticsearch.helpers import scan
+
 
 import utils.helpers as hp
 from model.Alarms import Alarms
@@ -45,7 +43,7 @@ def layout(**other_unknown_query_strings):
         dbc.Row([
             dbc.Col(
                 dcc.Loading(
-                  html.Div(id="alarms-sunburst"),
+                  html.Div(id="alarms-sunburst-tab"),
                 style={'height':'0.5rem'}, color='#00245A'),
             align="start", lg=7, md=12, className="pl-1 pr-1"),
             dbc.Col([
@@ -59,7 +57,7 @@ def layout(**other_unknown_query_strings):
                 html.Br(),
                 dbc.Row([
                     dcc.DatePickerRange(
-                        id='date-picker-range',
+                        id='date-picker-range-tab',
                         month_format='M-D-Y',
                         min_date_allowed=date(2022, 8, 1),
                         initial_visible_month=now[0],
@@ -70,13 +68,13 @@ def layout(**other_unknown_query_strings):
                 ]),
                 dbc.Row([
                     dbc.Col([
-                        dcc.Dropdown(multi=True, id='sites-dropdown', placeholder="Search for a site"),
+                        dcc.Dropdown(multi=True, id='sites-dropdown-tab', placeholder="Search for a site"),
                     ]),
                 ]),
                 html.Br(),
                 dbc.Row([
                     dbc.Col([
-                        dcc.Dropdown(multi=True, id='events-dropdown', placeholder="Search for an event type"),
+                        dcc.Dropdown(multi=True, id='events-dropdown-tab', placeholder="Search for an event type"),
                     ]),
                 ]),
                
@@ -90,7 +88,7 @@ def layout(**other_unknown_query_strings):
                 html.Hr(className="my-2"),
                 html.Br(),
                 dcc.Loading(
-                    html.Div(id='results-table'),
+                    html.Div(id='results-table-tab'),
                 style={'height':'0.5rem'}, color='#00245A')
             ], className="m-2"),
         ], className="p-2 site boxwithshadow page-cont mb-1 g-0", justify="center", align="center"),
@@ -117,21 +115,21 @@ def colorMap(eventTypes):
 
 @dash.callback(
     [
-        Output("sites-dropdown", "options"),
-        Output("events-dropdown", "options"),
-        Output('alarms-sunburst', 'children'),
-        Output('results-table', 'children'),
+        Output("sites-dropdown-tab", "options"),
+        Output("events-dropdown-tab", "options"),
+        Output('alarms-sunburst-tab', 'children'),
+        Output('results-table-tab', 'children'),
     ],
     [
-      Input('date-picker-range', 'start_date'),
-      Input('date-picker-range', 'end_date'),
-      Input("sites-dropdown", "search_value"),
-      Input("sites-dropdown", "value"),
-      Input("events-dropdown", "search_value"),
-      Input("events-dropdown", "value"),
+      Input('date-picker-range-tab', 'start_date'),
+      Input('date-picker-range-tab', 'end_date'),
+      Input("sites-dropdown-tab", "search_value"),
+      Input("sites-dropdown-tab", "value"),
+      Input("events-dropdown-tab", "search_value"),
+      Input("events-dropdown-tab", "value"),
     ],
-    State("sites-dropdown", "value"),
-    State("events-dropdown", "value"))
+    State("sites-dropdown-tab", "value"),
+    State("events-dropdown-tab", "value"))
 def update_output(start_date, end_date, sites, all, events, allevents, sitesState, eventsState ):
 
     if start_date and end_date:
@@ -205,7 +203,7 @@ def generate_tables(frame, unpacked, event, alarmsInst):
                         data=dfr.to_dict('records'),
                         columns=[{"name": i, "id": i, "presentation": "markdown"} for i in dfr.columns],
                         markdown_options={"html": True},
-                        id=f'search-tbl-{event}',
+                        id=f'search-tbl-{event}-tab',
                         page_current=0,
                         page_size=10,
                         style_cell={
@@ -234,6 +232,5 @@ def generate_tables(frame, unpacked, event, alarmsInst):
         return element
     except Exception as e:
         print('dash_table.DataTable expects each cell to contain a string, number, or boolean value', e)
-        return html.Div()    
+        return html.Div()
 
-    
