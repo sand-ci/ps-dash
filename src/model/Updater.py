@@ -334,7 +334,7 @@ class Scheduler(object):
     def _run(self):
         self.is_running = False
         self.start()
-        self.function(*self.args, self.kwargs)
+        self.function(*self.args, **self.kwargs)
 
     def start(self):
         if not self.is_running:
