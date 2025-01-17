@@ -451,7 +451,7 @@ def layout(**other_unknown_query_strings):
                             dbc.Row([
                                 dbc.Col([
                                     dbc.Button("Search", id="search-button", color="secondary", 
-                                               className="mr-2", style={"width": "100%", "font-size": "1.5em"})
+                                               className="mlr-2", style={"width": "100%", "font-size": "1.5em"})
                                 ])
                             ]),
                         ], lg=12, md=12, className="pl-1 pr-1 p-1"),

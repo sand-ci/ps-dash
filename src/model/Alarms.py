@@ -62,7 +62,7 @@ class Alarms(object):
 
           elif event in ['high packet loss',
                          'path changed',
-                         'path changed v2',
+                         'ASN path anomalies',
                          'destination cannot be reached from any',
                          'source cannot reach any',
                          'bandwidth decreased',
@@ -192,20 +192,19 @@ class Alarms(object):
             time_difference_hours = time_difference / (60 * 60)
 
             # Check if the file was modified more than 1 hour ago
-            if time_difference_hours <                                              12:
-              # print('--------', event, f, len(df))
+            if time_difference_hours <  1:
               # print('>>>>>>>', df['to'].min(), df['to'].max() , dateFrom, dateTo)
               # print("The file was modified within the last hour.")
               frames[event] = df[(df['to']>=dateFrom) & (df['to'] <= dateTo)]
               pdf = pq.readFile(f"parquet/pivot/{os.path.basename(f)}")
-
               pdf = pdf[(pdf['to'] >= dateFrom) & (pdf['to'] <= dateTo)]
               pivotFrames[event] = pdf
 
             else:
-              print("The file was modified more than 1 hour ago.", f)
+              print("\n\n The file was modified more than 1 hour ago.", f)
               isTooOld = True
-
+      
+      
       if len(folder)==0 or isTooOld == True:
           print('Query ES')
           print('+++++++++++++++++++++')
@@ -349,8 +348,10 @@ class Alarms(object):
         if 'src_sites' in df.columns:
             df = self.replaceCol('src_sites', df, '\n')
         if 'dest_sites' in df.columns:
-            df = self.replaceCol('dest_sites', df, '\n')
-
+            df = self.replaceCol('dest_sites', df, '\n'),
+        if 'asn_list' in df.columns:
+            df['asn_list'] = df['asn_list'].apply(lambda x: ', '.join(map(str, x)))
+            df.rename(columns={'asn_list': 'new asns'}, inplace=True)
 
         if 'alarms_id' in df.columns:
             df.drop('alarms_id', axis=1, inplace=True)
@@ -375,12 +376,10 @@ class Alarms(object):
           df.drop(columns=['avg_value'], inplace=True)
 
         # TODO: create pages/visualizatios for the following events then remove the df.drop('alarm_link') below
-        if event not in ['unresolvable host', 'hosts not found', 'path changed v2']:
+        if event not in ['unresolvable host', 'hosts not found', 'ASN path anomalies']:
           df = self.createAlarmURL(df, event)
         else:
           df.drop('alarm_link', axis=1, inplace=True)
-          if 'asn_list' in df.columns:
-             df = self.replaceCol('asn_list', df, '\n')
 
           if 'site' in df.columns:
               df['site'] = df['site'].fillna("Unknown site")

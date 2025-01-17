@@ -189,6 +189,25 @@ def queryPathChanged(dateFrom, dateTo):
 
 def queryAlarms(dateFrom, dateTo):
   period = hp.GetTimeRanges(dateFrom, dateTo)
+
+  # this is the list of events currently tracked in pSDash interface
+  allowed_events = ['bad owd measurements',
+                    'large clock correction',
+                    'high packet loss',
+                    'complete packet loss',
+                    'high packet loss on multiple links',
+                    'firewall issue',
+                    'path changed',
+                    'ASN path anomalies',
+                    'destination cannot be reached from any',
+                    'destination cannot be reached from multiple',
+                    'source cannot reach any',
+                    'hosts not found',
+                    'unresolvable host',
+                    'bandwidth decreased',
+                    'bandwidth increased',
+                    'bandwidth increased from/to multiple sites',
+                    'bandwidth decreased from/to multiple sites']
   q = {
         "query": {
             "bool": {
@@ -209,11 +228,16 @@ def queryAlarms(dateFrom, dateTo):
                                 "boost": 1.0
                             }
                         }
+                    },
+                    {
+                        "terms": {
+                            "event": allowed_events
+                        }
                     }
                 ]
             }
         }
-        }
+      }
   # print(str(q).replace("\'", "\""))
   try:
     result = scan(client=hp.es, index='aaas_alarms', query=q)

@@ -1,10 +1,11 @@
 import dash
 from dash import Dash, dash_table, dcc, html
 import dash_bootstrap_components as dbc
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 import pandas as pd
 
 import plotly.graph_objects as go
+import plotly.express as px
 
 import utils.helpers as hp
 import model.queries as qrs
@@ -22,7 +23,7 @@ def title():
 def description(q=None):
     return f"Explore the 'Path changed' alarms"
 
-
+pq = Parquet()
 
 dash.register_page(
     __name__,
@@ -35,13 +36,31 @@ dash.register_page(
 def layout(**other_unknown_query_strings):
     period = hp.defaultTimeRange(days=3, datesOnly=True)
     return dbc.Row([
-
         dbc.Row([
-            dbc.Col(
-                dcc.Loading(
-                    html.Div(id="paths-alarms-sunburst"),
-                    style={'height': '0.5rem'}, color='#00245A'),
-                align="start", lg=7, md=12, className="pl-1 pr-1"),
+            dbc.Col([
+                html.Div([
+                    html.Div([
+                        html.H1(f"Short term path deviations between sites"),
+                        html.P('The data is based on the alarms of type "path changed"', style={"font-size": "1.2rem"})
+                    ], className="l-h-3 p-2"),
+                    dcc.Loading(
+                        html.Div(id="asn-sankey"), color='#00245A'),
+                ], className="boxwithshadow page-cont ml-1 p-1")
+            ], xl=6, lg=12, md=12, sm=12, className=" mb-1 flex-grow-1",
+            ),
+            dbc.Col([
+                html.Div(id="asn-alarms-container", children=[
+                    html.Div([
+                        html.H1(f"ASN path anomalies"),
+                        html.P('The data is based on the alarms of type "ASN path anomalies', style={"font-size": "1.2rem"})
+                    ], className="l-h-3 p-2"),
+                    dcc.Loading(
+                        html.Div(create_anomalies_heatmap(period), id="asn-alarms-heatmap", style={"max-width": "1000px", "margin": "0 auto"}),
+                        color='#00245A')
+                ], className="boxwithshadow page-cont ml-1 p-1")
+            ], xl=6, lg=12, md=12, sm=12, className="mb-1 flex-grow-1")
+        ], className="gx-4 d-flex", justify="between", align="start"),
+        dbc.Row([
             dbc.Col([
                 dbc.Row([
                     dbc.Col([
@@ -49,10 +68,8 @@ def layout(**other_unknown_query_strings):
                                 className="l-h-3 pl-2"),
                         html.P(
                             f'Alarms generated in the period: {period[0]} - {period[1]} ',
-                            style={"padding-left": "1.5%","font-size": "14px"}),
-                        html.P('Rounded to the day', style={"padding-left": "1.5%"})
+                            style={"padding-left": "1.5%", "font-size": "14px"})
                     ], align="center", className="text-left pair-details rounded-border-1"),
-                    
                 ], justify="start", align="center"),
                 html.Br(),
                 html.Br(),
@@ -70,9 +87,15 @@ def layout(**other_unknown_query_strings):
                                      placeholder="Search ASNs"),
                     ]),
                 ]),
-                
-            ], lg=5, md=12, className="pl-1 pr-1 p-1"),
-        ], className="p-1 site boxwithshadow page-cont mb-1 g-0", justify="center", align="center"),
+                html.Br(),
+                dbc.Row([
+                    dbc.Col([
+                        dbc.Button("Search", id="search-button", color="secondary", 
+                                   className="mlr-2", style={"width": "100%", "font-size": "1.5em"})
+                    ])
+                ]),
+            ], lg=12, md=12, className="pl-1 pr-1 p-1"),
+        ], className="p-1 site boxwithshadow page-cont mb-1", justify="center", align="center"),
         html.Br(),
         html.Br(),
         dbc.Row([
@@ -87,7 +110,7 @@ def layout(**other_unknown_query_strings):
         ], className="p-2 site boxwithshadow page-cont mb-1 g-0", justify="center", align="center"),
         html.Br(),
         html.Br(),
-    ], className='g-0 main-cont', align="start", style={"padding": "0.5% 1.5%"})
+    ], className=' main-cont', align="center", style={"padding": "0.5% 1.5%"})
 
 
 def colorMap(eventTypes):
@@ -108,34 +131,43 @@ def colorMap(eventTypes):
     [
         Output("paths-sites-dropdown", "options"),
         Output("paths-asn-dropdown", "options"),
-        Output('paths-alarms-sunburst', 'children'),
+        Output('asn-sankey', 'children'),
         Output('paths-results-table', 'children'),
+        Output('asn-alarms-container', 'style')
     ],
     [
+        Input("search-button", "n_clicks"),
         Input("paths-asn-dropdown", "search_value"),
         Input("paths-asn-dropdown", "value"),
         Input("paths-sites-dropdown", "search_value"),
         Input("paths-sites-dropdown", "value"),
-    ])
-def update_output(asn, asnState, sites, sitesState):
+    ],
+    State("paths-sites-dropdown", "value"),
+    State("paths-asn-dropdown", "value")
+)
+def update_output(n_clicks, asn, asnState, sites, sitesState, sitesStateValue, asnStateValue):
 
     # that period should match the one in the layout, 
     # as well as the range of the cached data
     period = hp.defaultTimeRange(3)
 
-    sitesState = [] if sitesState is None else sitesState
-    asnState = [] if asnState is None else asnState
+    # Load all data initially
+    if n_clicks is None:
+        sitesState = []
+        asnState = []
+    else:
+        sitesState = [] if sitesStateValue is None else sitesStateValue
+        asnState = [] if asnStateValue is None else asnStateValue
 
     alarmsInst = Alarms()
     frames, pivotFrames = alarmsInst.loadData(period[0], period[1])
     dataTables = []
+    sitesDropdownData = []
 
-    if 'path changed between sites' in frames.keys() and 'path changed' in frames.keys():
-        frames = {'path changed between sites': frames['path changed between sites'],
-                'path changed': frames['path changed']}
-        pivotFrames = {'path changed between sites': pivotFrames['path changed between sites'],
-                    'path changed': pivotFrames['path changed'], }
-
+    if 'path changed between sites' in frames.keys() and 'path changed' in frames.keys():            
+        selected_keys = ['path changed between sites', 'path changed', 'ASN path anomalies']
+        frames = {key: frames[key] for key in selected_keys if key in frames}
+        pivotFrames = {key: pivotFrames[key] for key in selected_keys if key in pivotFrames}
 
         df =  pivotFrames['path changed between sites']
         scntdf = df[df['tag'] != ''].groupby('tag')[['id']].count().reset_index().rename(columns={'id': 'cnt', 'tag': 'site'})
@@ -144,12 +176,11 @@ def update_output(asn, asnState, sites, sitesState):
         graphData = scntdf.copy()
         graphData = graphData[graphData['site'].isin(sitesState)]
 
-        sitesDropdownData = []
         for s in sorted(pivotFrames['path changed'].tag.unique().tolist()):
             sitesDropdownData.append({"label": s.upper(), "value": s.upper()})
 
         # data tables
-        for event in sorted(['path changed','path changed between sites']):
+        for event in sorted(['path changed', 'path changed between sites', 'ASN path anomalies']):
             df = pivotFrames[event]
             
             df = df[df['tag'].isin(sitesState)] if len(sitesState) > 0 else df
@@ -157,6 +188,9 @@ def update_output(asn, asnState, sites, sitesState):
                 df = df[df['diff'].isin(asnState)]
             elif 'asn' in df.columns and len(asnState) > 0:
                 df = df[df['asn'].isin(asnState)]
+            elif 'asn_list' in df.columns and len(asnState) > 0:
+                df = df[df['asn_list'].isin(asnState)]
+                anomalous_asns = list(df['asn_list'].explode().unique())
             
             if 'src_site' in df.columns and 'dest_site' in df.columns and len(sitesState) > 0:
                 df = df[(df['src_site'].isin(sitesState)) | (df['dest_site'].isin(sitesState))]
@@ -172,9 +206,9 @@ def update_output(asn, asnState, sites, sitesState):
 
 
     # graph
-    pq = Parquet()
     changeDf = pq.readFile('parquet/prev_next_asn.parquet')
     asnsDropdownData = []
+    container_style = {"display": "none"}
 
     if len(changeDf) == 0:
         fig = go.Figure()
@@ -198,11 +232,46 @@ def update_output(asn, asnState, sites, sitesState):
         sortedDf = changeDf[changeDf['jumpedFrom'] > 0].sort_values('count')
         asnsDropdownData = list(set(sortedDf['diff'].unique().tolist() +
                                     sortedDf['jumpedFrom'].unique().tolist()))
+        asnsDropdownData = list(set(asnsDropdownData + anomalous_asns)) if 'anomalous_asns' in locals() else asnsDropdownData
         
         changeDf.loc[changeDf['jumpedFrom'] == 0] = 'No data'
         fig = buildSankey(sitesState, asnState, changeDf)
+        container_style = {"display": "block"}
 
-    return [sitesDropdownData, asnsDropdownData, dcc.Graph(figure=fig), dataTables]
+    return [sitesDropdownData, asnsDropdownData, dcc.Graph(figure=fig), dataTables, container_style]
+
+
+def create_anomalies_heatmap(period):
+    df = pq.readFile('parquet/frames/ASN_path_anomalies.parquet')
+    # df = df[df['to_date'] >= period[0]]
+    print(period, len(df))
+    # Aggregate the number of connections for the heatmap
+    heatmap_data = df.groupby(['src_netsite', 'dest_netsite'])['asn_count'].sum().reset_index(name='count')
+
+    # Pivot the data to create a matrix
+    heatmap_pivot = heatmap_data.pivot(index='src_netsite', columns='dest_netsite', values='count').fillna(0)
+
+    # Plot with the custom color scale
+    fig = px.imshow(
+        heatmap_pivot,
+        labels=dict(x="Destination", y="Source", color="Count"),
+        color_continuous_scale="BuPu",
+        text_auto=True
+    )
+
+    # Update layout for better appearance
+    fig.update_layout(
+        xaxis_title="Destination",
+        yaxis_title="Source",
+        autosize=True,  # Enable responsive autosizing
+        height=600,    # Let the container height define the plot size
+        width=None,     # Let the container width define the plot size
+        # margin=dict(t=10, b=180, l=70, r=0),
+        coloraxis_showscale=True
+    )
+
+    return dcc.Graph(figure=fig)
+
 
 
 # '''Takes the sites from the dropdown list and generates a Dash datatable'''
@@ -330,7 +399,7 @@ def buildSankey(sitesState, asnState, df):
             label=labels,
             customdata=customdata,
             hovertemplate='%{customdata}<extra></extra>',
-            color="blue"
+            color="rgb(4, 111, 137)"
         ),
         link=dict(
             # indices correspond to labels
@@ -354,7 +423,8 @@ def buildSankey(sitesState, asnState, df):
         )
 
     fig.update_layout(
-        # title_text=f"Track path changes related to ASN {asn}",
+        height=600,
+        # title_text=f"Short term path deviations between sites",
         xaxis={
             'showgrid': False,  # thin lines in the background
             'zeroline': False,  # thick line at x=0
@@ -365,8 +435,8 @@ def buildSankey(sitesState, asnState, df):
             'zeroline': False,  # thick line at x=0
             'visible': False,  # numbers below
         },
-        margin=dict(b=2, l=0, r=0),
-        plot_bgcolor='rgba(0,0,0,0)', font_size=10)
+        # margin=dict(b=2, l=0, r=0),
+        plot_bgcolor='rgba(0,0,0,0)',
+        font_size=10)
 
-    # fig.show()
     return fig
