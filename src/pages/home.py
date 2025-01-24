@@ -516,7 +516,7 @@ def update_output(n_clicks, start_date, end_date, sites, all, events, allevents,
                     df = df[df['tag'] != ''].groupby('tag')[['id']].count().reset_index().rename(columns={'id': 'cnt', 'tag': 'site'})
                 else: df = df[df['site'] != ''].groupby('site')[['id']].count().reset_index().rename(columns={'id': 'cnt'})
                 
-                if e != 'path changed':
+                if e != 'path changed between sites':
                     df['event'] = e
                     scntdf = pd.concat([scntdf, df])
 
