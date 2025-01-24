@@ -59,7 +59,7 @@ def layout(**other_unknown_query_strings):
                     dcc.DatePickerRange(
                         id='date-picker-range-tab',
                         month_format='M-D-Y',
-                        min_date_allowed=date(2022, 8, 1),
+                        min_date_allowed=date.today() - pd.Timedelta(days=30),
                         initial_visible_month=now[0],
                         start_date=now[0],
                         end_date=now[1]
