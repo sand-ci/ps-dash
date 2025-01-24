@@ -305,7 +305,8 @@ def SitesOverviewPlots(site_name, pq):
 def layout(q=None, **other_unknown_query_strings):
   pq = Parquet()
   alarmsInst = Alarms()
-  dateFrom, dateTo = hp.defaultTimeRange(1)
+  # that period should match on /home page
+  dateFrom, dateTo = hp.defaultTimeRange(2)
   frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
 
   alarmCnt = pq.readFile('parquet/alarmsGrouped.parquet')
