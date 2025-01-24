@@ -177,8 +177,8 @@ class ParquetUpdater(object):
 
     @timer
     def storeAlarms(self):
-        dateFrom, dateTo = hp.defaultTimeRange(60)
-        print("Update data. Get all alarms for the past 60 days...", dateFrom, dateTo)
+        dateFrom, dateTo = hp.defaultTimeRange(30)
+        print("Update data. Get all alarms for the past 30 days...", dateFrom, dateTo)
         frames, pivotFrames = self.alarms.getAllAlarms(dateFrom, dateTo)
         self.groupAlarms(pivotFrames)
 
