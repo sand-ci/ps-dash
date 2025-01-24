@@ -85,11 +85,14 @@ def builMap(mapDf):
 
 @timer
 def generate_status_table(alarmCnt):
+    # remove the path changed between sites event because sites tend to show big numbers for this event
+    # and it dominates the table. Use the summary event "path changed" instead
+    alarmCnt = alarmCnt[alarmCnt['event'] != 'path changed between sites']
 
     red_sites = alarmCnt[(alarmCnt['event']=='bandwidth decreased from/to multiple sites')
             & (alarmCnt['cnt']>0)]['site'].unique().tolist()
 
-    yellow_sites = alarmCnt[(alarmCnt['event']=='path changed between sites')
+    yellow_sites = alarmCnt[(alarmCnt['event'].isin(['path changed', 'ASN path anomalies']))
                     & (alarmCnt['cnt']>0)]['site'].unique().tolist()
 
     grey_sites = alarmCnt[(alarmCnt['event'].isin(['firewall issue', 'source cannot reach any', 'complete packet loss']))
@@ -558,139 +561,44 @@ def update_output(n_clicks, start_date, end_date, sites, all, events, allevents,
         raise dash.exceptions.PreventUpdate
 
 
-# # # '''Takes selected site from the Geo map and displays the relevant information'''
-# @dash.callback(
-#     [
-#         Output('datatables', 'children'),
-#         Output('selected-site', 'children'),
-#         Output('site-plots-in-out', 'figure'),
-#     ],
-#     Input('site-map', 'clickData')
-# )
-# def display_output(value):
-#     global eventCnt
-
-#     if value is not None:
-#         location = value['points'][0]['customdata'][0]
-#     # else:
-#     #     location = eventCnt[eventCnt['cnt'] == eventCnt['cnt'].max()]['site'].values[0]
-
-#     # print(location)
-    
-#         return []
-
-
-
-
-
-
-
-
-
-
-def colorMap(eventTypes):
-  colors = ['#75cbe6', '#3b6d8f', '#75E6DA', '#189AB4', '#2E8BC0', '#145DA0', '#05445E', '#0C2D48',
-          '#5EACE0', '#d6ebff', '#498bcc', '#82cbf9', 
-          '#2894f8', '#fee838', '#3e6595', '#4adfe1', '#b14ae1'
-          '#1f77b4', '#ff7f0e', '#2ca02c','#00224e', '#123570', '#3b496c', '#575d6d', '#707173', '#8a8678', '#a59c74',
-          ]
-
-  paletteDict = {}
-  for i,e in enumerate(eventTypes):
-      paletteDict[e] = colors[i]
-  
-  return paletteDict
-
-
-
-# @dash.callback(
-#     [
-#         Output("sites-dropdown", "options"),
-#         Output("events-dropdown", "options"),
-#         Output('alarms-stacked-bar', 'children'),
-#         Output('results-table', 'children'),
-#     ],
-#     [
-#       Input('date-picker-range', 'start_date'),
-#       Input('date-picker-range', 'end_date'),
-#       Input("sites-dropdown", "search_value"),
-#       Input("sites-dropdown", "value"),
-#       Input("events-dropdown", "search_value"),
-#       Input("events-dropdown", "value"),
-#     ],
-#     State("sites-dropdown", "value"),
-#     State("events-dropdown", "value"))
-# def update_output(start_date, end_date, sites, all, events, allevents, sitesState, eventsState ):
-
-#     if start_date and end_date:
-#         start_date, end_date = [f'{start_date}T00:01:00.000Z', f'{end_date}T23:59:59.000Z']
-#     else: start_date, end_date = hp.defaultTimeRange(2)
-#     alarmsInst = Alarms()
-#     frames, pivotFrames = alarmsInst.loadData(start_date, end_date)
-
-#     scntdf = pd.DataFrame()
-#     for e, df in pivotFrames.items():
-#         if len(df) > 0:
-#             if e != 'unresolvable host': # the tag is hostname for unresolvable hosts
-#                 df = df[df['tag'] != ''].groupby('tag')[['id']].count().reset_index().rename(columns={'id': 'cnt', 'tag': 'site'})
-#             else: df = df[df['site'] != ''].groupby('site')[['id']].count().reset_index().rename(columns={'id': 'cnt'})
-            
-#             if e != 'path changed':
-#                 df['event'] = e
-#                 scntdf = pd.concat([scntdf, df])
-
-#     # sites
-#     graphData = scntdf.copy()
-#     if (sitesState is not None and len(sitesState) > 0):
-#         graphData = graphData[graphData['site'].isin(sitesState)]
-
-#     sites_dropdown_items = []
-#     for s in sorted(scntdf['site'].unique()):
-#         if s:
-#             sites_dropdown_items.append({"label": s.upper(), "value": s.upper()})
-
-#     # events
-#     if eventsState is not None and len(eventsState) > 0:
-#         graphData = graphData[graphData['event'].isin(eventsState)]
-
-#     events_dropdown_items = []
-#     for e in sorted(scntdf['event'].unique()):
-#         events_dropdown_items.append({"label": e, "value": e})
-
-
-#     bar_chart = create_bar_chart(graphData)
-
-#     dataTables = []
-#     events = list(pivotFrames.keys()) if not eventsState or events else eventsState
-
-#     for event in sorted(events):
-#         df = pivotFrames[event]
-#         df = df[df['site'].isin(sitesState)] if sitesState is not None and len(sitesState) > 0 else df
-#         if len(df) > 0:
-#             dataTables.append(generate_tables(frames[event], df, event, alarmsInst))
-#     dataTables = html.Div(dataTables)
-
-
-#     return [sites_dropdown_items, events_dropdown_items, dcc.Graph(figure=bar_chart), dataTables]
-
-
 def create_bar_chart(graphData):
+    # Calculate the total counts for each event type
+    event_totals = graphData.groupby('event')['cnt'].transform('sum')
+    
+    # Calculate percentage for each site relative to the event total
+    graphData['percentage'] = (graphData['cnt'] / event_totals) * 100
 
-    fig = px.bar(graphData, x='site', y='cnt', color='event', 
-                    # title='Alarms by Site and Event Type', 
-                    labels={'cnt': 'Number of Alarms', 'site': '', 'event': 'Event Type'},
-                    barmode='stack',
-                    color_discrete_sequence=px.colors.qualitative.Prism)
+    # Create the bar chart using percentage as the y-axis
+    fig = px.bar(
+        graphData, 
+        x='site', 
+        y='percentage', 
+        color='event', 
+        labels={'percentage': 'Percentage (%)', 'site': '', 'event': 'Event Type'},
+        barmode='stack',
+        color_discrete_sequence=px.colors.qualitative.Prism
+    )
+
+    # Add custom tooltip with original counts
+    fig.update_traces(
+        hovertemplate="<br>".join([
+            "<span style='font-size:15px'>Site: %{x}</span>",
+            "<span style='font-size:15px'>Count: %{customdata[0]}</span>",
+        ]),
+        customdata=graphData[['cnt', 'event']].values
+    )
+
+    # Update layout parameters
     fig.update_layout(
         margin=dict(t=20, b=20, l=0, r=0),
         showlegend=True,
         legend_orientation='h',
-        legend_title_text=f'Alarm Type',
+        legend_title_text='Alarm Type',
         legend=dict(
             traceorder="normal",
             font=dict(
                 family="sans-serif",
-                size=12,
+                size=14,
             ),
             x=0,
             y=1.9,
@@ -702,7 +610,6 @@ def create_bar_chart(graphData):
         autosize=True,
         width=None,
         title={
-            # 'text': 'Alarms by Site and Event Type',
             'y': 0.01,
             'x': 0.95,
             'xanchor': 'right',
