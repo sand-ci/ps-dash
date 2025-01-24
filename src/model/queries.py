@@ -378,7 +378,8 @@ def getSubcategories():
 			                'source cannot reach any', 'firewall issue', 'complete packet loss',
                        'unresolvable host', 'hosts not found'],
 
-  'Network': 		      ['bandwidth decreased from/to multiple sites', 'path changed between sites'],
+  'Network': 		      ['bandwidth decreased from/to multiple sites', 'path changed between sites',
+                      'ASN path anomalies', 'path changed'],
 
   'Other': 		      ['bandwidth increased from/to multiple sites', 'bandwidth increased', 'bandwidth decreased',
                       'high packet loss', 'high packet loss on multiple links']

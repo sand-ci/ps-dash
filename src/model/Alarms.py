@@ -351,7 +351,9 @@ class Alarms(object):
             df = self.replaceCol('dest_sites', df, '\n'),
         if 'asn_list' in df.columns:
             df['asn_list'] = df['asn_list'].apply(lambda x: ', '.join(map(str, x)))
-            df.rename(columns={'asn_list': 'new asns'}, inplace=True)
+            df.rename(columns={'asn_list': 'new ASN(s)'}, inplace=True)
+        if 'ipv' in df.columns:
+            df.rename(columns={'ipv': 'IP version'}, inplace=True)
 
         if 'alarms_id' in df.columns:
             df.drop('alarms_id', axis=1, inplace=True)
@@ -374,6 +376,8 @@ class Alarms(object):
 
         if event == 'complete packet loss':
           df.drop(columns=['avg_value'], inplace=True)
+        elif event == 'ASN path anomalies':
+          df.drop(columns=['to_date', 'ipv6', 'asn_count'], inplace=True)
 
         # TODO: create pages/visualizatios for the following events then remove the df.drop('alarm_link') below
         if event not in ['unresolvable host', 'hosts not found', 'ASN path anomalies']:
