@@ -257,7 +257,7 @@ def queryAlarms(dateFrom, dateTo):
             desc['tag'] = tags
 
           if 'to' not in desc.keys():
-            desc['to'] = datetime.fromtimestamp(item['_source']['created_at']/1000.0)
+            desc['to'] = pd.to_datetime(item['_source']['created_at'], unit='ms', utc=True)
 
           if 'from' in desc.keys() and 'to' in desc.keys():
             desc['from'] = desc['from'].replace('T', ' ')
