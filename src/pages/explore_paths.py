@@ -73,7 +73,7 @@ def layout(**other_unknown_query_strings):
             dbc.Col([
                 dbc.Row([
                     dbc.Col([
-                        html.H1(f"Search the \"Path changed\" alarms",
+                        html.H1(f"Search for specific site and/or ASN and get all related alarms based on the traceroute measurements",
                                 className="l-h-3 pl-2"),
                         html.P(
                             f'Alarms generated in the period: {period_to_display[0]} - {period_to_display[1]} ',
@@ -141,8 +141,6 @@ def load_initial_data(selected_keys, changeDf):
     asnsDropdownData = []
     anomalous_asns = []
     dataTables = []
-
-    print(len(changeDf))
 
     for event in sorted(selected_keys):
         if event in frames.keys():
@@ -313,7 +311,7 @@ def create_anomalies_heatmap(selected_asns=[], selected_sites=[]):
             # title="ASN path anomalies summary",
             xaxis_title="Destination",
             yaxis_title="Source",
-            xaxis=dict(title=dict(text="Destination", standoff=20, font=dict(size=16))),
+            xaxis=dict(title=dict(text="Destination", font=dict(size=16))),
             height=600,
             plot_bgcolor='rgba(0,0,0,0)',
         )
@@ -400,8 +398,6 @@ def addNetworkOwners(df, labels):
 
 # ''' Prepares the data for the Sankey diagram'''
 def data4Sankey(sandf):
-    print(len(sandf))
-    print(sandf)
     typical = [f't{n}' for n in sandf['jumpedFrom'].unique().tolist()]
     diff = [f'd{n}' for n in sandf['diff'].unique().tolist()]
     src = [f'src_{n}' for n in sandf['src_site'].unique().tolist()]
@@ -443,7 +439,6 @@ def data4Sankey(sandf):
 
 # '''Creates a Sankey diagram'''
 def buildSankey(sitesState, asnState, df):
-    print(len(df), sitesState, asnState) 
     if len(sitesState) > 0 and len(asnState) > 0:
         df = df[((df['src_site'].isin(sitesState)) |
                 (df['dest_site'].isin(sitesState))) & ((df['jumpedFrom'].isin(asnState)) |
