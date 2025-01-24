@@ -563,10 +563,11 @@ def update_output(n_clicks, start_date, end_date, sites, all, events, allevents,
 
 def create_bar_chart(graphData):
     # Calculate the total counts for each event type
-    event_totals = graphData.groupby('event')['cnt'].transform('sum')
-    
+    # event_totals = graphData.groupby('event')['cnt'].transform('sum')
     # Calculate percentage for each site relative to the event total
-    graphData['percentage'] = (graphData['cnt'] / event_totals) * 100
+    # graphData['percentage'] = (graphData['cnt'] / event_totals) * 100
+
+    graphData['percentage'] = graphData.groupby(['site', 'event'])['cnt'].transform(lambda x: x / x.sum() * 100)
 
     # Create the bar chart using percentage as the y-axis
     fig = px.bar(
