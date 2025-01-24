@@ -60,11 +60,15 @@ class ParquetUpdater(object):
         metaDf = self.pq.readFile('parquet/raw/metaDf.parquet')
         # frames, pivotFrames = self.alarms.loadData(dateFrom, dateTo)
 
-        nodes = metaDf[~(metaDf['site'].isnull()) & ~(
-            metaDf['site'] == '') & ~(metaDf['lat'] == '') & ~(metaDf['lat'].isnull())]
+        nodes = metaDf[~(metaDf['site'].isnull()) & (metaDf['site'] != '')\
+               & (metaDf['lat'] != '') & (metaDf['lat'].isnull()==False)].drop_duplicates()
+        lat_lon_count = nodes.groupby(['site', 'lat', 'lon']).size().reset_index(name='count')
+        # Find the most common lat-lon for each site
+        most_common_lat_lon = lat_lon_count.loc[lat_lon_count.groupby('site')['count'].idxmax()]
+
         alarmCnt = []
         
-        for site, lat, lon in nodes[['site', 'lat', 'lon']].drop_duplicates().values.tolist():
+        for site, lat, lon in most_common_lat_lon[['site', 'lat', 'lon']].values.tolist():
             for e, df in pivotFrames.items():
                 # column "to" is closest to the time the alarms was generated, 
                 # thus we want to which approx. when the alarms was created,
