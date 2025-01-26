@@ -182,14 +182,14 @@ def queryPathChanged(dateFrom, dateTo):
     data = []
 
     for item in result:
-	    temp = item['_source'].copy()
-			if 'src_site' in temp.keys() and 'dest_site' in temp.keys():
-				temp['tag'] = [temp['src_site'], temp['dest_site']]
-				temp['from'] = temp['from_date']
-				temp['to'] = temp['to_date']
-				del temp['from_date']
-				del temp['to_date']
-				data.append(temp)
+      temp = item['_source'].copy()
+      if 'src_site' in temp.keys() and 'dest_site' in temp.keys():
+        temp['tag'] = [temp['src_site'], temp['dest_site']]
+        temp['from'] = temp['from_date']
+        temp['to'] = temp['to_date']
+        del temp['from_date']
+        del temp['to_date']
+        data.append(temp)
 
     return data
 
@@ -469,11 +469,12 @@ def queryTraceChanges(dateFrom, dateTo, asn=None):
   data, positions, baseline, altPaths = [],[],[],[]
   positions = []
   for item in result:
-      # print(len(data))
-      item['_source']['src'] = item['_source']['src'].upper()
-      item['_source']['dest'] = item['_source']['dest'].upper()
-      item['_source']['src_site'] = item['_source']['src_site'].upper()
-      item['_source']['dest_site'] = item['_source']['dest_site'].upper()
+      temp = item['_source']
+      if 'src_site' in temp.keys() and 'dest_site' in temp.keys():
+        item['src'] = item['src'].upper()
+        item['dest'] = item['dest'].upper()
+        item['src_site'] = item['src_site'].upper()
+        item['dest_site'] = item['dest_site'].upper()
 
       tempD = {}
       for k,v in item['_source'].items():
