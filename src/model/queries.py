@@ -166,7 +166,14 @@ def queryPathChanged(dateFrom, dateTo):
                   "format": "strict_date_optional_time"
                 }
               }
-            }]
+            }],
+	    "must_not": [
+	        {
+	          "term": {
+	            "event": "ASN path anomalies"
+	          }
+	        }
+	      ]
           }
         }
     }
