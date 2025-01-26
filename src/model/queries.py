@@ -183,12 +183,13 @@ def queryPathChanged(dateFrom, dateTo):
 
     for item in result:
       temp = item['_source'].copy()
-      temp['tag'] = [temp['src_site'], temp['dest_site']]
-      temp['from'] = temp['from_date']
-      temp['to'] = temp['to_date']
-      del temp['from_date']
-      del temp['to_date']
-      data.append(temp)
+      if 'src_site' in temp.keys() and 'dest_site' in temp.keys():
+	temp['tag'] = [temp['src_site'], temp['dest_site']]
+	temp['from'] = temp['from_date']
+	temp['to'] = temp['to_date']
+	del temp['from_date']
+	del temp['to_date']
+	data.append(temp)
 
     return data
 
