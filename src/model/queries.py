@@ -432,25 +432,32 @@ def queryTraceChanges(dateFrom, dateTo, asn=None):
 
   else:
     q = {
-      "query": {
-        "bool": {
-          "must": [
-            {
-              "range": {
-                "to_date": {
-                  "gte": dateFrom,
-                  "lte": dateTo,
-                  "format": "strict_date_optional_time"
-                }
-              }
-            }
-          ]
-        }
-      }
-    }
+	  "query": {
+	    "bool": {
+	      "must": [
+	        {
+	          "range": {
+	            "to_date": {
+	              "gte": dateFrom,
+                      "lte": dateTo,
+	              "format": "strict_date_optional_time"
+	            }
+	          }
+	        }
+	      ],
+	      "must_not": [
+	        {
+	          "term": {
+	            "event": "ASN path anomalies"
+	          }
+	        }
+	      ]
+	    }
+	  }
+	}
 
   # print(str(q).replace("\'", "\""))
-  result = scan(client=hp.es,index='ps_traces_changes',query=q)
+  result = scan(client=hp.es, index='ps_traces_changes',query=q)
   data, positions, baseline, altPaths = [],[],[],[]
   positions = []
   for item in result:
