@@ -447,7 +447,7 @@ def queryTraceChanges(dateFrom, dateTo, asn=None):
 	          "range": {
 	            "to_date": {
 	              "gte": dateFrom,
-                      "lte": dateTo,
+                "lte": dateTo,
 	              "format": "strict_date_optional_time"
 	            }
 	          }
@@ -464,28 +464,21 @@ def queryTraceChanges(dateFrom, dateTo, asn=None):
 	  }
 	}
 
-  # print(str(q).replace("\'", "\""))
+  print(str(q).replace("\'", "\""))
   result = scan(client=hp.es, index='ps_traces_changes',query=q)
   data, positions, baseline, altPaths = [],[],[],[]
   positions = []
   for item in result:
-      temp = item['_source']
-      if 'src_site' in temp.keys() and 'dest_site' in temp.keys():
-        item['src'] = item['src'].upper()
-        item['dest'] = item['dest'].upper()
-        item['src_site'] = item['src_site'].upper()
-        item['dest_site'] = item['dest_site'].upper()
-
       tempD = {}
       for k,v in item['_source'].items():
           if k not in ['positions', 'baseline', 'alt_paths', 'created_at']:
               tempD[k] = v
       data.append(tempD)
 
-      src = item['_source']['src']
-      dest = item['_source']['dest']
-      src_site = item['_source']['src_site']
-      dest_site = item['_source']['dest_site']
+      src = item['_source']['src'].upper()
+      dest = item['_source']['dest'].upper()
+      src_site = item['_source']['src_site'].upper()
+      dest_site = item['_source']['dest_site'].upper()
       from_date,to_date = item['_source']['from_date'], item['_source']['to_date']
 
       temp = item['_source']['positions']
