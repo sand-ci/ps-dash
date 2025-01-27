@@ -248,6 +248,7 @@ class ParquetUpdater(object):
 
             df['jumpedFrom'] = df['jumpedFrom'].astype(int)
             df['diff'] = df['diff'].astype(int)
+            df = df.drop_duplicates()
             self.pq.writeToFile(df, f"{self.location}prev_next_asn.parquet")
 
 

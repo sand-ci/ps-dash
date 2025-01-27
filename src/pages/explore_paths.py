@@ -192,7 +192,7 @@ def update_figures(n_clicks, asnStateValue, sitesStateValue):
     if n_clicks is not None:
         sitesState = sitesStateValue if sitesStateValue else []
         asnState = asnStateValue if asnStateValue else []
-        global changeDf, asn_anomalies
+        global changeDf
 
         sankey_fig = buildSankey(sitesState, asnState, changeDf)
         heatmap_fig = create_anomalies_heatmap(selected_asns=asnState, selected_sites=sitesState)
