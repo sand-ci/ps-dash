@@ -23,7 +23,7 @@ urllib3.disable_warnings()
 
 
 def title(q=None):
-    return f"Latency alarm {q}"
+    return f"ASN-path anomalies"
 
 
 
