@@ -38,12 +38,36 @@ dash.register_page(
     description=description,
 )
 
+def get_dropdown_data():
+    global asn_anomalies, pivotFrames, changeDf
+    # sites
+    unique_sites = pd.unique(asn_anomalies[['src_netsite', 'dest_netsite']].values.ravel()).tolist()
+    unique_sites.extend(pivotFrames['path changed'].tag.unique().tolist())
+
+    sitesDropdownData = [{"label": str(a), "value": a} for a in sorted(list(set(unique_sites)))]
+
+    # ASNs
+    unique_asns = pd.unique(asn_anomalies['asn_list'].explode()).tolist()
+    sortedDf = changeDf[changeDf['jumpedFrom'] > 0].sort_values('count')
+    asnsDropdownData = list(set(sortedDf['diff'].unique().tolist() +
+                                sortedDf['jumpedFrom'].unique().tolist()))
+    asnsDropdownData = list(set(asnsDropdownData + unique_asns))
+    asnsDropdownData = [{"label": str(a), "value": a} for a in sorted(asnsDropdownData)]
+
+    print(f"Unique sites: {len(sitesDropdownData)}, Unique ASNs: {len(asnsDropdownData)}")
+
+    return sitesDropdownData, asnsDropdownData
+
 
 def layout(**other_unknown_query_strings):
     global frames, pivotFrames, alarmsInst, selected_keys, changeDf
     period_to_display = hp.defaultTimeRange(days=2, datesOnly=True)
-    sitesDropdownData, asnsDropdownData, sankey_fig, dataTables = load_initial_data(selected_keys, changeDf)
+
+    sankey_fig, dataTables = load_initial_data(selected_keys, changeDf)
     heatmap_fig = create_anomalies_heatmap()
+
+    sitesDropdownData, asnsDropdownData = get_dropdown_data()
+
     return dbc.Row([
         dbc.Row([
             dbc.Col([
@@ -137,9 +161,6 @@ def colorMap(eventTypes):
 
 
 def load_initial_data(selected_keys, changeDf):
-    sitesDropdownData = []
-    asnsDropdownData = []
-    anomalous_asns = []
     dataTables = []
 
     for event in sorted(selected_keys):
@@ -153,26 +174,14 @@ def load_initial_data(selected_keys, changeDf):
 
     for event in sorted(selected_keys):
         df = pivotFrames[event]
-        
-        if 'asn_list' in df.columns:
-            anomalous_asns = list(df['asn_list'].explode().unique())
 
         if len(df) > 0:
             dataTables.append(generate_tables(frames[event], df, event, alarmsInst))
 
-    sortedDf = changeDf[changeDf['jumpedFrom'] > 0].sort_values('count')
-    asnsDropdownData = list(set(sortedDf['diff'].unique().tolist() +
-                                sortedDf['jumpedFrom'].unique().tolist()))
-    asnsDropdownData = list(set(asnsDropdownData + anomalous_asns)) if 'anomalous_asns' in locals() else asnsDropdownData
-    asnsDropdownData = sorted(asnsDropdownData)
-
-    for s in sorted(pivotFrames['path changed'].tag.unique().tolist()):
-        sitesDropdownData.append({"label": s.upper(), "value": s.upper()})
-
     changeDf.loc[changeDf['jumpedFrom'] == 0] = 'No data'
     fig = buildSankey([], [], changeDf)
 
-    return [sitesDropdownData, asnsDropdownData, fig, dataTables]
+    return [fig, dataTables]
 
 
 @dash.callback(
