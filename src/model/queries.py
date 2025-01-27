@@ -170,7 +170,7 @@ def queryPathChanged(dateFrom, dateTo):
 	    "must_not": [
 	        {
 	          "term": {
-	            "event": "ASN path anomalies"
+	            "event.keyword": "ASN path anomalies"
 	          }
 	        }
 	      ]
