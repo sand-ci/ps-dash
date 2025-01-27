@@ -495,7 +495,7 @@ def queryTraceChanges(dateFrom, dateTo, asn=None):
 	      "must_not": [
 	        {
 	          "term": {
-	            "event": "ASN path anomalies"
+	            "event.keyword": "ASN path anomalies"
 	          }
 	        }
 	      ]
