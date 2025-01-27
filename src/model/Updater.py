@@ -232,24 +232,27 @@ class ParquetUpdater(object):
         dateFrom, dateTo = hp.defaultTimeRange(days=2)
         chdf, posDf, baseline = qrs.queryTraceChanges(dateFrom, dateTo)[:3]
 
-        df = pd.DataFrame()
-        if len(chdf) > 0:
-            for p in posDf['pair'].unique():
-                # print(p)
-                temp = self.descChange(chdf[chdf['pair'] == p], posDf[posDf['pair'] == p])
-                temp['src_site'] = baseline[baseline['pair'] == p]['src_site'].values[0]
-                temp['dest_site'] = baseline[baseline['pair'] == p]['dest_site'].values[0]
-                temp = self.descChange(chdf[chdf['pair'] == p], posDf[posDf['pair'] == p])
-                if not temp.empty:
+        try:
+            df = pd.DataFrame()
+            if len(chdf) > 0:
+                for p in posDf['pair'].unique():
+                    # print(p)
+                    temp = self.descChange(chdf[chdf['pair'] == p], posDf[posDf['pair'] == p])
                     temp['src_site'] = baseline[baseline['pair'] == p]['src_site'].values[0]
                     temp['dest_site'] = baseline[baseline['pair'] == p]['dest_site'].values[0]
-                    temp['count'] = len(chdf[chdf['pair'] == p])
-                    df = pd.concat([df, temp])
+                    temp = self.descChange(chdf[chdf['pair'] == p], posDf[posDf['pair'] == p])
+                    if not temp.empty:
+                        temp['src_site'] = baseline[baseline['pair'] == p]['src_site'].values[0]
+                        temp['dest_site'] = baseline[baseline['pair'] == p]['dest_site'].values[0]
+                        temp['count'] = len(chdf[chdf['pair'] == p])
+                        df = pd.concat([df, temp])
 
-            df['jumpedFrom'] = df['jumpedFrom'].astype(int)
-            df['diff'] = df['diff'].astype(int)
-            df = df.drop_duplicates()
-            self.pq.writeToFile(df, f"{self.location}prev_next_asn.parquet")
+                df['jumpedFrom'] = df['jumpedFrom'].astype(int)
+                df['diff'] = df['diff'].astype(int)
+                self.pq.writeToFile(df, f"{self.location}prev_next_asn.parquet")
+        except Exception as e:
+            print(f"Error: {e}")
+            # print(traceback.format_exc())
 
 
     def createLocation(self, required_folders):
