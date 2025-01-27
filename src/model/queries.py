@@ -401,6 +401,45 @@ def getSubcategories():
   catdf = pd.DataFrame(subcategories)
 
   return catdf
+  
+def query_ASN_anomalies(dateFrom, dateTo):
+  q = {
+    "query": {
+      "bool": {
+        "must": [
+          {
+            "range": {
+              "to_date": {
+                "gte": dateFrom,
+                "lte": dateTo,
+                "format": "strict_date_optional_time"
+              }
+            }
+          },
+          {
+            "term": {
+              "event.keyword": "ASN path anomalies"
+            }
+          }
+        ]
+      }
+    }
+  }
+
+  print(str(q).replace("\'", "\""))
+  data = []
+  result = scan(client=hp.es, index='ps_traces_changes', query=q, source=['src_netsite', 'dest_netsite', 'ipv6', 'asn_list', 'alarm_id', 'to_date', 'paths'])
+  for item in result:
+    temp = item['_source']
+    for el in temp['paths']:
+      temp_copy = temp.copy()
+      temp_copy['last_appearance_path'] = el['last_appearance_path']
+      temp_copy['repaired_asn_path'] = el['repaired_asn_path']
+      temp_copy['path_len'] = len(el['repaired_asn_path'])
+      data.append(temp_copy)
+
+  ddf = pd.DataFrame(data)
+  return ddf
 
 
 def queryTraceChanges(dateFrom, dateTo, asn=None):
@@ -414,15 +453,8 @@ def queryTraceChanges(dateFrom, dateTo, asn=None):
                 "must": [
                     {
                         "range": {
-                            "from_date": {
-                                "gte": dateFrom,
-                                "format": "strict_date_optional_time"
-                            }
-                        }
-                    },
-                    {
-                        "range": {
                             "to_date": {
+                                "gte": dateFrom,
                                 "lte": dateTo,
                                 "format": "strict_date_optional_time"
                             }
@@ -433,6 +465,13 @@ def queryTraceChanges(dateFrom, dateTo, asn=None):
                             "diff": [asn]
                         }
                     }
+                ],
+                "must_not": [
+                  {
+                    "term": {
+                      "event": "ASN path anomalies"
+                    }
+                  }
                 ]
             }
         }
@@ -469,16 +508,21 @@ def queryTraceChanges(dateFrom, dateTo, asn=None):
   data, positions, baseline, altPaths = [],[],[],[]
   positions = []
   for item in result:
+      item['_source']['src'] = item['_source']['src'].upper()
+      item['_source']['dest'] = item['_source']['dest'].upper()
+      item['_source']['src_site'] = item['_source']['src_site'].upper()
+      item['_source']['dest_site'] = item['_source']['dest_site'].upper()
+
       tempD = {}
       for k,v in item['_source'].items():
           if k not in ['positions', 'baseline', 'alt_paths', 'created_at']:
               tempD[k] = v
       data.append(tempD)
 
-      src = item['_source']['src'].upper()
-      dest = item['_source']['dest'].upper()
-      src_site = item['_source']['src_site'].upper()
-      dest_site = item['_source']['dest_site'].upper()
+      src = item['_source']['src']
+      dest = item['_source']['dest']
+      src_site = item['_source']['src_site']
+      dest_site = item['_source']['dest_site']
       from_date,to_date = item['_source']['from_date'], item['_source']['to_date']
 
       temp = item['_source']['positions']

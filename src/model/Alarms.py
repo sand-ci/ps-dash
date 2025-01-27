@@ -380,7 +380,7 @@ class Alarms(object):
           df.drop(columns=['to_date', 'ipv6', 'asn_count'], inplace=True)
 
         # TODO: create pages/visualizatios for the following events then remove the df.drop('alarm_link') below
-        if event not in ['unresolvable host', 'hosts not found', 'ASN path anomalies']:
+        if event not in ['unresolvable host', 'hosts not found']:
           df = self.createAlarmURL(df, event)
         else:
           df.drop('alarm_link', axis=1, inplace=True)
@@ -405,6 +405,8 @@ class Alarms(object):
           page = 'throughput/'
     elif event == 'path changed':
         page = 'paths/'
+    elif event == 'ASN path anomalies':
+        page = 'anomalous_paths/'
     elif event in ['firewall issue', 'complete packet loss', 'bandwidth decreased from/to multiple sites',
                     'high packet loss on multiple links', 'high packet loss']:
         page = 'loss-delay/'
@@ -417,10 +419,9 @@ class Alarms(object):
         df['alarm_link'] = df['alarm_link'].apply(
             lambda id: f"<a class='btn btn-secondary' role='button' href='{url}{id}' target='_blank'>VIEW IN A NEW TAB</a>" if id else '-')
     
-    # if event == 'path changed between sites':
-    #     df['alarm_link'] = df['path'].apply(
-    #         lambda site: f"<a href='{request.host_url}paths-site/{site}?dateFrom={df['from'].min()}&dateTo={df['to'].max()}' target='_blank'>VIEW</a>" if site else '-')
-            
+    if event == 'ASN path anomalies':
+      df['alarm_link'] = df.apply(
+        lambda row: f"<a class='btn btn-secondary' role='button' href='{request.host_url}anomalous_paths/src_netsite={row['src_netsite']}&dest_netsite={row['dest_netsite']}' target='_blank'>VIEW IN A NEW TAB</a>" if row['src_netsite'] and row['dest_netsite'] else '-', axis=1)
     return df
 
 
