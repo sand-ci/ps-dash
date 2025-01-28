@@ -83,7 +83,7 @@ def update_graphs(query_params):
         print(src, dest)
         if src and dest:
             data = query_ASN_anomalies(src, dest)
-            print(data, data['ipv6'].unique())
+
             if len(data) > 0:
                 if len(data['ipv6'].unique()) == 2:
                     ipv6_figure = generate_plotly_heatmap_with_anomalies(data[data['ipv6'] == True])
