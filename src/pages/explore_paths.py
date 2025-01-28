@@ -279,9 +279,9 @@ def create_anomalies_heatmap(selected_asns=[], selected_sites=[]):
             # Create formatted ASN strings
             formatted_str = ""
             if ipv4_asns:
-                formatted_str += f"IPv4 -> {ipv4_asns}, \n "
+                formatted_str += f"IPv4 -> <b>{', '.join(map(str, ipv4_asns))}</b>; \n "
             if ipv6_asns:
-                formatted_str += f"IPv6 -> {ipv6_asns}"
+                formatted_str += f" IPv6 -> <b>{', '.join(map(str, ipv6_asns))}</b>".rstrip(',')
             
             # Calculate total unique ASNs across both versions
             total_unique_asns = len(set(ipv4_asns).union(set(ipv6_asns)))

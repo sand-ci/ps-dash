@@ -28,7 +28,7 @@ def title(q=None):
 
 
 def description(q=None):
-    return f"Visual represention of an ASN alarm {q}"
+    return f"Visual represention of an ASN-path anomaly"
 
 
 
@@ -47,7 +47,7 @@ def layout(q=None, **other_unknown_query_strings):
         html.Div(id='asn-anomalies-content'),
         html.Div([
           html.Div([
-            html.H1(f"ASN paths between source and destination sites"),
+            html.H1(f"The most recent ASN paths"),
             html.P('The plot shows new ASNs framed in red. The data is based on the alarms of type "ASN path anomalies"', style={"font-size": "1.2rem"})
           ], className="l-h-3 p-2"),
           dcc.Loading(id='loading-spinner', type='default', children=[
