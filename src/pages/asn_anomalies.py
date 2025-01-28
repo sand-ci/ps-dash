@@ -48,7 +48,7 @@ def layout(q=None, **other_unknown_query_strings):
         html.Div([
           html.Div([
             html.H1(f"The most recent ASN paths"),
-            html.P('The plot shows new ASNs framed in red. The data is based on the alarms of type "ASN path anomalies"', style={"font-size": "1.2rem"})
+            html.P('The plot shows new ASNs framed in white. The data is based on the alarms of type "ASN path anomalies"', style={"font-size": "1.2rem"})
           ], className="l-h-3 p-2"),
           dcc.Loading(id='loading-spinner', type='default', children=[
               html.Div(id='asn-anomalies-graphs')
@@ -108,7 +108,7 @@ def update_graphs(query_params):
 def generate_plotly_heatmap_with_anomalies(subset_sample):
     columns = ['src_netsite', 'dest_netsite', 'asn_list', 'ipv6']
     src_site, dest_site, anomaly, ipv = subset_sample[columns].values[0]
-    # ipv = 'IPv6' if ipv else 'IPv4'
+    ipv = 'IPv6' if ipv else 'IPv4'
 
     subset_sample['last_appearance_path'] = pd.to_datetime(subset_sample['last_appearance_path'], errors='coerce')
 
@@ -169,7 +169,7 @@ def generate_plotly_heatmap_with_anomalies(subset_sample):
                         y=subset_sample['last_appearance_short'].iloc[idx],
                         text=int(asn),
                         showarrow=False,
-                        bordercolor='red',
+                        bordercolor='white',
                         font=dict(color='white', size=12, family="Arial", weight='bold'),
                     )
                 else:
