@@ -163,20 +163,16 @@ def colorMap(eventTypes):
 def load_initial_data(selected_keys, changeDf):
     dataTables = []
 
-    for event in sorted(selected_keys):
-        if event in frames.keys():
-            dataTables.append(generate_tables(frames[event], pivotFrames[event], event, alarmsInst))
-
     # Filter out non-numeric values before conversion
     changeDf = changeDf[pd.to_numeric(changeDf['jumpedFrom'], errors='coerce').notnull()]
     changeDf['jumpedFrom'] = changeDf['jumpedFrom'].fillna(0).astype(int)
     changeDf['diff'] = changeDf['diff'].astype(int)
 
     for event in sorted(selected_keys):
-        df = pivotFrames[event]
-
-        if len(df) > 0:
-            dataTables.append(generate_tables(frames[event], df, event, alarmsInst))
+        if event in pivotFrames.keys():
+            df = pivotFrames[event]
+            if len(df) > 0:
+                dataTables.append(generate_tables(frames[event], df, event, alarmsInst))
 
     changeDf.loc[changeDf['jumpedFrom'] == 0] = 'No data'
     fig = buildSankey([], [], changeDf)
