@@ -127,20 +127,22 @@ def layout(**other_unknown_query_strings):
                                    className="mlr-2", style={"width": "100%", "font-size": "1.5em"})
                     ])
                 ]),
-            ], lg=12, md=12, className="pl-1 pr-1 p-1"),
+            ], lg=12, md=12),
         ], className="p-1 site boxwithshadow page-cont mb-1", justify="center", align="center"),
         html.Br(),
         html.Br(),
         dbc.Row([
-            dbc.Row([
-                html.H1(f"List of alarms", className="text-center"),
-                html.Hr(className="my-2"),
-                html.Br(),
-                dcc.Loading(
-                    html.Div(id='paths-results-table', children=dataTables),
-                    style={'height': '0.5rem'}, color='#00245A')
-            ], className="m-2"),
-        ], className="p-2 site boxwithshadow page-cont mb-1 g-0", justify="center", align="center"),
+            html.Div([
+                dbc.Row([
+                    html.H1(f"List of alarms", className="text-center"),
+                    html.Hr(className="my-2"),
+                    html.Br(),
+                    dcc.Loading(
+                        html.Div(id='paths-results-table', children=dataTables),
+                        style={'height': '0.5rem'}, color='#00245A')
+                ], className="m-2"),
+            ], className="site page-cont"),
+        ], className="p-1 site boxwithshadow page-cont mb-1", justify="center", align="center"),
         html.Br(),
         html.Br(),
     ], className=' main-cont', align="center", style={"padding": "0.5% 1.5%"})
