@@ -172,7 +172,7 @@ body{
 }
 
 .cls-site-map {
-    height: 640px;
+    height: 540px;
     /* padding: 20px;
     border: 1px solid rgba(0, 0, 0, .125);
     border-radius: 1rem */
@@ -561,10 +561,14 @@ body{
     flex: 0.8;
     margin: 0 2px;
     min-height: 100px;
-    padding: 30px;
+    padding: 1%;
     text-align: center;
     color: rgb(47, 46, 46);
     background-color: #ffffff;
+}
+
+.status-table-cls {
+    padding: 2% 2% 0 2% !important;
 }
 
 count-box {

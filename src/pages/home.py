@@ -232,7 +232,7 @@ def total_number_of_alarms(sitesDf):
                     ),
                     md=3, xs=3, xl=3, className='status-count-numbers'
                 ) for s, icon in status.items()]
-            ], className='w-100 status-box p-1 gx-4', align="center", justify='center'),
+            ], className='w-100 status-box gx-4', align="center", justify='center'),
         ], className='boxwithshadow g-0 mb-1')]
 
 
@@ -379,15 +379,15 @@ def layout(**other_unknown_query_strings):
                 dbc.Col(dcc.Graph(figure=builMap(sitesDf), id='site-map',
                                   className='cls-site-map'),
                         className='boxwithshadow page-cont mb-1 g-0 p-2 column-margin',
-                        xl=12, style={"background-color": "#b9c4d4;", "padding-top": "3%"}, align="center"
+                        xl=12, lg=12, style={"background-color": "#b9c4d4;", "padding-top": "3%"}
                         ),
                 dbc.Col(
                     dcc.Loading(
                         html.Div(id="alarms-stacked-bar"),
                         style={'height': '1rem'}, color='#00245A'
                     ),
-                    className="boxwithshadow page-cont mb-1 p-2",),
-            ], lg=6, md=12, className='d-flex flex-column'), # d-flex and flex-column make the columns the same size
+                    className="boxwithshadow page-cont mb-1 p-2 align-content-around",),
+            ], lg=6, md=12, className='d-flex flex-column', align='around'), # d-flex and flex-column make the columns the same size
             # end of top left column
 
             # top right column with status table, status statistics and the search fields
@@ -396,7 +396,7 @@ def layout(**other_unknown_query_strings):
                 dbc.Row([
                     dbc.Col(
                         [
-                            html.Div(children=statusTable, id='site-status', className='p-2'),
+                            html.Div(children=statusTable, id='site-status', className='status-table-cls'),
                             html.Div(
                                 [
                                     dbc.Button(
@@ -406,9 +406,16 @@ def layout(**other_unknown_query_strings):
                                         color="secondary",
                                         n_clicks=0,
                                     ),
-                                    dbc.Collapse(
-                                        id="how-status-collapse",
-                                        className="how-status-collapse",
+                                    dbc.Modal(
+                                        [
+                                            dbc.ModalHeader(dbc.ModalTitle("How was the status determined?")),
+                                            dbc.ModalBody(id="how-status-modal-body"),
+                                            dbc.ModalFooter(
+                                                dbc.Button("Close", id="close-how-status-modal", className="ml-auto", n_clicks=0)
+                                            ),
+                                        ],
+                                        id="how-status-modal",
+                                        size="lg",
                                         is_open=False,
                                     ),
                                 ], className="how-status-div",
@@ -427,18 +434,18 @@ def layout(**other_unknown_query_strings):
                                         "Search the Networking Alarms"
                                     ], className="l-h-3"),
                                 ], align="center", className="text-left rounded-border-1 pl-1"
-                                    , md=6, xl=6),
+                                    , md=12, xl=6),
                                 dbc.Col([
                                     dcc.DatePickerRange(
                                         id='date-picker-range',
                                         month_format='M-D-Y',
-                                        min_date_allowed=date(2022, 8, 1),
+                                        min_date_allowed=date.today() - pd.Timedelta(days=30),
                                         initial_visible_month=now[0],
                                         start_date=now[0],
                                         end_date=now[1]
                                     )
-                                ], style={"display": "flex", "justify-content": "flex-end", "align-items": "center"})
-                            ], justify="between", align="center"),
+                                ],  md=12, xl=6, className="mb-1 text-right")
+                            ], justify="around", align="center", className="flex-wrap"),
                             dbc.Row([
                                 dbc.Col([
                                     dcc.Dropdown(multi=True, id='sites-dropdown', placeholder="Search for a site"),
@@ -458,13 +465,13 @@ def layout(**other_unknown_query_strings):
                                 ])
                             ]),
                         ], lg=12, md=12, className="pl-1 pr-1 p-1"),
-                    ], className="p-1 site", justify="center", align="center"),
+                    ], className="p-1 site g-0", justify="center", align="center"),
                 ], className='boxwithshadow page-cont mb-1 row', align="center")],
-            lg=6, sm=12, className='d-flex flex-column h-100'),
+            lg=6, sm=12, className='d-flex flex-column h-100 pl-1'),
                 
             # end of top right column
 
-        ], className='h-100 gx-4'),
+        ], className='h-100 g-0'),
 
         # bottom part with the list of alarms
         dbc.Row([
@@ -476,7 +483,7 @@ def layout(**other_unknown_query_strings):
                     html.Div(id='results-table'),
                     style={'height': '0.5rem'}, color='#00245A')
             ], className="boxwithshadow page-cont p-2",),
-        ], className=""),
+        ], className="g-0"),
     ], className='', style={"padding": "0.5% 1% 0 1%"})
 
 
@@ -559,6 +566,36 @@ def update_output(n_clicks, start_date, end_date, sites, all, events, allevents,
         return [sites_dropdown_items, events_dropdown_items, dcc.Graph(figure=bar_chart), dataTables]
     else:
         raise dash.exceptions.PreventUpdate
+    
+
+@dash.callback(
+    [
+    Output("how-status-modal", "is_open"),
+    Output("how-status-modal-body", "children"),
+    ],
+    [
+        Input("how-status-collapse-button", "n_clicks"),
+        Input("close-how-status-modal", "n_clicks"),
+    ],
+    [State("how-status-modal", "is_open")],
+)
+def toggle_modal(n1, n2, is_open):
+    if n1 or n2:
+        if not is_open:
+            catTable, statusExplainedTable = explainStatuses()
+            data = dbc.Row([
+                dbc.Col(children=[
+                    html.H3('Category & Alarm types', className='status-title'),
+                    html.Div(statusExplainedTable, className='how-status-table')
+                ], lg=12, md=12, sm=12, className='page-cont pr-1 how-status-cont'),
+                dbc.Col(children=[
+                    html.H3('Status color rules', className='status-title'),
+                    html.Div(catTable, className='how-status-table')
+                ], lg=12, md=12, sm=12, className='page-cont how-status-cont')
+            ], className='pt-1')
+            return not is_open, data
+        return not is_open, dash.no_update
+    return is_open, dash.no_update
 
 
 def create_bar_chart(graphData):
@@ -596,15 +633,14 @@ def create_bar_chart(graphData):
         legend_orientation='h',
         legend_title_text='Alarm Type',
         legend=dict(
-            traceorder="normal",
-            font=dict(
-                family="sans-serif",
-                size=14,
-            ),
             x=0,
-            y=1.9,
+            y=1.35,
+            orientation="h",
             xanchor='left',
-            yanchor='top'
+            yanchor='top',
+            font=dict(
+                size=10,
+            ),
         ),
         height=600,
         plot_bgcolor='#fff',
@@ -615,6 +651,13 @@ def create_bar_chart(graphData):
             'x': 0.95,
             'xanchor': 'right',
             'yanchor': 'bottom'
+        },
+        xaxis=dict(
+            # tickangle=-45,
+            automargin=True
+        ),
+        modebar={
+            "orientation": 'v',
         }
     )
 
