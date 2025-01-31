@@ -102,9 +102,9 @@ app.layout = html.Div(children=[
                             [
                                dbc.NavItem(dbc.NavLink("SITES OVERVIEW", href="/",
                                                        id='sites-tab', class_name="nav-item-cls")),
-                                dbc.NavItem(dbc.NavLink("SEARCH ALARMS", href="/search-alarms",
-                                                        id='search-tab', class_name="nav-item-cls"
-                                                        )),
+                                # dbc.NavItem(dbc.NavLink("SEARCH ALARMS", href="/search-alarms",
+                                #                         id='search-tab', class_name="nav-item-cls"
+                                #                         )),
                                 dbc.NavItem(dbc.NavLink("EXPLORE PATHS", href="/explore-paths",
                                                         id='paths-tab', class_name="nav-item-cls"
                                                         )),
@@ -128,17 +128,17 @@ app.layout = html.Div(children=[
 
 @app.callback(
     [Output('sites-tab', 'active'),
-     Output('search-tab', 'active'),
+    #  Output('search-tab', 'active'),
      Output('paths-tab', 'active'),
     #  Output('major-alarms-tab', 'active')
      ],
     [Input('url', 'pathname')]
 )
 def update_active_tab(pathname):
-    url = ''
-    if pathname.startswith('/ml-alarms'):
-        url = pathname
-    return pathname == "/", pathname == "/search-alarms", pathname == "/explore-paths"
+    # url = ''
+    # if pathname.startswith('/ml-alarms'):
+    #     url = pathname
+    return pathname == "/", pathname == "/explore-paths"
 
 
 
