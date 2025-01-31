@@ -664,12 +664,13 @@ def create_bar_chart(graphData):
     return fig
 
 
-# '''Takes selected site from the Geo map and generates a Dash datatable'''
+# '''Takes selected site from the dropdpwn and generates a Dash datatable'''
 def generate_tables(frame, unpacked, event, alarmsInst):
     ids = unpacked['id'].values
     dfr = frame[frame.index.isin(ids)]
     dfr = alarmsInst.formatDfValues(dfr, event)
     dfr.sort_values('to', ascending=False, inplace=True)
+    print('Home page,', event, "Number of alarms:", len(dfr))
 
     try:
         element = html.Div([

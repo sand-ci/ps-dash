@@ -347,10 +347,11 @@ def create_anomalies_heatmap(selected_asns=[], selected_sites=[]):
 
 
 # '''Takes the sites from the dropdown list and generates a Dash datatable'''
-def generate_tables(frame, pivotFrames, event, alarmsInst):
-    ids = pivotFrames['id'].values
+def generate_tables(frame, pivotFrame, event, alarmsInst):
+    ids = pivotFrame['id'].values
     dfr = frame[frame.index.isin(ids)]
     dfr = alarmsInst.formatDfValues(dfr, event).sort_values('to', ascending=False)
+    print('Paths page,', event, "Number of alarms:", len(dfr))
 
     element = html.Div([
         html.Br(),
@@ -407,6 +408,7 @@ def addNetworkOwners(df, labels):
 
 # ''' Prepares the data for the Sankey diagram'''
 def data4Sankey(sandf):
+    sandf = sandf[~sandf['diff'].isin(['No data', '0', 0])]
     typical = [f't{n}' for n in sandf['jumpedFrom'].unique().tolist()]
     diff = [f'd{n}' for n in sandf['diff'].unique().tolist()]
     src = [f'src_{n}' for n in sandf['src_site'].unique().tolist()]
