@@ -401,8 +401,10 @@ def getSubcategories():
   catdf = pd.DataFrame(subcategories)
 
   return catdf
-  
-def query_ASN_anomalies(dateFrom, dateTo):
+
+
+def query_ASN_anomalies(src, dest):
+  dateFrom, dateTo = hp.defaultTimeRange(days=2)
   q = {
     "query": {
       "bool": {
@@ -420,15 +422,27 @@ def query_ASN_anomalies(dateFrom, dateTo):
             "term": {
               "event.keyword": "ASN path anomalies"
             }
+          },
+          {
+            "term": {
+              "src_netsite.keyword": src
+            }
+          },
+          {
+            "term": {
+              "dest_netsite.keyword": dest
+            }
           }
         ]
       }
     }
   }
 
-  print(str(q).replace("\'", "\""))
+  # print(str(q).replace("\'", "\""))
+  fields = ['ipv6', 'src_netsite', 'dest_netsite', 'last_appearance_path', 'repaired_asn_path', 'asn_list', 'paths']
+  result = scan(client=hp.es, index='ps_traces_changes', query=q, source=fields)
+
   data = []
-  result = scan(client=hp.es, index='ps_traces_changes', query=q, source=['src_netsite', 'dest_netsite', 'ipv6', 'asn_list', 'alarm_id', 'to_date', 'paths'])
   for item in result:
     temp = item['_source']
     for el in temp['paths']:

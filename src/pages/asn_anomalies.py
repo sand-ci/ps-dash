@@ -82,7 +82,7 @@ def update_graphs(query_params):
         dest = query_params.get('dest_netsite')
         print(src, dest)
         if src and dest:
-            data = query_ASN_anomalies(src, dest)
+            data = qrs.query_ASN_anomalies(src, dest)
 
             if len(data) > 0:
                 if len(data['ipv6'].unique()) == 2:
@@ -191,56 +191,3 @@ def generate_plotly_heatmap_with_anomalies(subset_sample):
     )
 
     return fig
-
-
-def query_ASN_anomalies(src, dest):
-  dateFrom, dateTo = hp.defaultTimeRange(days=2)
-  q = {
-    "query": {
-      "bool": {
-        "must": [
-          {
-            "range": {
-              "to_date": {
-                "gte": dateFrom,
-                "lte": dateTo,
-                "format": "strict_date_optional_time"
-              }
-            }
-          },
-          {
-            "term": {
-              "event.keyword": "ASN path anomalies"
-            }
-          },
-          {
-            "term": {
-              "src_netsite.keyword": src
-            }
-          },
-          {
-            "term": {
-              "dest_netsite.keyword": dest
-            }
-          }
-        ]
-      }
-    }
-  }
-
-  print(str(q).replace("\'", "\""))
-  fields = ['ipv6', 'src_netsite', 'dest_netsite', 'last_appearance_path', 'repaired_asn_path', 'asn_list', 'paths']
-  result = scan(client=hp.es, index='ps_traces_changes', query=q, source=fields)
-
-  data = []
-  for item in result:
-    temp = item['_source']
-    for el in temp['paths']:
-      temp_copy = temp.copy()
-      temp_copy['last_appearance_path'] = el['last_appearance_path']
-      temp_copy['repaired_asn_path'] = el['repaired_asn_path']
-      temp_copy['path_len'] = len(el['repaired_asn_path'])
-      data.append(temp_copy)
-
-  ddf = pd.DataFrame(data)
-  return ddf
