@@ -1,10 +1,7 @@
 import dash
 from dash import html
 from dash import Dash, html, dcc, Input, Output, Patch, callback, State, ctx, dash_table, dcc, html
-import dash_bootstrap_components as dbc
 
-from elasticsearch.helpers import scan
-import urllib
 import urllib3
 
 import pandas as pd
@@ -12,12 +9,8 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
 
-import utils.helpers as hp
-from utils.helpers import DATE_FORMAT
-from model.Alarms import Alarms
 import model.queries as qrs
 
-from utils.parquet import Parquet
 urllib3.disable_warnings()
 
 
