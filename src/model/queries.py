@@ -382,15 +382,15 @@ def getSubcategories():
 
   description = {
   'Infrastructure': 	['bad owd measurements','large clock correction',
-	 				            'destination cannot be reached from multiple', 'destination cannot be reached from any',
-			                'source cannot reach any', 'firewall issue', 'complete packet loss',
-                       'unresolvable host', 'hosts not found'],
+	 		 'destination cannot be reached from multiple', 'destination cannot be reached from any',
+			 'source cannot reach any', 'firewall issue', 'complete packet loss',
+                       	 'unresolvable host', 'hosts not found'],
 
-  'Network': 		      ['bandwidth decreased from/to multiple sites', 'path changed between sites',
-                      'ASN path anomalies', 'path changed'],
+  'Network': 		 ['bandwidth decreased from/to multiple sites', 'path changed between sites',
+                          'ASN path anomalies', 'path changed'],
 
-  'Other': 		      ['bandwidth increased from/to multiple sites', 'bandwidth increased', 'bandwidth decreased',
-                      'high packet loss', 'high packet loss on multiple links']
+  'Other': 		 ['bandwidth increased from/to multiple sites', 'bandwidth increased', 'bandwidth decreased',
+                          'high packet loss', 'high packet loss on multiple links']
   }
 
   subcategories = []
