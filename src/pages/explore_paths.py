@@ -24,8 +24,7 @@ def description(q=None):
 pq = Parquet()
 alarmsInst = Alarms()
 selected_keys = ['path changed between sites', 'path changed', 'ASN path anomalies']
-changeDf = pq.readFile('parquet/prev_next_asn.parquet')
-asn_anomalies = pq.readFile('parquet/frames/ASN_path_anomalies.parquet')
+
 
 dash.register_page(
     __name__,
@@ -34,8 +33,7 @@ dash.register_page(
     description=description,
 )
 
-def get_dropdown_data():
-    global asn_anomalies, pivotFrames, changeDf
+def get_dropdown_data(asn_anomalies, pivotFrames, changeDf):
     # sites
     unique_sites = pd.unique(asn_anomalies[['src_netsite', 'dest_netsite']].values.ravel()).tolist()
     unique_sites.extend(pivotFrames['path changed'].tag.unique().tolist())
@@ -56,15 +54,17 @@ def get_dropdown_data():
 
 
 def layout(**other_unknown_query_strings):
-    global frames, pivotFrames, alarmsInst, selected_keys, changeDf
+    changeDf = pq.readFile('parquet/prev_next_asn.parquet')
+    asn_anomalies = pq.readFile('parquet/frames/ASN_path_anomalies.parquet')
+
     dateFrom, dateTo = hp.defaultTimeRange(2)
     frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
     period_to_display = hp.defaultTimeRange(days=2, datesOnly=True)
 
-    sankey_fig, dataTables = load_initial_data(selected_keys, changeDf)
-    heatmap_fig = create_anomalies_heatmap()
+    sankey_fig, dataTables = load_initial_data(selected_keys, changeDf, asn_anomalies)
+    heatmap_fig = create_anomalies_heatmap(asn_anomalies, dateFrom, dateTo)
 
-    sitesDropdownData, asnsDropdownData = get_dropdown_data()
+    sitesDropdownData, asnsDropdownData = get_dropdown_data(asn_anomalies, pivotFrames, changeDf)
 
     return dbc.Row([
         dbc.Row([
@@ -160,8 +160,9 @@ def colorMap(eventTypes):
   return paletteDict
 
 
-def load_initial_data(selected_keys, changeDf):
-    global pivotFrames, alarmsInst
+def load_initial_data(sselected_keys, changeDf, asn_anomalies):
+    dateFrom, dateTo = hp.defaultTimeRange(2)
+    frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
     dataTables = []
 
     # Filter out non-numeric values before conversion
@@ -175,16 +176,18 @@ def load_initial_data(selected_keys, changeDf):
             if len(df) > 0:
                 dataTables.append(generate_tables(frames[event], df, event, alarmsInst))
 
-    changeDf.loc[changeDf['jumpedFrom'] == 0] = 'No data'
+    # Explicitly cast 'jumpedFrom' column to object dtype before assigning 'No data'
+    changeDf['jumpedFrom'] = changeDf['jumpedFrom'].astype(object)
+    changeDf.loc[changeDf['jumpedFrom'] == 0, 'jumpedFrom'] = 'No data'
     fig = buildSankey([], [], changeDf)
 
     return [fig, dataTables]
 
 
 @dash.callback(
-        Output('asn-sankey', 'figure'),
-        Output('asn-heatmap', 'figure'),
-        Output('paths-results-table', 'children'),
+    Output('asn-sankey', 'figure'),
+    Output('asn-heatmap', 'figure'),
+    Output('paths-results-table', 'children'),
     [
         Input("search-button", "n_clicks"),
     ],
@@ -196,13 +199,17 @@ def load_initial_data(selected_keys, changeDf):
 )
 def update_figures(n_clicks, asnStateValue, sitesStateValue):
     if n_clicks is not None:
+        # Define the necessary variables within the callback function
+        changeDf = pq.readFile('parquet/prev_next_asn.parquet')
+        asn_anomalies = pq.readFile('parquet/frames/ASN_path_anomalies.parquet')
+        dateFrom, dateTo = hp.defaultTimeRange(2)
+
         sitesState = sitesStateValue if sitesStateValue else []
         asnState = asnStateValue if asnStateValue else []
-        global changeDf
 
         sankey_fig = buildSankey(sitesState, asnState, changeDf)
-        heatmap_fig = create_anomalies_heatmap(selected_asns=asnState, selected_sites=sitesState)
-        datatables = create_data_tables(sitesState, asnState)
+        heatmap_fig = create_anomalies_heatmap(asn_anomalies, dateFrom, dateTo, selected_asns=asnState, selected_sites=sitesState)
+        datatables = create_data_tables(sitesState, asnState, selected_keys)
         return sankey_fig, heatmap_fig, datatables
 
     return dash.no_update
@@ -222,8 +229,9 @@ def filterASN(df, selected_asns=[], selected_sites=[]):
   return df
 
 
-def create_data_tables(sitesState, asnState):
-    global selected_keys, pivotFrames
+def create_data_tables(sitesState, asnState, selected_keys):
+    dateFrom, dateTo = hp.defaultTimeRange(2)
+    frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
     dataTables = []
     for event in sorted(selected_keys):
         df = pivotFrames[event]
@@ -250,8 +258,8 @@ def create_data_tables(sitesState, asnState):
 
 
 
-def create_anomalies_heatmap(selected_asns=[], selected_sites=[]):
-    global asn_anomalies, dateFrom, dateTo
+def create_anomalies_heatmap(asn_anomalies, dateFrom, dateTo, selected_asns=[], selected_sites=[]):
+    print('Creating heatmap', dateFrom, dateTo, selected_asns, selected_sites)
     df = asn_anomalies.copy()
     df = df[df['to_date'] >= dateFrom]
     df = filterASN(df, selected_asns=selected_asns, selected_sites=selected_sites)
