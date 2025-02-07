@@ -23,10 +23,6 @@ def description(q=None):
 
 pq = Parquet()
 alarmsInst = Alarms()
-# that period should match the one in the layout, 
-# as well as the range of the cached data + the period on /site page
-dateFrom, dateTo = hp.defaultTimeRange(2)
-frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
 selected_keys = ['path changed between sites', 'path changed', 'ASN path anomalies']
 changeDf = pq.readFile('parquet/prev_next_asn.parquet')
 asn_anomalies = pq.readFile('parquet/frames/ASN_path_anomalies.parquet')
@@ -61,6 +57,8 @@ def get_dropdown_data():
 
 def layout(**other_unknown_query_strings):
     global frames, pivotFrames, alarmsInst, selected_keys, changeDf
+    dateFrom, dateTo = hp.defaultTimeRange(2)
+    frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
     period_to_display = hp.defaultTimeRange(days=2, datesOnly=True)
 
     sankey_fig, dataTables = load_initial_data(selected_keys, changeDf)
@@ -163,6 +161,7 @@ def colorMap(eventTypes):
 
 
 def load_initial_data(selected_keys, changeDf):
+    global pivotFrames, alarmsInst
     dataTables = []
 
     # Filter out non-numeric values before conversion
