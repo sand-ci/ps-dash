@@ -16,6 +16,7 @@ Currently pSDash provides information about:
 * Bad clock configurations
 * Traceroute issues
 * Divergence from the usual path (based on the AS numbers)
+* ASN path anomalies
 * And more
 
 [Brief description of the rules and thresholds of the alarms](https://docs.google.com/presentation/d/1QZseDVnhN8ghn6yaSQmPbMzTi53jwUFTr818V_hUjO8/edit#slide=id.gff94f0d11a_0_41)
@@ -33,7 +34,7 @@ Project Link: [https://ps-dash.uc.ssl-hep.org/](https://ps-dash.uc.ssl-hep.org/)
 ## Screenshots
 
 
-### Overview of the sites and reported alarms over the past 24h
+### Visual summary of the sites (site status) and reported alarms over the past 48h
 <img src="/images/1.png" alt="Alt text" title="Optional title">
 <img src="/images/2.png" alt="Alt text" title="Optional title">
 
