@@ -37,16 +37,17 @@ Project Link: [https://ps-dash.uc.ssl-hep.org/](https://ps-dash.uc.ssl-hep.org/)
 <img src="/images/1.png" alt="Alt text" title="Optional title">
 <img src="/images/2.png" alt="Alt text" title="Optional title">
 
-
-### Page focused on filtering alarms based on events/sites
-<img src="/images/3.png" alt="Alt text" title="Optional title">
-
-
-### View of a single alarm of type "Path changed" where the focus is on the ASN which was found unusual for the traceroute paths (pair-wise)
+### Page focused on ASN path anomalies
 <img src="/images/4.png" alt="Alt text" title="Optional title">
+
+### View of a single alarm of type "Path changed" where the focus is on the ASN which was found unusual for the traceroute paths (pair-wise and short-term)
+<img src="/images/3.png" alt="Alt text" title="Optional title">
 
 ### Description of how the path changed relative to two specific nodes
 <img src="/images/5.png" alt="Alt text" title="Optional title">
+
+### Plot a sample of paths and the detected ASN path anomalies (framed in white)
+<img src="/images/8.png" alt="Alt text" title="Optional title">
 
 ### View of a bandwidth alarm affecting multiple sites
 <img src="/images/6.png" alt="Alt text" title="Optional title">
