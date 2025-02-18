@@ -273,25 +273,39 @@ def createTable(df, id):
     return dash_table.DataTable(
             df.to_dict('records'),
             columns=[{"name": i, "id": i, "presentation": "markdown"} for i in df.columns],
-                markdown_options={"html": True},
-                style_cell={
-                    'padding': '2px',
-                    'font-size': '1.5em',
-                    'textAlign': 'center',
-                    'whiteSpace': 'pre-line',
-                    },
-                style_header={
-                    'backgroundColor': 'white',
-                    'fontWeight': 'bold'
-                },
-                style_data={
-                    'height': 'auto',
-                    'overflowX': 'auto',
-                },
-                style_table={
-                    'overflowY': 'auto',
-                    'overflowX': 'auto'
-                },
+            markdown_options={"html": True},
+            style_cell={
+                'padding': '10px',
+                'font-size': '1.5em',
+                'textAlign': 'center',
+                'whiteSpace': 'normal',
+                'backgroundColor': '#f9f9f9',
+                'border': '1px solid #ddd',
+                'fontFamily': 'sans-serif "Courier New", Courier, monospace !important'
+            },
+            style_header={
+                'fontWeight': 'bold',
+                'color': 'black',
+                'border': '1px solid #ddd',
+            },
+            style_data={
+                'height': 'auto',
+                'lineHeight': '20px',
+                'border': '1px solid #ddd',
+            },
+            style_table={
+                'overflowY': 'auto',
+                'overflowX': 'auto',
+                'border': '1px solid #ddd',
+                'borderRadius': '5px',
+                'boxShadow': '0 2px 5px rgba(0,0,0,0.1)',
+            },
+            style_data_conditional=[
+                {
+                    'if': {'row_index': 'odd'},
+                    'backgroundColor': '#f2f2f2',
+                }
+            ],
             id=id)
 
 
@@ -587,7 +601,7 @@ def toggle_modal(n1, n2, is_open):
                 dbc.Col(children=[
                     html.H3('Category & Alarm types', className='status-title'),
                     html.Div(statusExplainedTable, className='how-status-table')
-                ], lg=12, md=12, sm=12, className='page-cont pr-1 how-status-cont'),
+                ], lg=12, md=12, sm=12, className='page-cont pr-1 how-status-cont mb-1'),
                 dbc.Col(children=[
                     html.H3('Status color rules', className='status-title'),
                     html.Div(catTable, className='how-status-table')
