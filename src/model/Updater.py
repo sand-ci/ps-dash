@@ -20,6 +20,7 @@ from ml.packet_loss_one_month_onehot import one_month_data
 from ml.packet_loss_train_model import packet_loss_train_model
 import os
 from datetime import datetime, timedelta
+import psconfig.api
 
 
 @timer
@@ -39,6 +40,8 @@ class ParquetUpdater(object):
                 self.cacheIndexData()
                 self.storeAlarms()
                 self.storePathChangeDescDf()
+                self.psConfigData()
+
                 # self.storeThroughputDataAndModel()
                 # self.storePacketLossDataAndModel()
 
@@ -47,6 +50,7 @@ class ParquetUpdater(object):
             Scheduler(60*30, self.storeAlarms)
             Scheduler(60*30, self.storePathChangeDescDf)
             Scheduler(60*60*12, self.storeMetaData)
+            Scheduler(60*60*24, self.psConfigData)
             # Scheduler(60*60*12, self.storeThroughputDataAndModel)
             # Scheduler(60*60*12, self.storePacketLossDataAndModel)
         except Exception as e:
@@ -178,7 +182,37 @@ class ParquetUpdater(object):
         metaDf = qrs.getMetaData()
         self.pq.writeToFile(metaDf, f"{self.location}raw/metaDf.parquet")
 
-
+    @timer
+    def psConfigData(self):
+        mesh_url = "https://psconfig.aglt2.org/pub/config"
+        mesh_config = psconfig.api.PSConfig(mesh_url)
+        all_hosts = mesh_config.get_all_hosts()
+        host_test_type = pd.DataFrame({
+                                        'host': list(all_hosts),
+                                        'owd': False,
+                                        'trace': False,
+                                        'throughput': False
+                                        })
+        def checkTestsForHost(host, mesh_conf):
+            """
+            Classifies the host as belonging to one of
+            the three test groups (latency, trace and throughput).
+            """
+            try:
+                types = mesh_conf.get_test_types(host)
+            except Exception:
+                return False, False
+            latency = any(test in ['latency', 'latencybg'] for test in types)
+            trace = 'trace' in types
+            throughput = any(test in ['throughput', 'rtt'] for test in types) # as rtt is now in ps_throughput
+            return host, latency, trace, throughput
+        
+        host_test_type = host_test_type['host'].apply(
+            lambda host: pd.Series(checkTestsForHost(host, mesh_config))
+        )
+        host_test_type.columns = ['host', 'owd', 'trace', 'throughput']
+        self.pq.writeToFile(host_test_type, f"{self.location}raw/psConfigData.parquet")
+        
     @timer
     def storeAlarms(self):
         dateFrom, dateTo = hp.defaultTimeRange(30)
