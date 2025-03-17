@@ -436,76 +436,36 @@ def layout(**other_unknown_query_strings):
                     ], className="boxwithshadow page-cont mb-1"),
 
                     # Bottom part with the three pie charts
-                    dbc.Row([
+                   dbc.Row([
                         dbc.Row([
-                            # expected testing data availability in Elasticsearch per host
-                            html.H3(f'Expected Testing Data Availability(per host) in Elasticsearch [{stats_date.strftime("%d-%m-%Y")}]', className='stats-title mt-1'),
-                            # OWD stats
-                            dbc.Col([
-                                dcc.Graph(
-                                    figure=build_pie_chart(expected_received_stats, 'owd'),  # OWD stats
-                                    id='owd-stats',
-                                    className='cls-owd-stats',
-                                    style={'height': '200px'}  # Adjust the height as needed
-                                ),
-                            ], width=4, className='mt-2'),  # Adjust column width
-
-                            # Throughput stats
-                            dbc.Col([
-                                dcc.Graph(
-                                    figure=build_pie_chart(expected_received_stats, 'throughput'),  # Throughput stats
-                                    id='throughput-stats',
-                                    className='cls-throughput-stats',
-                                    style={'height': '200px'}  # Adjust the height as needed
-                                ),
-                            ], width=4, className='mt-2'),  # Adjust column width
-
-                            # Trace stats
-                            dbc.Col([
-                                dcc.Graph(
-                                    figure=build_pie_chart(expected_received_stats, 'trace'),  # Trace stats
-                                    id='trace-stats',
-                                    className='cls-trace-stats',
-                                    style={'height': '200px'}  # Adjust the height as needed
-                                ),
-                            ], width=4, className='mt-2'),  # Adjust column width
-                        ]),
-                        dbc.Row([
-                            #colored dots and explanations + buttons with historical data
-                            dbc.Col([
-                                html.Div([
-                                    # First colored dot and explanation
-                                    html.Div([
-                                        html.Span(style={
-                                            'display': 'inline-block',
-                                            'width': '10px',
-                                            'height': '10px',
-                                            'border-radius': '50%',
-                                            'background-color': '#69c4c4',  # custom color
-                                            'margin-right': '8px',
-                                            'margin-left': '8px'
-                                        }),
-                                        html.Span("expected hosts found in the Elasticsearch", style={'font-size': '10px'})
-                                    ]),
-
-                                # Second colored dot and explanation
-                                html.Div([
-                                    html.Span(style={
-                                        'display': 'inline-block',
-                                        'width': '10px',
-                                        'height': '10px',
-                                        'border-radius': '50%',
-                                        'background-color': '#00245a',  # custom color
-                                        'margin-right': '8px',
-                                        'margin-left': '8px'
-                                    }),
-                                    html.Span("expected hosts NOT found in the Elasticsearch", style={'font-size': '10px'})
-                                ])
-                            ], style={'background-color': 'transparent'})
-                        ], width=2, className='w-100 mb-1'),  # Adjust column width
-                        ]),    
-                    ], className='boxwithshadow page-cont mb-1', align="center")],
-                lg=6, sm=12, className='d-flex flex-column h-100 pl-1'),
+                            dbc.Row([
+                                dbc.Row([
+                                    # Title for the section
+                                    dbc.Col([
+                                        html.H3(children=f'Expected Testing Data Availability (per host) in Elasticsearch [{stats_date.strftime("%d-%m-%Y")}]',
+                                                className='stats-title'
+                                            )
+                                        ], width=10),
+                                    # Button to switch to historical data
+                                    dbc.Col([
+                                        dcc.Store(id='historical-data-for-graph', data=get_data_for_histogram(dt)),
+                                        dcc.Store(id='hosts-not-found-stats', data=expected_received_stats),
+                                        dcc.Store(id='date', data=dt),
+                                        dcc.Dropdown(
+                                            id='data-over-time-dropdown',
+                                            options=['all (pie charts)', 'all (histograms)'],
+                                            value='all (pie charts)',
+                                            placeholder="Test Type",
+                                            multi=False  # Allow multiple selections
+                                        )
+                                        ], width=2, className="align-left")
+                                    ], className="mt-2 ml-1"),
+                                # adding the pie charts or histogram
+                                html.Div(id='graph-placeholder'),                          
+                            ]),
+                        ], className="mt-2 ml-2"),
+                    ], className='boxwithshadow page-cont mb-1 p-1 align-center')
+                ], lg=6, sm=12, className='d-flex flex-column h-100 pl-1'),
                 # End of top right column
                 
             ], className='w-100 h-100 g-0'),
@@ -873,7 +833,6 @@ def build_pie_chart(stats, test_type):
     statistics about data availability in Elasticsearch.
     """
     #TODO: add inside the donut chart trend(has the percent of got data grown or vice verse)
-    # print("*************************************\nDebug build_pie_chart\n")
     part, total = stats[test_type]
     percentage = (part / total) * 100
 
@@ -921,3 +880,180 @@ def build_pie_chart(stats, test_type):
     )
 
     return fig
+
+def build_histogram(dictionary):
+    df = pd.DataFrame(dictionary).T.reset_index()
+    df[['owd', 'throughput', 'trace']] = df[['owd', 'throughput', 'trace']] * -1
+    
+    df.rename(columns={"index": "date"}, inplace=True)
+
+    # Normalize the data (percentage change from the first day)
+    # df_normalized = df.copy()
+    # for col in ["owd", "throughput", "trace"]:
+    #     df_normalized[col] = df[col] - df[col].iloc[0]
+
+    df_melted = df.melt(id_vars=['date'], var_name='group', value_name='host_count')
+
+
+    # Create a Plotly line plot
+    fig = px.line(
+        df_melted,
+        x='date',
+        y='host_count',
+        color='group',
+        labels={'date': 'Date', 'host_count': 'Number of Hosts', 'group': 'Group'},
+        line_shape='linear'
+    )
+
+    # Show the plot
+    return fig
+
+
+@dash.callback(
+    [
+        Output("graph-placeholder", "children"), 
+        Output("data-over-time-dropdown", "value")
+    ],
+    [
+        Input("data-over-time-dropdown", "options"),
+        Input("data-over-time-dropdown", "value"),  
+        Input("historical-data-for-graph", "data"),
+        Input("hosts-not-found-stats", "data"),
+        Input("date", "data"),
+    ],
+)
+def update_hosts_not_found_graphs(options, selected, histData, pieData, dt):
+    if selected == "all (pie charts)":
+        
+        # three pie charts
+        graph = dbc.Row([
+                    dbc.Row([
+                        # OWD stats
+                        dbc.Col([
+                            dcc.Graph(
+                                figure=build_pie_chart(pieData, 'owd'),  
+                                id='owd-stats',
+                                className='cls-owd-stats',
+                                style={'height': '200px'} 
+                            ),
+                        ], width=4, className='mt-2'), 
+
+                        # Throughput stats
+                        dbc.Col([
+                            dcc.Graph(
+                                figure=build_pie_chart(pieData, 'throughput'), 
+                                id='throughput-stats',
+                                className='cls-throughput-stats',
+                                style={'height': '200px'}  
+                            ),
+                        ], width=4, className='mt-2'),  
+
+                        # Trace stats
+                        dbc.Col([
+                            dcc.Graph(
+                                figure=build_pie_chart(pieData, 'trace'), 
+                                id='trace-stats',
+                                className='cls-trace-stats',
+                                style={'height': '200px'} 
+                            ),
+                        ], width=4, className='mt-2')
+                    ]),
+                    # Colored dots and explanations
+                    dbc.Row([
+                        dbc.Col([
+                            html.Div([
+                                # First colored dot and explanation
+                                html.Div([
+                                    html.Span(style={
+                                        'display': 'inline-block',
+                                        'width': '10px',
+                                        'height': '10px',
+                                        'border-radius': '50%',
+                                        'background-color': '#69c4c4',  # custom color
+                                        'margin-right': '8px',
+                                        'margin-left': '8px'
+                                    }),
+                                    html.Span("expected hosts found in the Elasticsearch", style={'font-size': '10px'})
+                                ]),
+
+                                # Second colored dot and explanation
+                                html.Div([
+                                    html.Span(style={
+                                        'display': 'inline-block',
+                                        'width': '10px',
+                                        'height': '10px',
+                                        'border-radius': '50%',
+                                        'background-color': '#00245a', 
+                                        'margin-right': '8px',
+                                        'margin-left': '8px'
+                                    }),
+                                    html.Span("expected hosts NOT found in the Elasticsearch", style={'font-size': '10px'})
+                                        ])
+                                    ], style={'background-color': 'transparent'})
+                        ], width=2, className='w-100 mb-1'), 
+                    ])
+                ])
+        return graph, "all (pie charts)"
+    
+    else:
+        # histogram 14 days data
+        graph = dbc.Row([
+                    dbc.Row([
+                            dbc.Col([
+                                dcc.Graph(
+                                    figure=build_histogram(histData), 
+                                    id='histogram-graph',
+                                    style={'height': '400px'}
+                                ),
+                            ], width=12, className='mt-0') 
+                        ]),
+                    dbc.Row([
+                        dbc.Col([
+                            html.Div([
+                                # black do explanation of histogram
+                                html.Div([
+                                    html.Span(style={
+                                        'display': 'inline-block',
+                                        'width': '10px',
+                                        'height': '10px',
+                                        'border-radius': '50%',
+                                        'background-color': 'black',
+                                        'margin-right': '5px',
+                                        'margin-left': '5px'
+                                    }),
+                                    html.Span("number of missing hosts in the Elasticsearch (14 days)", style={'font-size': '12px'})
+                                ]),
+                            ], style={'background-color': 'transparent'})
+                        ], width=2, className='w-100 mb-1'), 
+                    ])
+                    ])
+    return graph, "all (pie histograms)"
+
+
+
+def get_data_for_histogram(rn):
+    """
+    The function extracts historical data from last 14 days \
+    about test data availability in Elasticsearch. The data \
+    is further used for the histogram on the home page.
+    """
+    histDateFrom = (rn - timedelta(days=16)).replace(hour=0, minute=0, second=0, microsecond=0)
+    histDateTo = (rn - timedelta(days=2)).replace(hour=23, minute=59, second=59, microsecond=0)
+    histAlarms, histPivotFrames = alarmsInst.loadData(histDateFrom.strftime('%Y-%m-%dT%H:%M:%S.000Z'), histDateTo.strftime('%Y-%m-%dT%H:%M:%S.000Z'))
+    histDf, histFrame = histAlarms['hosts not found'], histPivotFrames['hosts not found']
+    histDf['from'] = pd.to_datetime(histDf['from'])
+    histDf['date'] = histDf['from'].dt.date
+    grouped = histDf.groupby('date')
+    all_dates = dict()
+    # Iterate through each day
+    for date, group in grouped:
+        all_hosts_not_found = {'owd': set(), 'throughput': set(), 'trace': set()}
+        for hosts_dict in group['hosts_not_found']:
+            if isinstance(hosts_dict, dict):
+                for key, hosts_list in hosts_dict.items():
+                    if hosts_list is not None:
+                        all_hosts_not_found[key].update(hosts_list)
+        
+        all_dates[date.strftime("%d/%m/%Y")] = all_hosts_not_found
+    all_dates = {key: {k: len(d) for k, d in dictionary.items()} for key, dictionary in all_dates.items()}
+    return all_dates
