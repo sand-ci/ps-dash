@@ -11,6 +11,7 @@ from model.Updater import ParquetUpdater
 
 
 # cache the data in /parquet.
+#TODO: uncomment
 # ParquetUpdater()
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css',

@@ -10,7 +10,8 @@ import plotly.express as px
 
 import pandas as pd
 from flask import request
-from datetime import date
+from datetime import date, timedelta, datetime
+from time import time
 
 from model.Alarms import Alarms
 import utils.helpers as hp
@@ -18,6 +19,8 @@ from utils.helpers import timer
 import model.queries as qrs
 from utils.parquet import Parquet
 import pycountry
+import os
+# import psconfig.api
 
 
 @timer
@@ -132,8 +135,9 @@ def generate_status_table(alarmCnt):
     status_order = ['🔴', '🟡', '🟢', '⚪']
     df_pivot = df_pivot.sort_values(by='Status', key=lambda x: x.map({status: i for i, status in enumerate(status_order)}))
     display_columns = [col for col in df_pivot.columns.tolist() if col not in ['Status', 'site']]
-    print(display_columns)
-
+    # print(display_columns)
+    # print(df_pivot)
+    # print(df_pivot.to_dict('records'))
     if len(df_pivot) > 0:
         element = html.Div([
                 dash_table.DataTable(
@@ -143,7 +147,7 @@ def generate_status_table(alarmCnt):
                 sort_action="native",
                 is_focused=True,
                 markdown_options={"html": True},
-                page_size=10,
+                page_size=8,
                 style_cell={
                 'padding': '10px',
                 'font-size': '1.2em',
@@ -232,7 +236,9 @@ def total_number_of_alarms(sitesDf):
                     ),
                     md=3, xs=3, xl=3, className='status-count-numbers'
                 ) for s, icon in status.items()]
-            ], className='w-100 status-box gx-4', align="center", justify='center'),
+            ], className='w-100 status-box', align="center", justify='center', style={
+        "background-color": "transparent",  # Make the card background transparent
+        }),
         ], className='boxwithshadow g-0 mb-1')]
 
 
@@ -273,39 +279,25 @@ def createTable(df, id):
     return dash_table.DataTable(
             df.to_dict('records'),
             columns=[{"name": i, "id": i, "presentation": "markdown"} for i in df.columns],
-            markdown_options={"html": True},
-            style_cell={
-                'padding': '10px',
-                'font-size': '1.5em',
-                'textAlign': 'center',
-                'whiteSpace': 'normal',
-                'backgroundColor': '#f9f9f9',
-                'border': '1px solid #ddd',
-                'fontFamily': 'sans-serif "Courier New", Courier, monospace !important'
-            },
-            style_header={
-                'fontWeight': 'bold',
-                'color': 'black',
-                'border': '1px solid #ddd',
-            },
-            style_data={
-                'height': 'auto',
-                'lineHeight': '20px',
-                'border': '1px solid #ddd',
-            },
-            style_table={
-                'overflowY': 'auto',
-                'overflowX': 'auto',
-                'border': '1px solid #ddd',
-                'borderRadius': '5px',
-                'boxShadow': '0 2px 5px rgba(0,0,0,0.1)',
-            },
-            style_data_conditional=[
-                {
-                    'if': {'row_index': 'odd'},
-                    'backgroundColor': '#f2f2f2',
-                }
-            ],
+                markdown_options={"html": True},
+                style_cell={
+                    'padding': '2px',
+                    'font-size': '1.5em',
+                    'textAlign': 'center',
+                    'whiteSpace': 'pre-line',
+                    },
+                style_header={
+                    'backgroundColor': 'white',
+                    'fontWeight': 'bold'
+                },
+                style_data={
+                    'height': 'auto',
+                    'overflowX': 'auto',
+                },
+                style_table={
+                    'overflowY': 'auto',
+                    'overflowX': 'auto'
+                },
             id=id)
 
 
@@ -382,62 +374,144 @@ def layout(**other_unknown_query_strings):
     statusTable, sitesDf = generate_status_table(alarmCnt)
     print("Period:", dateFrom," - ", dateTo)
     print(f'Number of alarms: {len(alarmCnt)}')
+    
+    
+    # adding stats calculations for hosts not found
+    dt = datetime.now()
+    hostsNotFoundAlarms, expected_received_stats, stats_date = get_hosts_not_found_stats_data(dt)
 
     total_number = total_number_of_alarms(sitesDf)
-
     return html.Div([
-        dbc.Row([
-
-            # top left column with the map and the stacked bar chart
-            dbc.Col([
-                dbc.Col(dcc.Graph(figure=builMap(sitesDf), id='site-map',
-                                  className='cls-site-map'),
-                        className='boxwithshadow page-cont mb-1 g-0 p-2 column-margin',
-                        xl=12, lg=12, style={"background-color": "#b9c4d4;", "padding-top": "3%"}
+        dbc.Col([
+            dbc.Row([
+                # Top left column with the map and the stacked bar chart
+                dbc.Col([
+                        dbc.Col(dcc.Graph(figure=builMap(sitesDf), id='site-map',
+                                    className='cls-site-map'),
+                            className='boxwithshadow page-cont mb-1 g-0 p-2 column-margin',
+                            xl=12, lg=12, style={"background-color": "#b9c4d4;", "padding-top": "3%"}
+                            # ), className="align-content-start", align='start'),
+                            ),        
+                        dbc.Col(
+                        dcc.Loading(
+                            html.Div(id="alarms-stacked-bar"),
+                            style={'height': '1rem'}, color='#00245A'
                         ),
-                dbc.Col(
-                    dcc.Loading(
-                        html.Div(id="alarms-stacked-bar"),
-                        style={'height': '1rem'}, color='#00245A'
-                    ),
-                    className="boxwithshadow page-cont mb-1 p-2 align-content-around",),
-            ], lg=6, md=12, className='d-flex flex-column', align='around'), # d-flex and flex-column make the columns the same size
-            # end of top left column
+                        className="boxwithshadow page-cont mb-1 p-2 align-content-around",),
+                ], lg=6, md=12, className='d-flex flex-column', align='around'), # d-flex and flex-column make the columns the same size
+                # end of top left column
 
-            # top right column with status table, status statistics and the search fields
-            dbc.Col([
-                dbc.Row(children=total_number, className="h-100"),
-                dbc.Row([
-                    dbc.Col(
-                        [
-                            html.Div(children=statusTable, id='site-status', className='status-table-cls'),
-                            html.Div(
-                                [
-                                    dbc.Button(
-                                        "How was the status determined?",
-                                        id="how-status-collapse-button",
-                                        className="mb-3",
-                                        color="secondary",
-                                        n_clicks=0,
-                                    ),
-                                    dbc.Modal(
-                                        [
-                                            dbc.ModalHeader(dbc.ModalTitle("How was the status determined?")),
-                                            dbc.ModalBody(id="how-status-modal-body"),
-                                            dbc.ModalFooter(
-                                                dbc.Button("Close", id="close-how-status-modal", className="ml-auto", n_clicks=0)
-                                            ),
-                                        ],
-                                        id="how-status-modal",
-                                        size="lg",
-                                        is_open=False,
-                                    ),
-                                ], className="how-status-div",
-                            ),
-                        ], className='page-cont mb-1 p-1', xl=12
-                    )
-                ], className="boxwithshadow page-cont mb-1"
-                ),
+                # Top right column with status table, status statistics, and the search fields
+                dbc.Col([
+                    dbc.Row(children=total_number, className="h-100"),
+                    dbc.Row([
+                        dbc.Col(
+                            [
+                                html.Div(children=statusTable, id='site-status', className='status-table-cls'),
+                                html.Div(
+                                    [
+                                        dbc.Button(
+                                            "How was the status determined?",
+                                            id="how-status-collapse-button",
+                                            className="mb-3",
+                                            color="secondary",
+                                            n_clicks=0,
+                                        ),
+                                        dbc.Modal(
+                                            [
+                                                dbc.ModalHeader(dbc.ModalTitle("How was the status determined?")),
+                                                dbc.ModalBody(id="how-status-modal-body"),
+                                                dbc.ModalFooter(
+                                                    dbc.Button("Close", id="close-how-status-modal", className="ml-auto", n_clicks=0)
+                                                ),
+                                            ],
+                                            id="how-status-modal",
+                                            size="lg",
+                                            is_open=False,
+                                        ),
+                                    ], className="how-status-div",
+                                ),
+                            ], className='page-cont mb-1 p-1', xl=12
+                        )
+                    ], className="boxwithshadow page-cont mb-1"),
+
+                    # Bottom part with the three pie charts
+                    dbc.Row([
+                        dbc.Row([
+                            # expected testing data availability in Elasticsearch per host
+                            html.H3(f'Expected Testing Data Availability(per host) in Elasticsearch [{stats_date.strftime("%d-%m-%Y")}]', className='stats-title mt-1'),
+                            # OWD stats
+                            dbc.Col([
+                                dcc.Graph(
+                                    figure=build_pie_chart(expected_received_stats, 'owd'),  # OWD stats
+                                    id='owd-stats',
+                                    className='cls-owd-stats',
+                                    style={'height': '200px'}  # Adjust the height as needed
+                                ),
+                            ], width=4, className='mt-2'),  # Adjust column width
+
+                            # Throughput stats
+                            dbc.Col([
+                                dcc.Graph(
+                                    figure=build_pie_chart(expected_received_stats, 'throughput'),  # Throughput stats
+                                    id='throughput-stats',
+                                    className='cls-throughput-stats',
+                                    style={'height': '200px'}  # Adjust the height as needed
+                                ),
+                            ], width=4, className='mt-2'),  # Adjust column width
+
+                            # Trace stats
+                            dbc.Col([
+                                dcc.Graph(
+                                    figure=build_pie_chart(expected_received_stats, 'trace'),  # Trace stats
+                                    id='trace-stats',
+                                    className='cls-trace-stats',
+                                    style={'height': '200px'}  # Adjust the height as needed
+                                ),
+                            ], width=4, className='mt-2'),  # Adjust column width
+                        ]),
+                        dbc.Row([
+                            #colored dots and explanations + buttons with historical data
+                            dbc.Col([
+                                html.Div([
+                                    # First colored dot and explanation
+                                    html.Div([
+                                        html.Span(style={
+                                            'display': 'inline-block',
+                                            'width': '10px',
+                                            'height': '10px',
+                                            'border-radius': '50%',
+                                            'background-color': '#69c4c4',  # custom color
+                                            'margin-right': '8px',
+                                            'margin-left': '8px'
+                                        }),
+                                        html.Span("expected hosts found in the Elasticsearch", style={'font-size': '10px'})
+                                    ]),
+
+                                # Second colored dot and explanation
+                                html.Div([
+                                    html.Span(style={
+                                        'display': 'inline-block',
+                                        'width': '10px',
+                                        'height': '10px',
+                                        'border-radius': '50%',
+                                        'background-color': '#00245a',  # custom color
+                                        'margin-right': '8px',
+                                        'margin-left': '8px'
+                                    }),
+                                    html.Span("expected hosts NOT found in the Elasticsearch", style={'font-size': '10px'})
+                                ])
+                            ], style={'background-color': 'transparent'})
+                        ], width=2, className='w-100 mb-1'),  # Adjust column width
+                        ]),    
+                    ], className='boxwithshadow page-cont mb-1', align="center")],
+                lg=6, sm=12, className='d-flex flex-column h-100 pl-1'),
+                # End of top right column
+                
+            ], className='w-100 h-100 g-0'),
+
+            # Bottom part with search field and the list of alarms
+            dbc.Row([
                 dbc.Row([
                     dbc.Row([
                         dbc.Col([
@@ -447,7 +521,7 @@ def layout(**other_unknown_query_strings):
                                         html.I(className="fas fa-search"),
                                         "Search the Networking Alarms"
                                     ], className="l-h-3"),
-                                ], align="center", className="text-left rounded-border-1 pl-1"
+                                ], align="center", className="text-left rounded-border-1"
                                     , md=12, xl=6),
                                 dbc.Col([
                                     dcc.DatePickerRange(
@@ -458,7 +532,7 @@ def layout(**other_unknown_query_strings):
                                         start_date=now[0],
                                         end_date=now[1]
                                     )
-                                ],  md=12, xl=6, className="mb-1 text-right")
+                                ], md=12, xl=6, className="mb-1 text-right")
                             ], justify="around", align="center", className="flex-wrap"),
                             dbc.Row([
                                 dbc.Col([
@@ -474,33 +548,28 @@ def layout(**other_unknown_query_strings):
                             html.Br(),
                             dbc.Row([
                                 dbc.Col([
-                                    dbc.Button("Search", id="search-button", color="secondary", 
-                                               className="mlr-2", style={"width": "100%", "font-size": "1.5em"})
+                                    dbc.Button("Search", id="search-button", color="secondary",
+                                            className="mlr-2", style={"width": "100%", "font-size": "1.5em"})
                                 ])
                             ]),
-                        ], lg=12, md=12, className="pl-1 pr-1 p-1"),
-                    ], className="p-1 site g-0", justify="center", align="center"),
-                ], className='boxwithshadow page-cont mb-1 row', align="center")],
-            lg=6, sm=12, className='d-flex flex-column h-100 pl-1'),
+                        ], lg=12, md=12, className="p-1"),
+                    ], className="w-100 site g-0", justify="center", align="center"),
+                ], className='w-100 boxwithshadow page-cont row', align="center")
+            ], className='w-100 h-100 g-0 pl-1 pb-2'),
                 
-            # end of top right column
-
-        ], className='h-100 g-0'),
-
-        # bottom part with the list of alarms
-        dbc.Row([
-            dbc.Col([
-                html.H1(f"List of alarms", className="text-center"),
-                html.Hr(className="my-2"),
-                html.Br(),
-                dcc.Loading(
-                    html.Div(id='results-table'),
-                    style={'height': '0.5rem'}, color='#00245A')
-            ], className="boxwithshadow page-cont p-2",),
-        ], className="g-0"),
-    ], className='', style={"padding": "0.5% 1% 0 1%"})
-
-
+            dbc.Row([
+                dbc.Col([
+                    html.H1(f"List of alarms", className="text-center"),
+                    html.Hr(className="my-2"),
+                    html.Br(),
+                    dcc.Loading(
+                        html.Div(id='results-table'),
+                        style={'height': '0.5rem'}, color='#00245A')
+                ], className="boxwithshadow page-cont p-2",),
+            ], className="g-0"),    
+        ]),
+    ], className='')
+    
 @dash.callback(
     [
         Output("sites-dropdown", "options"),
@@ -579,8 +648,7 @@ def update_output(n_clicks, start_date, end_date, sites, all, events, allevents,
 
         return [sites_dropdown_items, events_dropdown_items, dcc.Graph(figure=bar_chart), dataTables]
     else:
-        raise dash.exceptions.PreventUpdate
-    
+        raise dash.exceptions.PreventUpdate 
 
 @dash.callback(
     [
@@ -601,7 +669,7 @@ def toggle_modal(n1, n2, is_open):
                 dbc.Col(children=[
                     html.H3('Category & Alarm types', className='status-title'),
                     html.Div(statusExplainedTable, className='how-status-table')
-                ], lg=12, md=12, sm=12, className='page-cont pr-1 how-status-cont mb-1'),
+                ], lg=12, md=12, sm=12, className='page-cont pr-1 how-status-cont'),
                 dbc.Col(children=[
                     html.H3('Status color rules', className='status-title'),
                     html.Div(catTable, className='how-status-table')
@@ -683,9 +751,12 @@ def generate_tables(frame, unpacked, event, alarmsInst):
     ids = unpacked['id'].values
     dfr = frame[frame.index.isin(ids)]
     dfr = alarmsInst.formatDfValues(dfr, event)
+    # try:
+    #     print(f"###################\n{dfr}")
+    # except Exception as err:
+    #     print(err)
     dfr.sort_values('to', ascending=False, inplace=True)
     print('Home page,', event, "Number of alarms:", len(dfr))
-
     try:
         element = html.Div([
                     html.Br(),
@@ -725,3 +796,128 @@ def generate_tables(frame, unpacked, event, alarmsInst):
         print('dash_table.DataTable expects each cell to contain a string, number, or boolean value', e)
         return html.Div()
 
+def expected_hosts_PsConfig():
+    """
+    The function reads parquet file with updated every 24 \
+    hours data from psConfig about expected hosts and tests \
+    results in the Elasticsearch.
+    """
+    parquet_path = 'parquet/raw/psConfigData.parquet'
+    try: 
+        print("Reading the parquet file with psConfig data...")
+        df = pq.readFile(parquet_path)
+        expected_tests_types = {
+                                "owd": len(df[df["owd"] == True]),
+                                "trace": len(df[df["trace"] == True]),
+                                "throughput": len(df[df["throughput"] == True])
+                                }
+        df = pd.DataFrame.from_dict(expected_tests_types, orient='index', columns=['Count'])
+        df['date'] = time
+        print(f"psConfigData from parquet file: {df}")
+        return df
+    except Exception as err:
+        print(err)
+        print(f"Problems with reading the file {parquet_path}")
+        
+def count_unique_not_found_hosts(df, category):
+    """
+    The function helps to count unique hosts among \
+    different categories from the Alarms to count the general statistics \
+    about perfSonar missing tests in Elasticsearch.
+    """
+    missing_hosts = df.groupby("site")["hosts_not_found"].apply(lambda x: set(
+            host for d in x 
+            if isinstance(d, dict) and isinstance(d.get(category), (list, set, np.ndarray))
+            for host in (d[category].tolist() if isinstance(d[category], np.ndarray) else d[category])
+        ))
+    all_missing_hosts = set().union(*missing_hosts.dropna())
+    # print(all_missing_hosts)
+    return (
+        len(all_missing_hosts)
+    )
+
+def get_hosts_not_found_stats_data(time):
+    """
+    This function extracts the hosts not found alarms\
+    for the last available day and count statistics for \
+    expected and missing tests and hosts.
+    """
+    dayBeforeYesterdayS = (time - timedelta(days=2)).replace(hour=0, minute=0, second=0, microsecond=0)
+    dayBeforeYesterdayE = (time - timedelta(days=2)).replace(hour=23, minute=59, second=59, microsecond=0)
+    alarmsInst = Alarms()
+    alarms, pivotFrames = alarmsInst.loadData(dayBeforeYesterdayS.strftime('%Y-%m-%dT%H:%M:%S.000Z'), dayBeforeYesterdayE.strftime('%Y-%m-%dT%H:%M:%S.000Z'))
+    alarmsWithNotFoundHosts, pivotFrame = alarms['hosts not found'], pivotFrames['hosts not found']
+    tests_types_results = {'owd': None, 'throughput': None, 'trace': None}
+    try: 
+        expected_stats = expected_hosts_PsConfig().to_dict()['Count']
+        all_missing_num = 0
+        for key in tests_types_results.keys():
+            missing_hosts = count_unique_not_found_hosts(alarmsWithNotFoundHosts, key)
+            expected_hosts = expected_stats[key]
+            tests_types_results[key] = (missing_hosts, expected_hosts)
+            all_missing_num += missing_hosts
+        if all_missing_num == 0:
+            print("!!!!!!!!!!!!!!!!!!!!suspicious!!!!!!!!!!!!!!!!!!!!!!!!!")
+            print("Check parquet file existence and data format.")
+        return alarmsWithNotFoundHosts, tests_types_results, dayBeforeYesterdayS
+    except Exception as err:
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        print(err)
+        print("Check parquet file existence and data format.")
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        return alarmsWithNotFoundHosts, tests_types_results, dayBeforeYesterdayS
+
+def build_pie_chart(stats, test_type):
+    """
+    The function builds pie chart with general
+    statistics about data availability in Elasticsearch.
+    """
+    #TODO: add inside the donut chart trend(has the percent of got data grown or vice verse)
+    # print("*************************************\nDebug build_pie_chart\n")
+    part, total = stats[test_type]
+    percentage = (part / total) * 100
+
+    labels = ['Not Found', 'Found']
+    values = [part, total - part]
+
+    fig = px.pie(
+        names=labels,
+        values=values,
+        hole=0.4,
+        color=labels,
+        color_discrete_map={'Not Found': '#00245a', 'Found': '#69c4c4'} 
+    )
+
+    fig.update_layout(
+        height=200,  # Height of the chart
+        width=200,   # Width of the chart
+        autosize=False,  # Disable autosizing to enforce custom dimensions
+        margin=dict(l=20, r=20, t=20, b=20),
+        title={
+            'text': test_type.upper(),  
+            'y': 0.95,  
+            'x': 0.05,
+            'xanchor': 'left',
+            'yanchor': 'top',
+            'font': {'size': 12, 'color': '#00245a'}  
+        },
+        showlegend=False,
+        template='plotly_white',
+        annotations=[
+            {
+                'text': f'{(100-percentage):.1f}%',
+                'x': 0.5,
+                'y': 0.5,
+                'font_size': 15,
+                'showarrow': False
+            }
+        ]
+    )
+
+    fig.update_traces(
+        marker=dict(
+            line=dict(color='#ffffff', width=2)  # Add a white border to the slices
+        )
+    )
+
+    return fig
