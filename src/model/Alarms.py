@@ -11,6 +11,7 @@ import utils.helpers as hp
 from utils.helpers import timer
 import model.queries as qrs
 from utils.parquet import Parquet
+import dash_bootstrap_components as dbc
 
 import urllib3
 urllib3.disable_warnings()
@@ -184,6 +185,8 @@ class Alarms(object):
             event = self.eventUF(event)
 
             df = pq.readFile(f)
+            # print("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n")
+            # print(df)
             df['to'] = pd.to_datetime(df['to'], utc=True)
             modification_time = os.path.getmtime(f)
 
@@ -192,7 +195,8 @@ class Alarms(object):
             time_difference_hours = time_difference / (60 * 60)
 
             # Check if the file was modified more than 1 hour ago
-            if time_difference_hours <  1:
+            # TODO: change this to time_difference_hours <  1
+            if time_difference_hours <  24:
               # print('>>>>>>>', df['to'].min(), df['to'].max() , dateFrom, dateTo)
               # print("The file was modified within the last hour.")
               frames[event] = df[(df['to']>=dateFrom) & (df['to'] <= dateTo)]
@@ -207,7 +211,6 @@ class Alarms(object):
       
       if len(folder)==0 or isTooOld == True:
           print('Query ES')
-          print('+++++++++++++++++++++')
           frames, pivotFrames = self.getAllAlarms(dateFrom, dateTo)
 
     except Exception as e:
@@ -234,9 +237,7 @@ class Alarms(object):
     dateFrom, dateTo = hp.getPriorNhPeriod(alarmEnd)
     # frames, pivotFrames = self.loadData(dateFrom, dateTo)
     print('getOtherAlarms')
-    print('+++++++++++++++++++++')
     # print(dateFrom, dateTo, currEvent, alarmEnd, '# alarms:', [len(d) for d in pivotFrames], site, src_site, dest_site)
-    print()
 
     alarmsListed = {}
 
@@ -285,8 +286,9 @@ class Alarms(object):
 
 
   @staticmethod
-  def convertListOfDict(column_name, df):
+  def convertListOfDict(column_name, df, event=False):
     def convert_to_string(value):
+# I could have broken smth here
             if isinstance(value, dict):
                 result = []
                 for key, val in value.items():
@@ -297,9 +299,15 @@ class Alarms(object):
                             val_str = str(val)
                         result.append(f"<b>{key}</b>: {val_str}")
                 return '\n'.join(result)
+            if isinstance(value, list):
+                val_str = ' || '.join(value)
+                return val_str
             return str(value)
-        
-    df[column_name] = df[column_name].apply(convert_to_string)
+    if event:
+      df['hosts_failed'] = df['hosts_failed'].apply(convert_to_string)
+      df['tests_types_failed'] = df['tests_types_failed'].apply(convert_to_string)
+    else:
+      df[column_name] = df[column_name].apply(convert_to_string)
     return df
 
 
@@ -371,8 +379,11 @@ class Alarms(object):
 
         if 'configurations' in df.columns:
             df = self.replaceCol('configurations', df, '\n')
-        if 'hosts_not_found' in df.columns:
-            df = self.convertListOfDict('hosts_not_found', df)
+        if 'hosts_not_found' in df.columns or event == 'hosts not found':
+            additionalTable = False
+            if 'hosts_not_found' not in df.columns:
+              additionalTable = True
+            df = self.convertListOfDict('hosts_not_found', df, additionalTable)
 
         if event == 'complete packet loss':
           df.drop(columns=['avg_value'], inplace=True)
@@ -380,13 +391,13 @@ class Alarms(object):
           df.drop(columns=['to_date', 'ipv6', 'asn_count'], inplace=True)
 
         # TODO: create pages/visualizatios for the following events then remove the df.drop('alarm_link') below
-        if event not in ['unresolvable host', 'hosts not found']:
+        if event not in ['unresolvable host']:
           df = self.createAlarmURL(df, event)
-        else:
-          df.drop('alarm_link', axis=1, inplace=True)
-
-          if 'site' in df.columns:
-              df['site'] = df['site'].fillna("Unknown site")
+        if event == 'hosts not found':
+            self.createGraphButton(df)
+        # df.drop('alarm_link', axis=1, inplace=True)
+        if 'site' in df.columns:
+            df['site'] = df['site'].fillna("Unknown site")
 
         # Reorder 'from' and 'to' columns to be the first two columns if they exist
         df = self.reorder_columns(df, ['from', 'to'])
@@ -401,27 +412,47 @@ class Alarms(object):
   @staticmethod
   # Create dynamically the URLs leading to a page for a specific alarm
   def createAlarmURL(df, event):
-    if event.startswith('bandwidth'):
-          page = 'throughput/'
-    elif event == 'path changed':
-        page = 'paths/'
-    elif event == 'ASN path anomalies':
-        page = 'anomalous_paths/'
-    elif event in ['firewall issue', 'complete packet loss', 'bandwidth decreased from/to multiple sites',
-                    'high packet loss on multiple links', 'high packet loss']:
-        page = 'loss-delay/'
-    # else:
-    #     page = 'alarms/'
-
+    event_page_map = {
+        'path changed': 'paths/',
+        'ASN path anomalies': 'anomalous_paths/',
+        'firewall issue': 'loss-delay/',
+        'complete packet loss': 'loss-delay/',
+        'bandwidth decreased from/to multiple sites': 'loss-delay/',
+        'high packet loss on multiple links': 'loss-delay/',
+        'high packet loss': 'loss-delay/',
+        'hosts not found': 'hosts_not_found/'
+    }
+    if event.startswith('bandwidth') and event != 'bandwidth decreased from/to multiple sites':
+        page = 'throughput/'
+    else:
+        page = event_page_map.get(event, '')
     # create clickable cells leading to alarm pages
     if 'alarm_link' in df.columns:
         url = f'{request.host_url}{page}'
         df['alarm_link'] = df['alarm_link'].apply(
-            lambda id: f"<a class='btn btn-secondary' role='button' href='{url}{id}' target='_blank'>VIEW IN A NEW TAB</a>" if id else '-')
+          lambda id: f"<a class='btn btn-secondary' role='button' href='{url}{id}' target='_blank'>VIEW IN A NEW TAB</a>" if id else '-')
     
     if event == 'ASN path anomalies':
       df['alarm_link'] = df.apply(
         lambda row: f"<a class='btn btn-secondary' role='button' href='{request.host_url}anomalous_paths/src_netsite={row['src_netsite']}&dest_netsite={row['dest_netsite']}' target='_blank'>VIEW IN A NEW TAB</a>" if row['src_netsite'] and row['dest_netsite'] else '-', axis=1)
+    
+    if event == "hosts not found":
+          df['alarm_link'] = df.apply(
+            lambda row: f"<a class='btn btn-secondary' role='button' href='{request.host_url}hosts_not_found/{row['site']}' target='_blank'>VIEW IN A NEW TAB</a>" if row['site'] else '-', axis=1)
+        
+    return df
+  
+  @staticmethod
+  def createGraphButton(df):
+    df['alarm_button'] = df['site'].apply(
+        lambda site: dbc.Button(
+            "GENERATE GRAPH",
+            id={'type': 'generate-graph-button', 'index': site},  # Unique ID for each button
+            color="primary",
+            className="me-1",
+            style={"width": "100%", "font-size": "1.0em"}
+        )
+    )
     return df
 
 
