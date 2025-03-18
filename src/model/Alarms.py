@@ -401,7 +401,6 @@ class Alarms(object):
 
         # Reorder 'from' and 'to' columns to be the first two columns if they exist
         df = self.reorder_columns(df, ['from', 'to'])
-
         return df
     except Exception as e:
         print('Exception ------- ', event)
