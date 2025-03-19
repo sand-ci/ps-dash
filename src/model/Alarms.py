@@ -319,7 +319,7 @@ class Alarms(object):
 
 
   # Format, hide or edit anything displayed in the datatables
-  def formatDfValues(self, df, event):
+  def formatDfValues(self, df, event, generate_button=False):
     try:
         sign = {'bandwidth increased from/to multiple sites': '+',
                 'bandwidth decreased from/to multiple sites': ''}
@@ -393,7 +393,8 @@ class Alarms(object):
         # TODO: create pages/visualizatios for the following events then remove the df.drop('alarm_link') below
         if event not in ['unresolvable host']:
           df = self.createAlarmURL(df, event)
-        if event == 'hosts not found':
+          
+        if generate_button:
             self.createGraphButton(df)
         # df.drop('alarm_link', axis=1, inplace=True)
         if 'site' in df.columns:

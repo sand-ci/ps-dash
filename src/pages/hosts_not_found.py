@@ -302,7 +302,7 @@ def generate_table(data, alarmsInsts, dateFrom=None, dateTo=None):
     # print(f"-----------------------\nDATA:\n{data}")
     df_complete = get_stats_per_site(data)
     print(f"Type dfr: {type(df_complete)}")
-    dfAddButton = alarmsInsts.formatDfValues(df_complete, 'hosts not found')
+    dfAddButton = alarmsInsts.formatDfValues(df_complete, 'hosts not found', True)
     df = dfAddButton[["from", "to", "site", "hosts_failed", "tests_types_failed", "alarm_button"]]
     # print(f"-----------------------\nDATA:\n{df_complete}") 
     display_columns = df.keys()

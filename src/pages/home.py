@@ -711,8 +711,6 @@ def generate_tables(frame, unpacked, event, alarmsInst):
     ids = unpacked['id'].values
     dfr = frame[frame.index.isin(ids)]
     dfr = alarmsInst.formatDfValues(dfr, event)
-    if event == 'hosts not found':
-        dfr.drop(columns=['alarm_button'], inplace=True)
     dfr.sort_values('to', ascending=False, inplace=True)
     print('Home page,', event, "Number of alarms:", len(dfr))
     try:
