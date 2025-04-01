@@ -667,3 +667,17 @@ count-box {
     margin-right: 10px;
     border-radius: 5px;
 }
+
+/**********   Site Report   **********/
+.boxwithshadowhidden {
+    border: 1px solid rgba(0,0,0,.125);
+    box-shadow: 4px 4px 7px -1px #b4b2b2;
+    border-radius: 1rem;
+    overflow: hidden; /* This ensures child elements respect the border radius */
+}
+
+.header-line {
+    border-radius: 1rem 1rem 0 0 !important; /* Rounded top corners */
+    /* margin: -1rem -1rem 1rem -1rem !important; Counteracts the parent padding */
+    width: calc(100% + 2rem) !important; /* Expands to full width including padding */
+}

@@ -58,7 +58,7 @@ class ParquetUpdater(object):
 
 
     # The following function is used to group alarms by site 
-    # taking into account the most recent 24 hours only
+    # taking into account the most recent 48 hours only
     def groupAlarms(self, pivotFrames):
         dateFrom, dateTo = hp.defaultTimeRange(2)
         metaDf = self.pq.readFile('parquet/raw/metaDf.parquet')

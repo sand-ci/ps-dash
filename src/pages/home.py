@@ -711,6 +711,9 @@ def generate_tables(frame, unpacked, event, alarmsInst):
     ids = unpacked['id'].values
     dfr = frame[frame.index.isin(ids)]
     dfr = alarmsInst.formatDfValues(dfr, event)
+    if event == 'hosts not found':
+                    if 'hosts' in dfr.columns:
+                        dfr.drop(columns=['hosts'], inplace=True)
     dfr.sort_values('to', ascending=False, inplace=True)
     print('Home page,', event, "Number of alarms:", len(dfr))
     try:
@@ -897,7 +900,7 @@ def build_histogram(dictionary):
         x='date',
         y='host_count',
         color='group',
-        labels={'date': 'Date', 'host_count': 'Number of Hosts', 'group': 'Group'},
+        labels={'date': 'Date', 'host_count': 'Number of Missing Hosts', 'group': 'Group'},
         line_shape='linear'
     )
 

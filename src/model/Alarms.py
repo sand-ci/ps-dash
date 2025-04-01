@@ -319,7 +319,7 @@ class Alarms(object):
 
 
   # Format, hide or edit anything displayed in the datatables
-  def formatDfValues(self, df, event, generate_button=False):
+  def formatDfValues(self, df, event, generate_button=False, site_report=False):
     try:
         sign = {'bandwidth increased from/to multiple sites': '+',
                 'bandwidth decreased from/to multiple sites': ''}
@@ -361,6 +361,7 @@ class Alarms(object):
             df['asn_list'] = df['asn_list'].apply(lambda x: ', '.join(map(str, x)))
             df.rename(columns={'asn_list': 'new ASN(s)'}, inplace=True)
         if 'ipv' in df.columns:
+            df['ipv'] = df['ipv'].apply(lambda x: x.lower() if x is not None else x)
             df.rename(columns={'ipv': 'IP version'}, inplace=True)
 
         if 'alarms_id' in df.columns:
@@ -384,6 +385,13 @@ class Alarms(object):
             if 'hosts_not_found' not in df.columns:
               additionalTable = True
             df = self.convertListOfDict('hosts_not_found', df, additionalTable)
+            
+            # import re
+            # def extract_hosts(text):
+            #     return re.findall(r'(?:^|\n)\s*[^:]*:\s*([^\s]+)', text)
+            # df['hosts'] = df['hosts_not_found'].apply(lambda x: extract_hosts(x))
+            # print(df.iloc[0])
+            
 
         if event == 'complete packet loss':
           df.drop(columns=['avg_value'], inplace=True)
@@ -392,7 +400,7 @@ class Alarms(object):
 
         # TODO: create pages/visualizatios for the following events then remove the df.drop('alarm_link') below
         if event not in ['unresolvable host']:
-          df = self.createAlarmURL(df, event)
+          df = self.createAlarmURL(df, event, site_report)
           
         if generate_button:
             self.createGraphButton(df)
@@ -411,7 +419,7 @@ class Alarms(object):
 
   @staticmethod
   # Create dynamically the URLs leading to a page for a specific alarm
-  def createAlarmURL(df, event):
+  def createAlarmURL(df, event, site_report=False):
     event_page_map = {
         'path changed': 'paths/',
         'ASN path anomalies': 'anomalous_paths/',
@@ -426,20 +434,52 @@ class Alarms(object):
         page = 'throughput/'
     else:
         page = event_page_map.get(event, '')
+    if not site_report:
     # create clickable cells leading to alarm pages
-    if 'alarm_link' in df.columns:
-        url = f'{request.host_url}{page}'
-        df['alarm_link'] = df['alarm_link'].apply(
-          lambda id: f"<a class='btn btn-secondary' role='button' href='{url}{id}' target='_blank'>VIEW IN A NEW TAB</a>" if id else '-')
-    
-    if event == 'ASN path anomalies':
-      df['alarm_link'] = df.apply(
-        lambda row: f"<a class='btn btn-secondary' role='button' href='{request.host_url}anomalous_paths/src_netsite={row['src_netsite']}&dest_netsite={row['dest_netsite']}' target='_blank'>VIEW IN A NEW TAB</a>" if row['src_netsite'] and row['dest_netsite'] else '-', axis=1)
-    
-    if event == "hosts not found":
-          df['alarm_link'] = df.apply(
-            lambda row: f"<a class='btn btn-secondary' role='button' href='{request.host_url}hosts_not_found/{row['site']}' target='_blank'>VIEW IN A NEW TAB</a>" if row['site'] else '-', axis=1)
-        
+      if 'alarm_link' in df.columns:
+          url = f'{request.host_url}{page}'
+          df['alarm_link'] = df['alarm_link'].apply(
+            lambda id: f"<a class='btn btn-secondary' role='button' href='{url}{id}' target='_blank'>VIEW IN A NEW TAB</a>" if id else '-')
+      
+      if event == 'ASN path anomalies':
+        df['alarm_link'] = df.apply(
+          lambda row: f"<a class='btn btn-secondary' role='button' href='{request.host_url}anomalous_paths/src_netsite={row['src_netsite']}&dest_netsite={row['dest_netsite']}' target='_blank'>VIEW IN A NEW TAB</a>" if row['src_netsite'] and row['dest_netsite'] else '-', axis=1)
+      
+      if event == "hosts not found":
+            df['alarm_link'] = df.apply(
+              lambda row: f"<a class='btn btn-secondary' role='button' href='{request.host_url}hosts_not_found/{row['site']}' target='_blank'>VIEW IN A NEW TAB</a>" if row['site'] else '-', axis=1)
+    else:
+        if 'alarm_link' in df.columns:
+            df['alarm_link'] = df['alarm_link'].apply(
+                lambda id: dbc.Button(
+                    "VIEW DETAILS",
+                    id={'type': 'alarm-link-btn', 'index': id},
+                    className="btn btn-secondary",
+                    n_clicks=0
+                ) if id else '-'
+            )
+
+        if event == 'ASN path anomalies':
+            df['alarm_link'] = df.apply(
+                lambda row: dbc.Button(
+                    "VIEW DETAILS",
+                    id={'type': 'path-anomaly-btn', 'index': f"{row['src_netsite']}_{row['dest_netsite']}"},
+                    className="btn btn-secondary",
+                    n_clicks=0
+                ) if row['src_netsite'] and row['dest_netsite'] else '-',
+                axis=1
+            )
+
+        if event == "hosts not found":
+            df['alarm_link'] = df.apply(
+                lambda row: dbc.Button(
+                    "VIEW DETAILS",
+                    id={'type': 'hosts-not-found-btn', 'index': row['site']},
+                    className="btn btn-secondary",
+                    n_clicks=0
+                ) if row['site'] else '-',
+                axis=1
+            )   
     return df
   
   @staticmethod
