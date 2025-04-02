@@ -302,6 +302,8 @@ class Alarms(object):
             if isinstance(value, list):
                 val_str = ' || '.join(value)
                 return val_str
+            if column_name == "hosts_not_found":
+                print(type(value))
             return str(value)
     if event:
       df['hosts_failed'] = df['hosts_failed'].apply(convert_to_string)

@@ -1,9 +1,8 @@
-#TODO: count statuses throughout the week
-#TODO: i guess i have fixed it, I changed something in hosts not found Alarms.py and now I broke home page list and the webpage
-
+#TODO: change date format for sorting in graphs
 #TODO: debug groupAlarms in Updater.py, number of alarms is counted not correct
-#TODO: graphs
+#TODO: add in summary what petya told
 #TODO: add button which generates detailed information about alarm
+    #TODO isolate functions to extract the visualistions? ither visuals
 #TODO: add measurements
 #TODO: add graph like in Grafana
 
@@ -29,7 +28,7 @@ import utils.helpers as hp
 from utils.helpers import timer
 import model.queries as qrs
 from utils.parquet import Parquet
-from pages.home import generate_status_table
+# from pages.home import generate_status_table
 
 
 def title(q=None):
@@ -91,7 +90,7 @@ def layout(q=None, **other_unknown_query_strings):
     site_alarms = pd.DataFrame(columns=["to", "alarm group", "alarm name", "hosts", "IP version", "Details"])
     site_alarms_num = 0
     subcategories = qrs.getSubcategories()
-
+    path_changed_item = frames.pop("path changed between sites", None)
     for frame in frames:
         print(frame)
         print("----------------")
@@ -100,19 +99,13 @@ def layout(q=None, **other_unknown_query_strings):
         site_df = df[df['tag'].apply(lambda x: q in x)]
         if not site_df.empty:
             print(site_df.head(5))
-            site_df["to"] = site_df['to'].apply(reformat_time)
+            site_df['to'] = pd.to_datetime(site_df['to'], errors='coerce')
+            # drop time
+            site_df['to'] = site_df['to'].dt.normalize()  # or .dt.floor('D')
+            site_df['to'] = site_df['to'].dt.strftime('%Y-%m-%d')
+            # site_df["to"] = site_df['to'].apply(reformat_time)
             if frame == "hosts not found":
                 print(site_df['hosts_not_found'].head(5))
-                # site_df['hosts'] = site_df['hosts_not_found'].apply(
-                #                                                 lambda x:[item for item in x.values() if item is not None]
-                #                                             )
-                # for i, row in site_df.iterrows():
-                #     s = set()
-                #     hosts_list = row['hosts_not_found']
-                #     if hosts_list is not None:\
-                #         s.update(hosts_list)
-                #     row['hosts'] = list(s)
-                #     print(row)
                 site_df['hosts'] = None
                 site_df['hosts list'] = None
                 for i, row in site_df.iterrows():
@@ -126,26 +119,15 @@ def layout(q=None, **other_unknown_query_strings):
                                 s.update(item)
                             else:
                                 s.add(item)
-                    hosts_list = list(s)
+                    hosts_list = s
                     print("HOSTS LIST")
                     print(hosts_list)
                     site_df.at[i, 'hosts list'] = hosts_list
-                    # string_representation = '\n'.join(hosts_list).replace('-', '\u2011')
                     site_df.at[i, 'hosts'] = hosts_list
-
-                    
-                print(site_df.columns)
-                        
-                # site_df['hosts'] = site_df['hosts_not_found'].apply(
-                #             lambda x: [item for item in x.values() if item is not None]
-                #         )
-                
-
-                # site_df['hosts'] = site_df['hosts_not_found']
-                
-                # site_df = alarmsInst.formatDfValues(site_df, frame, True)
-                # site_df.rename(columns={'alarm_button': "alarm_link"}, inplace=True)
             site_df = alarmsInst.formatDfValues(site_df, frame, False, True)
+            # TODO: put it in the formating to the Alarms.py to def formatDfValues()
+            if 'hosts' in site_df.columns:
+                site_df['hosts'] = site_df['hosts'].apply(lambda x: html.Div([html.Div(item) for item in x.split('\n')]) if isinstance(x, str) else x)
             site_alarms_num += len(site_df)
             site_df.reset_index(drop=True, inplace=True)
             for i, alarm in site_df.iterrows():
@@ -157,7 +139,7 @@ def layout(q=None, **other_unknown_query_strings):
                     'alarm group': subcategories[subcategories['event'] == frame]['category'].values[0],
                     'alarm name': frame,
                     'IP version': alarm.get('IP version', None),  # Added IP version if available
-                    'hosts': str('\n'.join(alarm['hosts']).replace('-', '\u2011')) if 'hosts' in alarm else None,
+                    'hosts': alarm['hosts'] if 'hosts' in alarm else None,
                     'Details': alarm.get('alarm_link', None),  # Added Details if available
                 }
                 
@@ -213,12 +195,12 @@ def layout(q=None, **other_unknown_query_strings):
                                                 children=[
                                                     html.Div([
                                                         dbc.ButtonGroup([
-                                                            dbc.Button("Alarm Type", id="btn-alarm-type", n_clicks=0, 
+                                                            dbc.Button("Categories", id="btn-alarm-type", n_clicks=0, 
                                                                     color="secondary", className="me-1"),
-                                                            dbc.Button("Alarm Name", id="btn-alarm-name", n_clicks=0,
+                                                            dbc.Button("Alarms", id="btn-alarm-name", n_clicks=0,
                                                                     color="secondary")
                                                         ], style={"margin-bottom": "10px"}),
-                                                        dcc.Store(id="active-button-store", data="alarm_type"),
+                                                        dcc.Store(id="active-button-store", data="alarm group"),
                                                     ]),
                                                     dcc.Loading(
                                                         html.Div(
@@ -247,13 +229,21 @@ def layout(q=None, **other_unknown_query_strings):
                                     children=[
                                         # html.H5("Site status throughout the week", style={"padding-top": "3%", "padding-left": "3%"}),
                                         # dcc.Graph(id="site-status", style={"height": "calc(100% - 50px)"}
-                                        dcc.Graph(id="site-status", figure=create_status_chart(site_alarms), style={"height": "100%"}
+                                        dcc.Graph(id="site-status", figure=create_status_chart(site_alarms), 
+                                                  style={
+                                                        "height": "90%",
+                                                        "width": "95%",
+                                                        "display": "flex",
+                                                        "flex-grow": "1",  # Allows graph to expand
+                                                        "min-height": "0"  # Prevents overflow issues
+                                                    }
                                     )
                                     ], style={
                                         "height": "65%",
                                         "margin-bottom": "1rem",
                                         "display": "flex",
-                                        "flex-direction": "column"
+                                        "flex-direction": "column",
+                                        "overflow": "hidden"
                                     }
                                 ),
                                 html.Div(
@@ -303,7 +293,7 @@ def layout(q=None, **other_unknown_query_strings):
                                             dbc.Col(
                                                 dcc.Dropdown(
                                                     id='filter-group',
-                                                    placeholder="Alarm group",
+                                                    placeholder="Category",
                                                     options=[{'label': group, 'value': group} for group in sorted(site_alarms['alarm group'].unique())],
                                                     multi=True,
                                                     clearable=True
@@ -311,7 +301,7 @@ def layout(q=None, **other_unknown_query_strings):
                                             dbc.Col(
                                                 dcc.Dropdown(
                                                     id='filter-type',
-                                                    placeholder="Alarm name",
+                                                    placeholder="Alarm",
                                                     options=[{'label': alarm_name, 'value': alarm_name} for alarm_name in sorted(site_alarms['alarm name'].unique())],
                                                     multi=True,
                                                     clearable=True
@@ -394,7 +384,6 @@ def create_bar_chart(graphData, column_name='alarm group'):
         margin=dict(t=20, b=20, l=0, r=0),
         showlegend=True,
         legend_orientation='h',
-        legend_title_text='Alarm Type',
         legend=dict(
             x=0,
             y=1.35,
@@ -402,8 +391,9 @@ def create_bar_chart(graphData, column_name='alarm group'):
             xanchor='left',
             yanchor='top',
             font=dict(
-                size=12,
+                size=10,
             ),
+            
         ),
         height=250,
         plot_bgcolor='#fff',
@@ -484,10 +474,19 @@ def create_status_chart(graphData):
         ),
         name='Status'
     ))
-
+    fig.update_xaxes(
+        tickangle = 45
+        # size=6
+        )
     # Customize layout
     fig.update_layout(
-        title='Daily Status Overview',
+        title=dict(text='Daily Status Overview',
+                   font=dict(
+                       size=14
+                       )
+                   ),
+        margin=dict(l=0, r=0, t=25, b=0),
+        
         yaxis=dict(visible=False),  # Hide y-axis as it's just for visual spacing
         showlegend=False
     )
@@ -562,6 +561,7 @@ def update_alarms_table(date_filter, ip_filter, group_filter, type_filter, btn_t
         
         # df["from"] = df['from'].apply(reformat_time)
         df = df.sort_values(by='to', ascending=True)
+        df.rename(columns={'to': "Date", 'alarm group':'Category', 'alarm name': 'Alarm', 'hosts': 'Hosts'}, inplace=True)
         element = dbc.Table.from_dataframe(
                                             df,
                                             id='alarms-site-table',
@@ -645,41 +645,41 @@ def generate_alarm_content(alarm=""):
         dbc.Button("Close", id="close-btn", className="mt-3")
     ])
 
-@dash.callback(
-    Output("dynamic-content-container", "children"),
-    [
-        Input({'type': 'alarm-link-btn', 'index': ALL}, 'n_clicks'),
-        Input({'type': 'path-anomaly-btn', 'index': ALL}, 'n_clicks'),
-        Input({'type': 'hosts-not-found-btn', 'index': ALL}, 'n_clicks')
-    ],
-    [
-        State('url', 'pathname'),
-        State('dynamic-content-container', 'children')
-    ]
-)
-def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, current_path, current_children):
-    print("Debugging update_dynamic_content")
-    ctx = dash.callback_context
+# @dash.callback(
+#     Output("dynamic-content-container", "children"),
+#     [
+#         Input({'type': 'alarm-link-btn', 'index': ALL}, 'n_clicks'),
+#         Input({'type': 'path-anomaly-btn', 'index': ALL}, 'n_clicks'),
+#         Input({'type': 'hosts-not-found-btn', 'index': ALL}, 'n_clicks')
+#     ],
+#     [
+#         State('url', 'pathname'),
+#         State('dynamic-content-container', 'children')
+#     ]
+# )
+# def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, current_path, current_children):
+#     print("Debugging update_dynamic_content")
+#     ctx = dash.callback_context
 
-    if not ctx.triggered:
-        return dash.no_update
-    print(ctx.triggered)
-    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
-    button_id = eval(button_id)  # Convert string to dict
+#     if not ctx.triggered:
+#         return dash.no_update
+#     print(ctx.triggered)
+#     button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+#     button_id = eval(button_id)  # Convert string to dict
     
-    print(button_id)
-    # Determine which button was clicked
-    if button_id['type'] == 'alarm-link-btn':
-        alarm_id = button_id['index']
-        content = generate_alarm_content(alarm_id)  # Replace with your logic
-    elif button_id['type'] == 'path-anomaly-btn':
-        src, dest = button_id['index'].split('_')
-        # content = generate_alarm_content(src, dest)  # Replace with your logic
-        content = generate_alarm_content(src)
-    elif button_id['type'] == 'hosts-not-found-btn':
-        site = button_id['index']
-        content = generate_alarm_content(site)  # Replace with your logic
-    else:
-        return dash.no_update
+#     print(button_id)
+#     # Determine which button was clicked
+#     if button_id['type'] == 'alarm-link-btn':
+#         alarm_id = button_id['index']
+#         content = generate_alarm_content(alarm_id)  # Replace with your logic
+#     elif button_id['type'] == 'path-anomaly-btn':
+#         src, dest = button_id['index'].split('_')
+#         # content = generate_alarm_content(src, dest)  # Replace with your logic
+#         content = generate_alarm_content(src)
+#     elif button_id['type'] == 'hosts-not-found-btn':
+#         site = button_id['index']
+#         content = generate_alarm_content(site)  # Replace with your logic
+#     else:
+#         return dash.no_update
 
-    return content
+#     return content
