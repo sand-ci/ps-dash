@@ -366,8 +366,8 @@ class Alarms(object):
             df['ipv'] = df['ipv'].apply(lambda x: x.lower() if x is not None else x)
             df.rename(columns={'ipv': 'IP version'}, inplace=True)
 
-        if 'alarms_id' in df.columns:
-            df.drop('alarms_id', axis=1, inplace=True)
+        # if 'alarms_id' in df.columns:
+        #     df.drop('alarms_id', axis=1, inplace=True)
         if 'tag' in df.columns:
             df.drop('tag', axis=1, inplace=True)
         if '%change' in df.columns:
@@ -378,7 +378,6 @@ class Alarms(object):
             df['avg_value'] = df['avg_value'].apply(lambda x: f'{x}%')
         if 'alarm_id' in df.columns:
           df['alarm_link'] = df['alarm_id']
-          df.drop('alarm_id', axis=1, inplace=True)
 
         if 'configurations' in df.columns:
             df = self.replaceCol('configurations', df, '\n')
@@ -412,6 +411,8 @@ class Alarms(object):
 
         # Reorder 'from' and 'to' columns to be the first two columns if they exist
         df = self.reorder_columns(df, ['from', 'to'])
+        if 'alarm_id' in df.columns:
+            df.drop('alarm_id', axis=1, inplace=True)
         return df
     except Exception as e:
         print('Exception ------- ', event)
@@ -455,7 +456,7 @@ class Alarms(object):
             df['alarm_link'] = df['alarm_link'].apply(
                 lambda id: dbc.Button(
                     "VIEW DETAILS",
-                    id={'type': 'alarm-link-btn', 'index': id},
+                    id={'type': 'alarm-link-btn', 'index': f"{id}, {event}"},
                     className="btn btn-secondary",
                     n_clicks=0
                 ) if id else '-'
@@ -465,7 +466,7 @@ class Alarms(object):
             df['alarm_link'] = df.apply(
                 lambda row: dbc.Button(
                     "VIEW DETAILS",
-                    id={'type': 'path-anomaly-btn', 'index': f"{row['src_netsite']}_{row['dest_netsite']}"},
+                    id={'type': 'path-anomaly-btn', 'index': f"{row['src_netsite']}*{row['dest_netsite']}"},
                     className="btn btn-secondary",
                     n_clicks=0
                 ) if row['src_netsite'] and row['dest_netsite'] else '-',
@@ -476,12 +477,18 @@ class Alarms(object):
             df['alarm_link'] = df.apply(
                 lambda row: dbc.Button(
                     "VIEW DETAILS",
-                    id={'type': 'hosts-not-found-btn', 'index': row['site']},
+                    id={'type': 'hosts-not-found-btn', 'index': f"{row['site']}, {row['alarm_id']}"},
                     className="btn btn-secondary",
                     n_clicks=0
                 ) if row['site'] else '-',
                 axis=1
-            )   
+            )  
+        # if event == "path changed":
+        #     df['alarm_link'] = df.apply(
+        #         lambda row: dbc.Button(
+        #             "VIEW DETAILS",
+        #             id={'type': 'path-changed-btn', 'index': f"{row['src_site']}*{row['dest_site']}"},
+        #     )
     return df
   
   @staticmethod

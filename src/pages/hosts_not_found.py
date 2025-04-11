@@ -600,8 +600,10 @@ def update_graph(n_clicks, data=None, testTypeFilter=None, hostFilter = None, da
                 plotly.graph_objects.Figure: The heatmap figure.
             """
             print("In create_heatmap function...")
+            print(site_dict)
             # Get the records for the specified site
             records = site_dict.get(site, [])
+            print(records)
             # print(f"Data records: {records}")
             # Parse date_from and date_to
             date_from = datetime.strptime(date_from, '%Y-%m-%d')

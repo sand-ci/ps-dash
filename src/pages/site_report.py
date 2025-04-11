@@ -1,12 +1,14 @@
-#TODO: change date format for sorting in graphs
+#TODO: add country and overview to my summary, add button that switch you to measurement
+
+#TODO: finish isolating functions and buttons 
 #TODO: debug groupAlarms in Updater.py, number of alarms is counted not correct
-#TODO: add in summary what petya told
-#TODO: add button which generates detailed information about alarm
-    #TODO isolate functions to extract the visualistions? ither visuals
-#TODO: add measurements
+
 #TODO: add graph like in Grafana
 
-from datetime import datetime
+#TODO: add hosts overview? what should I add there
+#TODO: debug hosts not found graph
+
+from datetime import datetime, timedelta
 from functools import lru_cache
 
 import numpy as np
@@ -14,7 +16,7 @@ import dash
 import dash_bootstrap_components as dbc
 
 from dash import Dash, dash_table, dcc, html
-from dash.dependencies import Input, Output, State, ALL
+from dash.dependencies import Input, Output, State, ALL, MATCH
 
 import plotly.graph_objects as go
 import plotly.express as px
@@ -28,7 +30,10 @@ import utils.helpers as hp
 from utils.helpers import timer
 import model.queries as qrs
 from utils.parquet import Parquet
-# from pages.home import generate_status_table
+from utils.utils import defineStatus, explainStatuses, create_heatmap, createDictionaryWithHistoricalData, generate_plotly_heatmap_with_anomalies, extractAlarm
+from utils.components import siteBoxPathChanged, siteMeasurements
+
+from collections import Counter
 
 
 def title(q=None):
@@ -48,25 +53,20 @@ dash.register_page(
     description=description,
 )
 
-# def layout(q=None, **other_unknown_query_strings):
-#     pq = Parquet()
-#     alarmsInst = Alarms()
-#     fromDay, toDay = hp.defaultTimeRange(7)
-#     frames, pivotFrames = alarmsInst.loadData(fromDay, toDay)
-#     alarmCnt = pq.readFile('parquet/alarmsGrouped.parquet')
-#     alarmCnt = alarmCnt[alarmCnt['site'] == q]
-#     print(f"fromDay: {fromDay}, toDay: {toDay}")
-#     print(alarmCnt)
-#     return html.Div()
-def reformat_time(timestamp):
-        try:
-            timestamp_new = pd.to_datetime(timestamp).strftime("%d %b %Y")
-            return timestamp_new
-        except Exception as err:
-            print(err)
-            return timestamp
+site = None
+
+# def reformat_time(timestamp):
+#         try:
+#             timestamp_new = pd.to_datetime(timestamp).strftime("%d %b %Y")
+#             return timestamp_new
+#         except Exception as err:
+#             print(err)
+#             return timestamp
 
 def layout(q=None, **other_unknown_query_strings):
+    global site
+    site = q
+    
     if q is not None:
         print(f"Site name: {q}")
     else:
@@ -78,8 +78,16 @@ def layout(q=None, **other_unknown_query_strings):
                         ]
                         )
     pq = Parquet()
+    
+    now = datetime.now()
+    fromDay = (now - timedelta(days=8)).replace(hour=0, minute=0, second=0, microsecond=0)
+    fromDay = fromDay.strftime("%Y-%m-%d %H:%M:%S")  # "2024-02-20 00:00:00"
+
+    # Calculate toDay (2 days ago at 23:59:59)
+    toDay = (now - timedelta(days=1)).replace(hour=00, minute=00, second=00, microsecond=00000)
+    toDay = toDay.strftime("%Y-%m-%d %H:%M:%S")  # "2024-02-26 23:59:59"
     alarmsInst = Alarms()
-    fromDay, toDay = hp.defaultTimeRange(7)
+    # toDay = toDay - timedelta(days=2)
     frames, pivotFrames = alarmsInst.loadData(fromDay, toDay)
     # alarmCnt = pq.readFile('parquet/alarmsGrouped.parquet')
     # alarmCnt = alarmCnt[alarmCnt['site'] == q]
@@ -91,19 +99,48 @@ def layout(q=None, **other_unknown_query_strings):
     site_alarms_num = 0
     subcategories = qrs.getSubcategories()
     path_changed_item = frames.pop("path changed between sites", None)
+    ########TODO: count the most frequent host
+    alarms_with_hosts = {'destination cannot be reached from any':'hosts', 'destination cannot be reached from multiple':'hosts', 
+                         'firewall issue': 'host',
+                         'source cannot reach any':'hosts'}
+    alarms_with_src_dest = ['complete packet loss', 'high packet loss']
+    #check source dest for complete packet loss, high packet loss,
+    all_hosts = []
     for frame in frames:
-        print(frame)
-        print("----------------")
+        
+        # if 'host' in frames[frame].columns:
+        #     all_hosts.extend(frames[frame]['host'].tolist())
+        # print(frame)
+        # print("----------------")
         df = frames[frame]
+        # pivotFrames[frame] = df.to_dict('records')
         # print(df.columns)
         site_df = df[df['tag'].apply(lambda x: q in x)]
+        
         if not site_df.empty:
-            print(site_df.head(5))
+            if frame in alarms_with_hosts:
+                print(frame)
+                print("----------------")
+                print(frames[frame].columns)
+                for item in site_df[alarms_with_hosts[frame]]:
+                    all_hosts.extend(
+                        item.tolist() if isinstance(item, np.ndarray) 
+                        else item if isinstance(item, list) 
+                        else [str(item)]
+                    )
+            if frame in alarms_with_src_dest:
+                print(frame)
+                print("----------------")
+                for item in site_df[site_df['src_site'] == q]['src_host']:
+                    all_hosts.extend([item])
+                for item in site_df[site_df['dest_site'] == q]['dest_host']:
+                    all_hosts.extend([item])
+            # print(site_df.head(5))
             site_df['to'] = pd.to_datetime(site_df['to'], errors='coerce')
+            
             # drop time
             site_df['to'] = site_df['to'].dt.normalize()  # or .dt.floor('D')
             site_df['to'] = site_df['to'].dt.strftime('%Y-%m-%d')
-            # site_df["to"] = site_df['to'].apply(reformat_time)
             if frame == "hosts not found":
                 print(site_df['hosts_not_found'].head(5))
                 site_df['hosts'] = None
@@ -122,16 +159,20 @@ def layout(q=None, **other_unknown_query_strings):
                     hosts_list = s
                     print("HOSTS LIST")
                     print(hosts_list)
+                    all_hosts.extend(hosts_list)
                     site_df.at[i, 'hosts list'] = hosts_list
                     site_df.at[i, 'hosts'] = hosts_list
             site_df = alarmsInst.formatDfValues(site_df, frame, False, True)
             # TODO: put it in the formating to the Alarms.py to def formatDfValues()
             if 'hosts' in site_df.columns:
+                print(site_df['hosts'].head(5))
                 site_df['hosts'] = site_df['hosts'].apply(lambda x: html.Div([html.Div(item) for item in x.split('\n')]) if isinstance(x, str) else x)
             site_alarms_num += len(site_df)
             site_df.reset_index(drop=True, inplace=True)
             for i, alarm in site_df.iterrows():
-                
+                add_hosts = 'hosts'
+                if 'host' in alarm:
+                    add_hosts = 'host'
                 # Create a new row dictionary
                 new_row = {
                     # 'from': alarm.get('from', '"from" field not found'),
@@ -139,19 +180,50 @@ def layout(q=None, **other_unknown_query_strings):
                     'alarm group': subcategories[subcategories['event'] == frame]['category'].values[0],
                     'alarm name': frame,
                     'IP version': alarm.get('IP version', None),  # Added IP version if available
-                    'hosts': alarm['hosts'] if 'hosts' in alarm else None,
+                    'hosts': alarm[add_hosts] if add_hosts in alarm else None,
                     'Details': alarm.get('alarm_link', None),  # Added Details if available
                 }
-                
-                # Append the new row to site_alarms
-                site_alarms = pd.concat([site_alarms, pd.DataFrame([new_row])], ignore_index=True)
-        # print(site_df.head(5))
+                dest_site_fields = ['dest_site', 'dest_netsite', 'sites']  # ordered by priority if multiple exist
+                destination_sites = None
 
+                for field in dest_site_fields:
+                    if field in alarm:
+                        destination_sites = html.Div([html.Div(item) for item in alarm[field].split('\n')])
+                        break
+
+                new_row['Destination Site(s)'] = destination_sites
+                site_alarms = pd.concat([site_alarms, pd.DataFrame([new_row])], ignore_index=True)
+        # print(site_alarms["Destination Site(s)"].head(5))
+        # site_alarms["Destination Site(s)"] = site_alarms["Destination Site(s)"].apply(lambda x: html.Div([html.Div(item) for item in x.split('\n')]) if isinstance(x, str) else x)
+        # print(site_alarms["Destination Site(s)"].head(5))
+    print("-----------HOST COUNT------------")
+    # print(hosts_count)
+    # all_hosts = []
+    # for arr in hosts_count:
+    #     print(arr)
+    #     all_hosts.extend(arr.tolist())  # Convert array to list and extend
+    host_counts = Counter(all_hosts)
+    most_common_host = host_counts.most_common(1)[0] if host_counts else (None, 0)
+
+    print(f"Most frequent host: {most_common_host[0]} (appears {most_common_host[1]} times)")
+    # flat_list = np.concatenate(hosts_count).tolist()
+    # print(flat_list)
     print(f"Total alarms collected: {site_alarms_num}")
     # print(site_alarms)
+    # get meta data for summary
+    meta_df = qrs.getMetaData()
+    meta_df['host_ip'] = meta_df.apply(
+        lambda row: (row['host'], 'ipv6' if row['ipv6'] else 'ipv4'),
+        axis=1
+    )
+    meta_df_site = meta_df[meta_df['site'] == q]
+    hosts_ip = meta_df_site["host_ip"].tolist()
+    country = meta_df_site["country"].values[0] if len(meta_df_site) > 0 else None
     
-    
-    return html.Div([
+    return html.Div(children = [
+        html.Div(id='scroll-trigger', style={'display': 'none'}),
+        dcc.Store(id='fromDay', data=fromDay),
+        dcc.Store(id='toDay', data=toDay),
         dbc.Row([
             dbc.Row(
                 dbc.Col([
@@ -190,7 +262,7 @@ def layout(q=None, **other_unknown_query_strings):
                                 ),
                                 width=3
                             ),
-                            dcc.Store(id='alarms-data', data=site_alarms.to_dict('records')), 
+                            dcc.Store(id='alarms-data-compressed', data=site_alarms.to_dict('records')), 
                             dbc.Col(html.Div(className="boxwithshadowhidden p-2 h-100", style={"background-color": "#ffffff"}, 
                                                 children=[
                                                     html.Div([
@@ -215,9 +287,61 @@ def layout(q=None, **other_unknown_query_strings):
                                                 ]
                                                 ), width=5, style={"background-color": "#ffffff", "height": "100%"}),
                             
-                            dbc.Col(html.Div(className="boxwithshadow page-cont p-2 h-100", style={"background-color": "#b4dede"}, children=[
-                                html.H5("Summary", style={"padding-top": "3%", "padding-left": "3%"}),
-                                html.P(" ", id="summary-text")
+                            dbc.Col(
+                                html.Div(className="boxwithshadow page-cont p-2 h-100", style={"background-color": "#ffffff", "align-content":"center"}, children=[
+                                    # html.H3("Summary", style={"padding-top": "5%", "padding-left": "5%"}),
+                                    dbc.Row(
+                                        [
+                                        dbc.Col(
+                                            html.Div(
+                                                [
+                                                    html.H4(f"Country: \t{country}", style={"padding-left": "10%", "pading-top": "5"}),
+                                                    
+                                                    ],
+                                                        style={"height": "100%", "display": "flex", "flex-direction": "column"}
+                                                ),
+                                                    width=6,
+                                                    style={
+                                                        "border-right": "1px solid #ddd",  # Thin vertical line
+                                                        "padding-right": "20px"
+                                                    }
+                                        ),
+                                        dbc.Col([
+                                            html.H4(f"{site} hosts:"),
+                                            html.Ul(
+                                                [
+                                                    html.Li(
+                                                        [
+                                                            html.Span(f"{host} ", className="font-weight-bold"),
+                                                            html.Span(
+                                                                f"({ip_ver})",
+                                                                className="badge badge-pill badge-success" if ip_ver == "ipv6" 
+                                                                else "badge badge-pill badge-primary"
+                                                            )
+                                                        ],
+                                                        className="mb-1"
+                                                    )
+                                                    for host, ip_ver in hosts_ip
+                                                ],
+                                                className="list-unstyled", style={"padding-top": "5%"},
+                                        )
+                                            
+                                    ], width=6
+                                )
+                                        
+                                ], className="align-items-stretch",  # Makes columns equal height
+                            ),
+                            dbc.Button(
+                                        "View Measurements →",
+                                        id="view-measurements-btn",
+                                        color="secondary",
+                                        style={
+                                            "margin-left": "10%",
+                                            "margin-top": "25px",
+                                            "width": "80%",
+                                            "border-radius": "5px"
+                                        }
+                                    )
                             ]), width=4, style={"background-color": "#b9c4d4;", "height": "100%"})
                         ], className="my-3 pr-1 pl-1", style={"height": "300px"}),
                         
@@ -226,18 +350,50 @@ def layout(q=None, **other_unknown_query_strings):
                             dbc.Col([
                                 html.Div(
                                     className="boxwithshadowhidden page-cont h-100 p-2",
-                                    children=[
-                                        # html.H5("Site status throughout the week", style={"padding-top": "3%", "padding-left": "3%"}),
-                                        # dcc.Graph(id="site-status", style={"height": "calc(100% - 50px)"}
+                                        children=[
+                                        # Question mark icon positioned absolutely in top-right corner
+                                        html.Div(
+                                            html.I(
+                                                className="fas fa-question-circle",
+                                                id="how-status-modal-trigger",
+                                                n_clicks=0,
+                                                style={
+                                                    "position": "absolute",
+                                                    "top": "10px",
+                                                    "right": "10px",
+                                                    "cursor": "pointer",
+                                                    "font-size": "20px",
+                                                    "color": "#6c757d",
+                                                    "z-index": "1000"  # Ensure it stays above other elements
+                                                }
+                                            ),
+                                            style={
+                                                "position": "relative"  # Needed for absolute positioning of child
+                                            }
+                                        ),
                                         dcc.Graph(id="site-status", figure=create_status_chart(site_alarms), 
                                                   style={
-                                                        "height": "90%",
-                                                        "width": "95%",
                                                         "display": "flex",
+                                                        "align-items": "center",
+                                                        "justify-content": "center",
                                                         "flex-grow": "1",  # Allows graph to expand
                                                         "min-height": "0"  # Prevents overflow issues
                                                     }
-                                    )
+                                    ),
+        
+                                        # The modal (can be placed here or at app level)
+                                        dbc.Modal(
+                                            [
+                                                dbc.ModalHeader(dbc.ModalTitle("How was the status determined?")),
+                                                dbc.ModalBody(id="how-status-modal-body-report"),
+                                                dbc.ModalFooter(
+                                                    dbc.Button("Close", id="close-how-status-modal-report", className="ml-auto", n_clicks=0)
+                                                ),
+                                            ],
+                                            id="how-status-modal-report",
+                                            size="lg",
+                                            is_open=False,
+                                        )
                                     ], style={
                                         "height": "65%",
                                         "margin-bottom": "1rem",
@@ -249,9 +405,38 @@ def layout(q=None, **other_unknown_query_strings):
                                 html.Div(
                                     className="boxwithshadow page-cont p-2 h-100",
                                     children=[
-                                        html.H5("Most problematic host"),
-                                        html.H4("host1.domain.com", id="most-problematic-host"),
-                                        dbc.Button("HOSTS OVERVIEW", color="primary", className="mt-2")
+                                        html.H3("Most problematic host", 
+                                                style={
+                                                    "padding-left": "5%", 
+                                                    "padding-top": "5%"
+                                                }),
+                                        html.H2(f"{most_common_host[0]}",
+                                                id="most-problematic-host",
+                                                style={
+                                                # "color": "white", 
+                                                # "font-size": "120px",
+                                                "display": "flex",          # Enables Flexbox
+                                                "justify-content": "center", # Centers horizontally
+                                                "align-items": "center",     # Centers vertically
+                                                "margin-top": "70px",            # Takes full available height
+                    
+                                                "padding-bottom": "5px"    # Optional: Adjusts spacing
+                                            }
+                                                ),
+                                        html.H4(f"(appears {most_common_host[1]} times)",
+                                            # f"{site_alarms_num if site_alarms_num > 0 else 0}", 
+                                            style={
+                                                # "font-size": "120px",
+                                                "display": "flex",          # Enables Flexbox
+                                                "justify-content": "center", # Centers horizontally
+                                                # "align-items": "center",     # Centers vertically
+                                                "height": "5%",            # Takes full available height
+                                                "margin": "10px",               # Removes default margins
+                                                "margin-bottom": "30px",    # Optional: Adjusts spacing
+                                                "padding-top": "0px"
+                                            }
+                                        ),
+                                        html.Div(dbc.Button("HOSTS OVERVIEW", color="secondary"), style={'margin-left':'5%', 'margin-top':'60px'})
                                     ], style={"height": "35%"}
                                 )
                             ], width=3, style={
@@ -277,7 +462,7 @@ def layout(q=None, **other_unknown_query_strings):
                                                 dcc.Dropdown(
                                                     id='filter-date',
                                                     placeholder="Date",
-                                                    options=[{'label': date, 'value': date} for date in site_alarms['to'].unique()],
+                                                    options=[{'label': date, 'value': date} for date in sorted(site_alarms['to'].unique())],
                                                     multi=True,
                                                     clearable=True,
                                                     
@@ -347,16 +532,48 @@ def layout(q=None, **other_unknown_query_strings):
                 )
         ], className="", style={"background-color": "#ffffff"}),
         # Hidden component to track URL changes
-        dbc.Row([
-            dcc.Location(id='url', refresh=False),
-            # Container to display dynamic content
-            html.Div(
-                id="dynamic-content-container",
-                className="boxwithshadow p-3 mt-3",
-                style={"background-color": "#ffffff"}
-            )
-        ])
-    ])
+    
+        
+        
+        html.Div(
+                id="alarm-content-section",
+                children=[
+                        dcc.Loading(
+                                id="loading-content",  # Changed ID to avoid duplication
+                                type="default",
+                                color="#00245A",
+                                children=[
+                                            html.Div(
+                                                    className="boxwithshadow p-0 mt-3",
+                                                    style={"background-color": "#ffffff"},
+                                                    children=[
+                                                        html.H3(
+                                                            id="alarm-name-display",  # Changed ID
+                                                            className="card header-line p-2",
+                                                            style={
+                                                                "background-color": "#00245a",
+                                                                "color": "white",
+                                                                "font-size": "25px",
+                                                                "margin": "0",
+                                                                "border-top-left-radius": "0.25rem",
+                                                                "border-top-right-radius": "0.25rem"
+                                                            }
+                                                        ),
+                                                        html.Div(
+                                                            id="dynamic-content-container",
+                                                            className="p-3"
+                                                        )
+                                                    ]
+                                                )
+                                            ])
+                        ], style={"scroll-margin-top": "20px"}
+            ), 
+        html.Div(id='site-measurements',
+                children=siteMeasurements(q, pq),
+                style={'margin-top': "20px"},
+                            ),
+    ], className="scroll-container")
+    
 
 def create_bar_chart(graphData, column_name='alarm group'):
     # Calculate the total counts for each event type
@@ -418,31 +635,9 @@ def create_bar_chart(graphData, column_name='alarm group'):
     return fig
 
 def create_status_chart(graphData):
-    graphData= graphData.groupby(['to', f"alarm name"]).size().reset_index(name='count')
-    # print(graphData.head(5))
-    # print(graphData.columns)
-    graphData = graphData[graphData['alarm name'] != 'path changed between sites']
-
-    red_status_days = graphData[(graphData['alarm name']=='bandwidth decreased from/to multiple sites')
-            & (graphData['count']>0)]['to'].unique().tolist()
-
-    yellow_status_days = graphData[(graphData['alarm name'].isin(['path changed', 'ASN path anomalies']))
-                    & (graphData['count']>0)]['to'].unique().tolist()
-
-    grey_status_days = graphData[(graphData['alarm name'].isin(['firewall issue', 'source cannot reach any', 'complete packet loss']))
-                    & (graphData['count']>0)]['to'].unique().tolist()
-    # status_dict= {'red': None, 'yellow': None, 'grey': None, 'green': None}
+    graphData= graphData.groupby(['to', f"alarm name"]).size().reset_index(name='cnt')
+    red_status_days, yellow_status_days, grey_status_days = defineStatus(graphData, "alarm name", 'to')
     days = sorted(graphData['to'].unique())
-    # for day in days:
-    #     if day in red_status_days:
-    #         status_dict['red'] = day
-    #     elif day in yellow_status_days:
-    #         status_dict['yellow'] = day
-    #     elif day in grey_status_days:
-    #         status_dict['grey'] = day
-    #     else:
-    #         status_dict['green'] = day
-
     colors = []
     for day in days:
         if day in red_status_days:
@@ -461,11 +656,6 @@ def create_status_chart(graphData):
         x=days,
         y=[1]*len(days),  # Constant y-value to make a straight line
         mode='markers',
-        # marker=dict(
-        #     color=colors,
-        #     size=12,
-            
-        # ),
         marker=dict(
             color=colors,
             size=16,
@@ -476,7 +666,6 @@ def create_status_chart(graphData):
     ))
     fig.update_xaxes(
         tickangle = 45
-        # size=6
         )
     # Customize layout
     fig.update_layout(
@@ -490,16 +679,6 @@ def create_status_chart(graphData):
         yaxis=dict(visible=False),  # Hide y-axis as it's just for visual spacing
         showlegend=False
     )
-
-    # Show the figure
-    
-    # print(status_dict)
-    # print(len(red_status_days))
-    # print(len(yellow_status_days))
-    # print(len(grey_status_days))
-    
-    # graphData= graphData.groupby(['to', f"{column_name}"]).size().reset_index(name='count')
-    
     return fig
 
 @dash.callback(
@@ -511,7 +690,7 @@ def create_status_chart(graphData):
         Output('filter-type', 'options'),
         Output("bar-graph", "figure"),
         Output("active-button-store", "data"),
-        Output("num-alarms", "children")
+        Output("num-alarms", "children"),
     ],
     [
         # Input('alarms-data', 'data'),
@@ -524,7 +703,7 @@ def create_status_chart(graphData):
         Input("bar-graph", "figure")
     ],
     [
-        State("alarms-data", "data"),
+        State("alarms-data-compressed", "data"),
         State("active-button-store", "data"),
     ]
 )
@@ -533,7 +712,6 @@ def update_alarms_table(date_filter, ip_filter, group_filter, type_filter, btn_t
     print("Debugging update_alarms_table")
     
     df = pd.DataFrame(df)
-    print(df)
     if len(df) > 0:
         ctx = dash.callback_context
         print(f"ctx.triggered: {ctx.triggered}")
@@ -559,7 +737,6 @@ def update_alarms_table(date_filter, ip_filter, group_filter, type_filter, btn_t
             figure = create_bar_chart(df, active_btn)
                 
         
-        # df["from"] = df['from'].apply(reformat_time)
         df = df.sort_values(by='to', ascending=True)
         df.rename(columns={'to': "Date", 'alarm group':'Category', 'alarm name': 'Alarm', 'hosts': 'Hosts'}, inplace=True)
         element = dbc.Table.from_dataframe(
@@ -577,51 +754,6 @@ def update_alarms_table(date_filter, ip_filter, group_filter, type_filter, btn_t
                                             
                                         
         )
-        # element = dash_table.DataTable(
-        #     df.to_dict('records'),
-        #     [{"name": i.upper(), "id": i, "presentation": "markdown"} for i in df.columns],
-        #     filter_action="native",
-        #         filter_options={"case": "insensitive"},
-        #         sort_action="native",
-        #         is_focused=True,
-        #         markdown_options={"html": True},
-        #         page_size=8,
-        #         style_cell={
-        #         'padding': '10px',
-        #         'font-size': '1.2em',
-        #         'textAlign': 'center',
-        #         'backgroundColor': '#ffffff',
-        #         'border': '1px solid #ddd',
-        #         },
-        #         style_header={
-        #         'backgroundColor': '#ffffff',
-        #         'fontWeight': 'bold',
-        #         'color': 'black',
-        #         'border': '1px solid #ddd',
-        #         },
-        #         style_data={
-        #         'height': 'auto',
-        #         'overflowX': 'auto',
-        #         },
-                # style_table={
-                # 'overflowY': 'auto',
-                # 'overflowX': 'auto',
-                # 'border': '1px solid #ddd',
-                # 'borderRadius': '5px',
-                # 'boxShadow': '0 2px 5px rgba(0,0,0,0.1)',
-                # },
-                # style_data_conditional=[
-                # {
-                #     'if': {'row_index': 'odd'},
-                #     'backgroundColor': '#f7f7f7',
-                # },
-                # {
-                #     'if': {'column_id': 'SITE NAME'},
-                #     'textAlign': 'left !important',
-                # }
-                # ],
-                # id='status-tbl')
-        
         
     else:
         element = html.Div(html.H3('No data was found'), style={'textAlign': 'center'})
@@ -645,22 +777,212 @@ def generate_alarm_content(alarm=""):
         dbc.Button("Close", id="close-btn", className="mt-3")
     ])
 
-# @dash.callback(
-#     Output("dynamic-content-container", "children"),
-#     [
-#         Input({'type': 'alarm-link-btn', 'index': ALL}, 'n_clicks'),
-#         Input({'type': 'path-anomaly-btn', 'index': ALL}, 'n_clicks'),
-#         Input({'type': 'hosts-not-found-btn', 'index': ALL}, 'n_clicks')
-#     ],
-#     [
-#         State('url', 'pathname'),
-#         State('dynamic-content-container', 'children')
-#     ]
-# )
-# def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, current_path, current_children):
-#     print("Debugging update_dynamic_content")
-#     ctx = dash.callback_context
+@dash.callback(
+    [
+    Output("how-status-modal-report", "is_open"),
+    Output("how-status-modal-body-report", "children"),
+    ],
+    [
+        Input("how-status-modal-trigger", "n_clicks"),
+        Input("close-how-status-modal-report", "n_clicks"),
+    ],
+    [State("how-status-modal-report", "is_open")],
+    
+)
+def toggle_modal(n1, n2, is_open):
+    if n1 or n2:
+        if not is_open:
+            catTable, statusExplainedTable = explainStatuses()
+            data = dbc.Row([
+                dbc.Col(children=[
+                    html.H3('Category & Alarm types', className='status-title'),
+                    html.Div(statusExplainedTable, className='how-status-table')
+                ], lg=12, md=12, sm=12, className='page-cont pr-1 how-status-cont'),
+                dbc.Col(children=[
+                    html.H3('Status color rules', className='status-title'),
+                    html.Div(catTable, className='how-status-table')
+                ], lg=12, md=12, sm=12, className='page-cont how-status-cont')
+            ], className='pt-1')
+            return not is_open, data
+        return not is_open, dash.no_update
+    return is_open, dash.no_update
 
+@dash.callback(
+    [
+        Output("dynamic-content-container", "children"),
+        Output('alarm-name-display', 'children')
+    ],
+    [
+        Input({'type': 'alarm-link-btn', 'index': ALL}, 'n_clicks'),
+        Input({'type': 'path-anomaly-btn', 'index': ALL}, 'n_clicks'),
+        Input({'type': 'hosts-not-found-btn', 'index': ALL}, 'n_clicks')
+    ],
+    [
+        # State('url', 'pathname'),
+        State('dynamic-content-container', 'children'),
+        State('fromDay', 'data'),
+        State('toDay', 'data')
+    ],
+    prevent_initial_call=True
+)
+def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, current_children, fromDay, toDay):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        return dash.no_update, dash.no_update
+    
+    global site
+    print("Debugging update_dynamic_content")
+    alarmsInst = Alarms()
+    # fromDay, toDay = hp.defaultTimeRange(6)
+    print(f"fromDay: {fromDay}, toDay: {toDay}")
+    frames, pivotFrames = alarmsInst.loadData(fromDay, toDay)
+    button_content_mapping = {'hosts-not-found-btn': "hosts not found",
+                              'path-anomaly-btn': "ASN path anomalies",
+                              'alarm-link-btn': "path changed"
+                              }
+    if len(ctx.triggered) == 1:
+        print(f"ctx.triggered: {ctx.triggered}")
+        button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+        print(button_id)
+        if button_id:
+            button_id = eval(button_id)  # Convert string to dict
+            print(button_id)
+            if button_id['type'] in button_content_mapping:
+                print("Alarms' data:\n")
+                event = button_content_mapping[button_id['type']]
+                pd_df = pivotFrames[event]
+                print(pd_df)
+                if pd_df.empty:
+                    return dash.no_update, dash.no_update
+                else:
+                    if event == 'hosts not found':
+                        
+                        histData = createDictionaryWithHistoricalData(pd_df)
+                        site_name, id = button_id['index'].split(', ')
+                        fig, test_types, hosts, site = create_heatmap(histData, site, fromDay, toDay)
+                        return dcc.Graph(figure=fig), event
+
+                    
+                    if event == 'ASN path anomalies':
+                        src, dest = button_id['index'].split('*')
+                        # print(f"src: {src}, dest: {dest}")
+                        data = qrs.query_ASN_anomalies(src, dest, dates=[f"{fromDay.replace(' ', 'T')}.000Z", f"{toDay.replace(' ', 'T')}.000Z"])
+                        # print(data)
+                        if len(data) > 0:
+                            if len(data['ipv6'].unique()) == 2:
+                                ipv6_figure = generate_plotly_heatmap_with_anomalies(data[data['ipv6'] == True])
+                                ipv4_figure = generate_plotly_heatmap_with_anomalies(data[data['ipv6'] == False])
+                                figures = [
+                                    dcc.Graph(figure=ipv4_figure, id="asn-sankey-ipv4"),
+                                    dcc.Graph(figure=ipv6_figure, id="asn-sankey-ipv6")
+                                ]
+                            else:
+                                figure = generate_plotly_heatmap_with_anomalies(data)
+                                figures = [dcc.Graph(figure=figure, id="asn-sankey-ipv4")]
+                        
+                            return html.Div(figures), event
+
+                    if event == "path changed":
+                        id, event = button_id['index'].split(', ')
+                        print(f"site: {site}, id: {id}")
+                        alarm, chdf, posDf, baseline, altPaths, dateFrom, dateTo, topDownList, frame, pivFrames, selectedTab, pairCount = extractAlarm(id)
+                        comp = siteBoxPathChanged(site, pairCount, chdf, posDf, baseline, altPaths, alarm, pivFrames, alarmsInst)
+                        return comp, event
+
+                    
+                    
+                    
+                    
+           
+                
+        
+        # df = pd.DataFrame(df)
+        # print(df)
+        
+    return html.Div(), ""
+
+dash.clientside_callback(
+    """
+    function(alarmClicks, pathClicks, hostsClicks, measurementsClick) {
+        const ctx = dash_clientside.callback_context;
+        // Only proceed if something was triggered
+        if (ctx.triggered.length > 1) return dash_clientside.no_update;
+        
+        const triggered = ctx.triggered[0];
+        console.log('Triggered by:', triggered.prop_id);
+
+        // Check if measurements button was clicked
+        if (triggered.prop_id === 'view-measurements-btn.n_clicks') {
+            setTimeout(() => {
+                const element = document.getElementById('site-measurements');
+                if (element) {
+                    element.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            }, 300);
+        } 
+        // Handle pattern-matched buttons (original logic)
+        else {
+            const isInitialLoad = triggered.prop_id === '.' && triggered.value === null;
+            if (!isInitialLoad) {
+                setTimeout(() => {
+                    const element = document.getElementById('alarm-content-section');
+                    if (element) {
+                        const yOffset = -100;
+                        const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+                        window.scrollTo({top: y, behavior: 'smooth'});
+                    }
+                }, 350);
+            }
+        }
+        return dash_clientside.no_update;
+    }
+    """,
+    Output('scroll-trigger', 'children'),
+    [
+        Input({'type': 'alarm-link-btn', 'index': ALL}, 'n_clicks'),
+        Input({'type': 'path-anomaly-btn', 'index': ALL}, 'n_clicks'),
+        Input({'type': 'hosts-not-found-btn', 'index': ALL}, 'n_clicks'),
+        Input('view-measurements-btn', 'n_clicks'),
+    ],
+    prevent_initial_call=True
+)
+
+# dash.clientside_callback(
+#     """
+#     function(n_clicks) {
+#         // Only scroll if the button was actually clicked
+#         if (n_clicks && n_clicks > 0) {
+#             setTimeout(() => {
+#                 const target = document.getElementById('site-measurements');
+#                 if (target) {
+#                     // Calculate position with optional offset
+#                     const yOffset = -20;  // Adjust this value as needed
+#                     const y = target.getBoundingClientRect().top + 
+#                               window.pageYOffset + 
+#                               yOffset;
+                    
+#                     window.scrollTo({
+#                         top: y,
+#                         behavior: 'smooth'
+#                     });
+                    
+#                     console.log('Scrolled to measurements section');
+#                 } else {
+#                     console.warn('Target element not found');
+#                 }
+#             }, 300);  // Short delay to ensure DOM is ready
+#         }
+#         return window.dash_clientside.no_update;
+#     }
+#     """,
+#     Output('scroll-trigger', 'children'),  # Dummy output
+    
+#     prevent_initial_call=True
+# )
+    
 #     if not ctx.triggered:
 #         return dash.no_update
 #     print(ctx.triggered)

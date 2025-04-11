@@ -140,3 +140,4 @@ venv/
 
 # Yana's experimental files
 dev
+creds.key

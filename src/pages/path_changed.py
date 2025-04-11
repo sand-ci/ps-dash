@@ -12,9 +12,11 @@ import pandas as pd
 
 from utils.helpers import timer
 
-import utils.helpers as hp
+
 import model.queries as qrs
 from model.Alarms import Alarms
+from utils.utils import extractAlarm
+from utils.components import siteBoxPathChanged
 
 import urllib3
 urllib3.disable_warnings()
@@ -44,6 +46,7 @@ chdf, posDf, baseline, altPaths = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 dateFrom, dateTo, frames, pivotFrames =  None, None, None, None
 alarmsInst = Alarms()
 
+   
 
 @timer
 def layout(q=None, **other_unknown_query_strings):
@@ -57,28 +60,8 @@ def layout(q=None, **other_unknown_query_strings):
     global pivotFrames
 
     if q:
-        alarm = qrs.getAlarm(q)['source']
-        print('URL query:', q, other_unknown_query_strings)
-        print()
-        print('Alarm content:', alarm)
-
-        chdf, posDf, baseline, altPaths = qrs.queryTraceChanges(alarm['from'], alarm['to'], alarm['asn'])
-        dateFrom, dateTo = hp.getPriorNhPeriod(alarm["to"])
-        frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
-        posDf['asn'] = posDf['asn'].astype(int)
-
-        dsts = chdf.groupby('dest_site')[['pair']].count().reset_index().rename(columns={'dest_site':'site'})
-        srcs = chdf.groupby('src_site')[['pair']].count().reset_index().rename(columns={'src_site':'site'})
-        pairCount = pd.concat([dsts, srcs]).groupby(['site']).sum().reset_index().sort_values('pair', ascending=False)
-        topDownList = pairCount[pairCount['site'].isin(alarm['sites'])]['site'].values.tolist()
-
-        # affected = '  |  '.join(alarm["sites"])
-
-        selectedTab = topDownList[0]
-        if 'site' in other_unknown_query_strings.keys():
-          if other_unknown_query_strings['site'] in pairCount['site'].values:
-            selectedTab = other_unknown_query_strings['site']
-
+        alarm, chdf, posDf, baseline, altPaths, dateFrom, dateTo, topDownList, frame, pivotFrames, selectedTab, pairCount = extractAlarm(q, alarmsInst, **other_unknown_query_strings)
+      
         return html.Div([
             dcc.Store(id='local-store', data=alarm),
             dcc.Location(id='url', refresh=True),
@@ -118,12 +101,13 @@ def layout(q=None, **other_unknown_query_strings):
                         dcc.Tab(label=site.upper(), value=site, 
                         id=site,
                         className='custom-tab text-center ', selected_className='custom-tab--selected rounded-border-1 p-1',
-                        children=buildSiteBox(site,
-                                              pairCount[pairCount['site']==site]['pair'].values[0], 
-                                              chdf[(chdf['src_site']==site) | (chdf['dest_site']==site)],
-                                              posDf[(posDf['src_site']==site) | (posDf['dest_site']==site)],
-                                              baseline[(baseline['src_site']==site) | (baseline['dest_site']==site)],
-                                              altPaths[(altPaths['src_site']==site) | (altPaths['dest_site']==site)],
+                        children=buildSiteBox(alarmsInst,
+                                              site,
+                                              pairCount, 
+                                              chdf,
+                                              posDf,
+                                              baseline,
+                                              altPaths,
                                               alarm)
                                               ) for site in topDownList
                         ], vertical=False, 
@@ -137,111 +121,10 @@ def layout(q=None, **other_unknown_query_strings):
           ])
 
 
-def extractRelatedOnly(chdf, asn):
-  chdf.loc[:, 'spair'] = chdf[['src_site', 'dest_site']].apply(lambda x: ' -> '.join(x), axis=1)
-
-  diffData = []
-  for el in chdf[['pair','spair','diff']].to_dict('records'):
-      for d in el['diff']:
-          diffData.append([el['spair'], el['pair'],d])
-
-  diffDf = pd.DataFrame(diffData, columns=['spair', 'pair', 'diff'])
-  return diffDf[diffDf['diff']==asn]
-
-
 
 @timer
-def buildSiteBox(site, cnt, chdf, posDf, baseline, altPaths, alarm):
-    if site:
-      baseline['spair'] = baseline['src_site']+' -> '+baseline['dest_site']
-
-      showSample = ''
-      related2FlaggedASN = extractRelatedOnly(chdf, alarm['asn'])
-      cntRelated = len(related2FlaggedASN)
-      if len(related2FlaggedASN)>10:
-        showSample = "Bellow is a subset of 5."
-        related2FlaggedASN = related2FlaggedASN.sample(5)
-      sitePairs = related2FlaggedASN['spair'].values
-      nodePairs = related2FlaggedASN['pair'].values
-      
-      
-      diffs = sorted(list(set([str(el) for v in chdf['diff'].values.tolist() for el in v])))
-      diffs_str = '  |  '.join(diffs)
-      
-      data = alarmsInst.getOtherAlarms(currEvent='path changed', alarmEnd=alarm["to"], pivotFrames=pivotFrames, site=site)
-      otherAlarms = alarmsInst.formatOtherAlarms(data)
-
-      url = f'{request.host_url}paths-site/{site}?dateFrom={alarm["from"]}&dateTo={alarm["to"]}'
-
-      return html.Div([
-              dbc.Row([
-                dbc.Row([
-                  dbc.Col([
-                    dbc.Row([
-                       dbc.Col([
-                            dbc.Card([
-                                dbc.CardBody([
-                                    html.P(f"{cnt} is the total number of traceroute alarms which involve site {site}", className='card-text'),
-                                    html.P(f"{cntRelated} (out of {cnt}) concern a path change to ASN {alarm['asn']}. {showSample}", className='card-text'),
-                                    html.P(f"Other flagged AS numbers:  {diffs_str}", className='card-text')
-                                ])
-                            ], className='mb-3 h-100'),
-                       ], lg=6, md=12),
-                        dbc.Col([
-                            dbc.Card([
-                                dbc.CardBody([
-                                    html.P(f'Site {site} takes part in the following alarms in the period 24h prior and up to 24h after the current alarm end ({alarm["to"]})', className='card-text'),
-                                    html.B(otherAlarms, className='card-text')
-                                ])
-                            ], className='mb-3 h-100')
-                        ], lg=6, md=12)
-                      ], 
-                      className='site-header-line p-2 d-flex',
-                      justify="center", align="stretch"),
-
-                    dbc.Row(
-                    [
-                      html.Div(id=f'pair-section{site+str(i)}',
-                        children=[
-                          dbc.Button(
-                              sitePairs[i],
-                              value=pair,
-                              id={
-                                  'type': 'collapse-button',
-                                  'index': site+str(i)
-                              },
-                              className="collapse-button",
-                              color="white",
-                              n_clicks=0,
-                          ),
-                          dcc.Loading(
-                            dbc.Collapse(
-                                id={
-                                    'type': 'collapse',
-                                    'index': site+str(i)
-                                },
-                                is_open=False, className="collaps-container rounded-border-1"
-                          ), style={'height':'0.5rem'}, color='#e9e9e9'),
-                        ]
-                      ) for i, pair in enumerate(nodePairs)
-                    ],),
-                    dbc.Row(
-                        html.Div(
-                              html.A('Show all "Path changed" alarms for that site in a new page', href=url, target='_blank',
-                                   className='btn btn-secondary site-btn mb-2',
-                                   id={
-                                       'type': 'site-new-page-btn',
-                                       'index': site
-                                   }
-                              ),
-                        ), align='center'
-                      )
-                  ]),
-                ]),
-              ])
-            ])
-
-
+def buildSiteBox(alarmI, site, pairCnt, chdf, posDf, baseline, altPaths, alarm):
+    return siteBoxPathChanged(site, pairCnt, chdf, posDf, baseline, altPaths, alarm, pivotFrames, alarmI)
 
 @timer
 @dash.callback(

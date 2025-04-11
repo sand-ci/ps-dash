@@ -403,8 +403,9 @@ def getSubcategories():
   return catdf
 
 
-def query_ASN_anomalies(src, dest):
-  dateFrom, dateTo = hp.defaultTimeRange(days=2)
+def query_ASN_anomalies(src, dest, dates=hp.defaultTimeRange(days=2)):
+  print(dates)
+  dateFrom, dateTo = dates
   q = {
     "query": {
       "bool": {
@@ -690,3 +691,14 @@ def query4Avg(idx, dateFrom, dateTo):
                     })
 
   return aggrs
+
+# def getSiteData():
+#     meta = []
+#     data = scan(hp.es, index='ps_alarms_meta')
+#     for item in data:
+#         meta.append(item['_source'])
+
+#     if meta:
+#         return pd.DataFrame(meta)
+#     else:
+#         print('No metadata!')
