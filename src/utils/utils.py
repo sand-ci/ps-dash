@@ -21,6 +21,9 @@ import utils.helpers as hp
 from model.Alarms import Alarms
 from functools import lru_cache
 from plotly.subplots import make_subplots
+from utils.parquet import Parquet
+from elasticsearch.helpers import scan
+
 def buildMap(mapDf):
     # usually test and production sites are at the same location,
     # so we add some noise to the coordinates to make them visible
@@ -274,6 +277,7 @@ def explainStatuses():
 ####################################################
                 #pages/hosts_not_found.py
 ####################################################
+
 def parse_date(date_str):
     """
     Parse a date string using regex to handle both formats:
@@ -290,8 +294,9 @@ def parse_date(date_str):
         return datetime.strptime(f"{date_part} {time_part}", "%Y-%m-%d %H:%M:%S.%f")
     else:
         raise ValueError(f"Date string '{date_str}' does not match expected formats")
-    
-def create_heatmap(site_dict, site, date_from=None, date_to=None, test_types=None, hostnames=None):
+
+
+def create_heatmap(site_dict, site, date_from, date_to, test_types=None, hostnames=None):
     """
     Create a Plotly heatmap for a specific site over a date range with optional filters.
 
@@ -304,15 +309,32 @@ def create_heatmap(site_dict, site, date_from=None, date_to=None, test_types=Non
         hostnames (list): List of selected hostnames to filter by.
 
     Returns:
+    '2025-04-10T00:00:00.000Z', '2025-04-10T23:59:59.000Z', {'owd': array(['psmsu01.aglt2.org'], dtype=object),
+    '2025-04-06T00:00:00.000Z', '2025-04-06T23:59:59.000Z', {'owd': array(['psmsu01.aglt2.org'], dtype=object)
         plotly.graph_objects.Figure: The heatmap figure.
     """
-    print("Debug create_heatmap for site reports...")
-    records = site_dict.get(site, [])
+    print("In create_heatmap function site_report...")
+    site_dict = site_dict[site_dict['site']==site]
+    print(site_dict)
+    # Get the records for the specified site
+    
+    records = site_dict.to_dict('records')
     print(records)
+    # print(f"Data records: {records}")
+    # # Parse date_from and date_to
+    date_from = datetime.strptime(date_from, '%Y-%m-%d %H:%M:%S')
+    date_to = datetime.strptime(date_to, '%Y-%m-%d %H:%M:%S')
+    print(f"Building graph for date range {date_from} to {date_to}...")
+    # Generate all dates in the range
+    date_range = [date_from + timedelta(days=i) for i in range((date_to - date_from).days)]
+    date_range_str = [date.strftime('%Y-%m-%d') for date in date_range]
+    print(f"Date range: {date_range_str}")
+    print("Extracting all hosts...")
+    # Extract all unique hostnames and test types
     all_hostnames = set()
     all_test_types = set()
     for record in records:
-        hosts_not_found = record[2]  # hosts_not_found dictionary
+        hosts_not_found = record['hosts_not_found']  # hosts_not_found dictionary
         for test_type, hosts in hosts_not_found.items():
             if hosts is not None:  # Check if hosts list is not empty
                 all_hostnames.update(hosts)
@@ -326,16 +348,7 @@ def create_heatmap(site_dict, site, date_from=None, date_to=None, test_types=Non
 
     # Create a list of all combinations (hostname + test type)
     combinations = [f"({test}) {host}" for host in all_hostnames for test in all_test_types]
-    print(date_from)
-    
-    dateFrom = date_from.split(' ')[0]
-    dateTo = date_to.split(' ')[0]
-    date_from = datetime.strptime(dateFrom, '%Y-%m-%d')
-    date_to = datetime.strptime(dateTo, '%Y-%m-%d') + timedelta(days=0, seconds=-1)
-    print(f"Building graph for date range {date_from} to {date_to}...")
-    # Generate all dates in the range
-    date_range = [date_from + timedelta(days=i) for i in range((date_to - date_from).days + 1)]
-    date_range_str = [date.strftime('%Y-%m-%d') for date in date_range]
+
     # Initialize a DataFrame to store the heatmap data
     heatmap_data = pd.DataFrame(index=date_range_str, columns=combinations, dtype=int)
 
@@ -343,11 +356,12 @@ def create_heatmap(site_dict, site, date_from=None, date_to=None, test_types=Non
     heatmap_data.fillna(0, inplace=True)
 
     # Mark presence of alarms with 1
+    print(f"Records: {records}")
     for record in records:
         try:
             # Parse the dates using the regex-based function
-            record_from = parse_date(record[0])
-            record_to = parse_date(record[1])
+            record_from = parse_date(record['from'])
+            record_to = parse_date(record["to"])
         except ValueError as err:
             print(f"Error parsing date: {err}")
 
@@ -357,7 +371,7 @@ def create_heatmap(site_dict, site, date_from=None, date_to=None, test_types=Non
             current_date_str = current_date.strftime('%Y-%m-%d')
             if current_date_str in heatmap_data.index:
                 for test_type, hosts in hosts_not_found.items():
-                    if hosts and test_type in all_test_types:  # Apply test type filter
+                    if (hosts is not None) & (test_type in all_test_types):  # Apply test type filter
                         for host in hosts:
                             if host in all_hostnames:  # Apply hostname filter
                                 combination = f"({test_type}) {host}"
@@ -366,7 +380,7 @@ def create_heatmap(site_dict, site, date_from=None, date_to=None, test_types=Non
             current_date += timedelta(days=1)
     # print(f"Heatmap data: {heatmap_data}")
     case = 0
-    # print(f"Heatmap data unique values: {len(np.unique(heatmap_data.values))}")
+            # print(f"Heatmap data unique values: {len(np.unique(heatmap_data.values))}")
     if heatmap_data.shape[1] == 1 or len(np.unique(heatmap_data.values)) == 1:
         heatmap_data[' '] = 0 # turning 1D data in 2D
         case = 1 # corner cases for cases when there is only one value meaning all the test for the period failed to be found in Elasticsearch
@@ -402,6 +416,7 @@ def create_heatmap(site_dict, site, date_from=None, date_to=None, test_types=Non
     )
 
     return fig, list(all_test_types), list(all_hostnames), site
+
 
 
 ####################################################
@@ -499,6 +514,36 @@ def generate_plotly_heatmap_with_anomalies(subset_sample):
 ####################################################
                 #pages/path_changed.py
 ####################################################
+def descChange(pair, chdf, posDf):
+
+  owners = qrs.getASNInfo(posDf[(posDf['pair']==pair)]['asn'].values.tolist())
+  owners['-1'] = 'OFF/Unavailable'
+  howPathChanged = []
+  for diff in chdf[(chdf['pair']==pair)]['diff'].values.tolist()[0]:
+
+    for pos, P in posDf[(posDf['pair']==pair)&(posDf['asn']==diff)][['pos','P']].values:
+        atPos = posDf[(posDf['pair']==pair) & (posDf['pos']==pos)]['asn'].values.tolist()
+
+        if len(atPos)>0:
+          atPos.remove(diff)
+          for newASN in atPos:
+            if newASN not in [0, -1]:
+              if P < 1:
+                howPathChanged.append({'diff': diff,
+                                      'diffOwner': owners[str(diff)], 'atPos': pos,
+                                      'jumpedFrom': newASN, 'jumpedFromOwner': owners[str(newASN)]})
+          # the following check is covering the cases when the change happened at the very end of the path
+          # i.e. the only ASN that appears at that position is the diff detected
+          if len(atPos) == 0:
+            howPathChanged.append({'diff': diff,
+                                  'diffOwner': owners[str(diff)], 'atPos': pos,
+                                  'jumpedFrom': "No data", 'jumpedFromOwner': ''})
+
+  if len(howPathChanged)>0:
+    return pd.DataFrame(howPathChanged).sort_values('atPos')
+  
+  return pd.DataFrame()
+
 def extractRelatedOnly(chdf, asn):
   chdf.loc[:, 'spair'] = chdf[['src_site', 'dest_site']].apply(lambda x: ' -> '.join(x), axis=1)
 
@@ -694,4 +739,154 @@ def SitesOverviewPlots(site_name, pq):
 
 
 
+#######################################
+         #pages/throughput.py
+#######################################
+def getRawDataFromES(src, dest, dateFrom, dateTo, ipv6):
+    pq = Parquet()
+    metaDf = pq.readFile('parquet/raw/metaDf.parquet')
+    sips = metaDf[(metaDf['site'] == src) | (metaDf['netsite'] == src)]['ip'].values.tolist()
+    sips = [ip.upper() for ip in sips] + [ip.lower() for ip in sips]
+    dips = metaDf[(metaDf['site'] == dest) | (metaDf['netsite'] == dest)]['ip'].values.tolist()
+    dips = [ip.upper() for ip in dips] + [ip.lower() for ip in dips]
 
+    if len(sips) > 0 or len(dips) > 0:
+        return qrs.queryBandwidthIncreasedDecreased(dateFrom, dateTo, sips, dips, ipv6)
+
+    else: print(f'No IPs found for the selected sites {src} and {dest} {ipv6}')
+
+def buildPlot(df):
+    fig = go.Figure(data=px.scatter(
+        df,
+        y = 'MBps',
+        x = 'dt',
+        color='pair'
+        
+    ))
+
+    fig.update_layout(showlegend=False)
+    fig.update_traces(marker=dict(
+                        color='#00245a',
+                        size=12
+                    ))
+    fig.layout.template = 'plotly_white'
+    # fig.show()
+    return fig
+
+
+def buildDataTable(df):
+    columns = ['dt', 'pair', 'throughput', 'src_host', 'dest_host',
+              'retransmits', 'src_site', 'src_netsite', 'src_rcsite', 'dest_site',
+              'dest_netsite', 'dest_rcsite', 'src_production', 'dest_production']
+
+    df = df[columns]
+    return html.Div(dash_table.DataTable(
+            data=df.to_dict('records'),
+            columns=[{"name": i, "id": i} for i in df.columns],
+            id='tbl-raw',
+            style_table={
+                'overflowX': 'auto'
+            },
+            page_action="native",
+            page_current= 0,
+            page_size= 10,
+            style_cell={
+              'padding': '3px'
+            },
+            style_header={
+                'fontWeight': 'bold'
+            },
+            style_data={
+                'height': 'auto',
+                'lineHeight': '15px',
+            },
+            filter_action="native",
+            filter_options={"case": "insensitive"},
+            sort_action="native",
+        ))
+def getSitePairs(alarm):
+  sitePairs = []
+  event = alarm['event']
+
+  if event in ['bandwidth decreased', 'bandwidth increased']:
+    sitePairs = [{'src_site': alarm['source']['src_site'],
+                'dest_site': alarm['source']['dest_site'],
+                'ipv6': alarm['source']['ipv6'],
+                'change':  alarm['source']['change']}]
+
+  elif event in ['bandwidth decreased from/to multiple sites', 'bandwidth increased from/to multiple sites']:
+    for i,s in enumerate(alarm['source']['dest_sites']):
+      temp = {'src_site': alarm['source']['site'],
+              'dest_site': s,
+              'ipv6': alarm['source']['ipv6'],
+              'change':  alarm['source']['dest_change'][i]}
+      sitePairs.append(temp)
+
+    for i,s in enumerate(alarm['source']['src_sites']):
+      temp = {'src_site': s,
+              'dest_site': alarm['source']['site'],
+              'ipv6': alarm['source']['ipv6'],
+              'change':  alarm['source']['src_change'][i]}
+      sitePairs.append(temp)
+  
+  return sitePairs
+
+def getRawDataFromES(src, dest, ipv6, dateFrom, dateTo):
+    pq = Parquet()
+    metaDf = pq.readFile('parquet/raw/metaDf.parquet')
+    sips = metaDf[(metaDf['site'] == src) | (metaDf['netsite'] == src)]['ip'].values.tolist()
+    sips = [ip.upper() for ip in sips] + [ip.lower() for ip in sips]
+    dips = metaDf[(metaDf['site'] == dest) | (metaDf['netsite'] == dest)]['ip'].values.tolist()
+    dips = [ip.upper() for ip in dips] + [ip.lower() for ip in dips]
+
+    if len(sips) > 0 or len(dips) > 0:
+      q = {
+          "query" : {  
+              "bool" : {
+              "must" : [
+                    {
+                      "range": {
+                          "timestamp": {
+                          "gte": dateFrom,
+                          "lte": dateTo,
+                          "format": "strict_date_optional_time"
+                          }
+                        }
+                    },
+                    {
+                      "terms" : {
+                        "src": sips
+                      }
+                    },
+                    {
+                      "terms" : {
+                        "dest": dips
+                      }
+                    },
+                    {
+                      "term": {
+                          "ipv6": {
+                            "value": ipv6
+                          }
+                      }
+                    }
+                ]
+              }
+            }
+          }
+      # print(str(q).replace("\'", "\""))
+
+      result = scan(client=hp.es,index='ps_throughput',query=q)
+      data = []
+
+      for item in result:
+          data.append(item['_source'])
+
+      df = pd.DataFrame(data)
+
+      df['pair'] = df['src']+'->'+df['dest']
+      df['dt'] = df['timestamp']
+      return df
+
+    else: print(f'No IPs found for the selected sites {src} and {dest} {ipv6}')
+    

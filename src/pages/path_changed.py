@@ -108,7 +108,8 @@ def layout(q=None, **other_unknown_query_strings):
                                               posDf,
                                               baseline,
                                               altPaths,
-                                              alarm)
+                                              alarm,
+                                              "-p1")
                                               ) for site in topDownList
                         ], vertical=False, 
                         style={
@@ -123,21 +124,21 @@ def layout(q=None, **other_unknown_query_strings):
 
 
 @timer
-def buildSiteBox(alarmI, site, pairCnt, chdf, posDf, baseline, altPaths, alarm):
-    return siteBoxPathChanged(site, pairCnt, chdf, posDf, baseline, altPaths, alarm, pivotFrames, alarmI)
+def buildSiteBox(alarmI, site, pairCnt, chdf, posDf, baseline, altPaths, alarm, button):
+    return siteBoxPathChanged(site, pairCnt, chdf, posDf, baseline, altPaths, alarm, pivotFrames, alarmI, button)
 
 @timer
 @dash.callback(
     [
-      Output({'type': 'collapse', 'index': MATCH},  "is_open"),
-      Output({'type': 'collapse', 'index': MATCH},  "children")
+      Output({'type': 'collapse-p1', 'index': MATCH},  "is_open"),
+      Output({'type': 'collapse-p1', 'index': MATCH},  "children")
     ],
     [
-      Input({'type': 'collapse-button', 'index': MATCH}, "n_clicks"),
-      Input({'type': 'collapse-button', 'index': MATCH}, "value"),
+      Input({'type': 'collapse-button-p1', 'index': MATCH}, "n_clicks"),
+      Input({'type': 'collapse-button-p1', 'index': MATCH}, "value"),
       Input('local-store', 'data')
     ],
-    [State({'type': 'collapse', 'index': MATCH},  "is_open")],
+    [State({'type': 'collapse-p1', 'index': MATCH},  "is_open")],
 )
 def toggle_collapse(n, pair, alarm, is_open):
     data = ''
@@ -339,4 +340,3 @@ def descChange(pair, chdf, posDf):
     return pd.DataFrame(howPathChanged).sort_values('atPos')
   
   return pd.DataFrame()
-

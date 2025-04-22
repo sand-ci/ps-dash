@@ -491,13 +491,20 @@ def update_output(n_clicks, start_date, end_date, sites, all, sitesState):
         # print("DaraTables:")
         # print(dataTables)
         def createDictionaryWithHistoricalData(dframe):
+            print("createDictionaryWithHistoricalData hosts not found...")
+            print('from')
+            print(dframe.describe())
             site_dict = dframe.groupby('site').apply(
+                
                 lambda group: [
                     (row['from'], row['to'], row['hosts_not_found'])
                     for _, row in group.iterrows()
                 ]
             ).to_dict()
+            print('to')
+            print(site_dict)
             return site_dict
+        # print(f"pivotFrame: {pivotFrame}")
         historicalData = createDictionaryWithHistoricalData(pivotFrame)
         dataTables = html.Div(
             dataTables
@@ -599,7 +606,7 @@ def update_graph(n_clicks, data=None, testTypeFilter=None, hostFilter = None, da
             Returns:
                 plotly.graph_objects.Figure: The heatmap figure.
             """
-            print("In create_heatmap function...")
+            print("In create_heatmap function hosts_not_found...")
             print(site_dict)
             # Get the records for the specified site
             records = site_dict.get(site, [])

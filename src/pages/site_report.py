@@ -1,12 +1,14 @@
-#TODO: add country and overview to my summary, add button that switch you to measurement
-
-#TODO: finish isolating functions and buttons 
-#TODO: debug groupAlarms in Updater.py, number of alarms is counted not correct
-
 #TODO: add graph like in Grafana
+#TODO: add country and overview to my summary, add button that switch you to measurement
+#TODO: if len(hosts) > 6 then break into 2 column
+#TODO: finish isolating functions and buttons 
+#TODO: set up "firewall issue button"
+#TODO: debug groupAlarms in Updater.py, number of alarms is counted not correct
+#TODO: for 0 alarms
 
-#TODO: add hosts overview? what should I add there
-#TODO: debug hosts not found graph
+#TODO: substitute hosts with summary
+#      Percentage of alarms in Infrastracture/Network/Others
+#      
 
 from datetime import datetime, timedelta
 from functools import lru_cache
@@ -30,10 +32,11 @@ import utils.helpers as hp
 from utils.helpers import timer
 import model.queries as qrs
 from utils.parquet import Parquet
-from utils.utils import defineStatus, explainStatuses, create_heatmap, createDictionaryWithHistoricalData, generate_plotly_heatmap_with_anomalies, extractAlarm
-from utils.components import siteBoxPathChanged, siteMeasurements
-
+from utils.utils import defineStatus, explainStatuses, create_heatmap, createDictionaryWithHistoricalData, generate_plotly_heatmap_with_anomalies, extractAlarm, getSitePairs, getRawDataFromES
+from utils.components import siteBoxPathChanged, siteMeasurements, toggleCollapse, pairDetails, loss_delay_kibana, bandwidth_increased_decreased, throughput_graph_components
+import functools
 from collections import Counter
+
 
 
 def title(q=None):
@@ -54,7 +57,7 @@ dash.register_page(
 )
 
 site = None
-
+alarmsInst = Alarms()
 # def reformat_time(timestamp):
 #         try:
 #             timestamp_new = pd.to_datetime(timestamp).strftime("%d %b %Y")
@@ -86,9 +89,11 @@ def layout(q=None, **other_unknown_query_strings):
     # Calculate toDay (2 days ago at 23:59:59)
     toDay = (now - timedelta(days=1)).replace(hour=00, minute=00, second=00, microsecond=00000)
     toDay = toDay.strftime("%Y-%m-%d %H:%M:%S")  # "2024-02-26 23:59:59"
-    alarmsInst = Alarms()
+    
     # toDay = toDay - timedelta(days=2)
+    global pivotFrames
     frames, pivotFrames = alarmsInst.loadData(fromDay, toDay)
+    
     # alarmCnt = pq.readFile('parquet/alarmsGrouped.parquet')
     # alarmCnt = alarmCnt[alarmCnt['site'] == q]
     print(f"fromDay: {fromDay}, toDay: {toDay}")
@@ -218,12 +223,19 @@ def layout(q=None, **other_unknown_query_strings):
     )
     meta_df_site = meta_df[meta_df['site'] == q]
     hosts_ip = meta_df_site["host_ip"].tolist()
+    if len(hosts_ip) < 1:
+        hosts_ip = [("hosts information not available", '-')]
     country = meta_df_site["country"].values[0] if len(meta_df_site) > 0 else None
-    
+    site_meta_data = qrs.getSiteMetadata(q)
+    if site_meta_data is not None:
+        cpus, cpu_cores = site_meta_data.iloc[0]['cpus'], site_meta_data.iloc[0]['cpu_cores']
+    else:
+        cpus, cpu_cores = None, None
     return html.Div(children = [
         html.Div(id='scroll-trigger', style={'display': 'none'}),
         dcc.Store(id='fromDay', data=fromDay),
         dcc.Store(id='toDay', data=toDay),
+        dcc.Store(id='alarm-storage', data={}),
         dbc.Row([
             dbc.Row(
                 dbc.Col([
@@ -296,7 +308,8 @@ def layout(q=None, **other_unknown_query_strings):
                                             html.Div(
                                                 [
                                                     html.H4(f"Country: \t{country}", style={"padding-left": "10%", "pading-top": "5"}),
-                                                    
+                                                    html.H4(f"CPUs: \t{cpus}", style={"padding-left": "10%", "pading-top": "5"}),
+                                                    html.H4(f"CPU Cores: \t{cpu_cores}", style={"padding-left": "10%", "pading-top": "5"})
                                                     ],
                                                         style={"height": "100%", "display": "flex", "flex-direction": "column"}
                                                 ),
@@ -319,7 +332,7 @@ def layout(q=None, **other_unknown_query_strings):
                                                                 else "badge badge-pill badge-primary"
                                                             )
                                                         ],
-                                                        className="mb-1"
+                                                        className=""
                                                     )
                                                     for host, ip_ver in hosts_ip
                                                 ],
@@ -810,7 +823,8 @@ def toggle_modal(n1, n2, is_open):
 @dash.callback(
     [
         Output("dynamic-content-container", "children"),
-        Output('alarm-name-display', 'children')
+        Output('alarm-name-display', 'children'),
+        Output("alarm-storage", "data")
     ],
     [
         Input({'type': 'alarm-link-btn', 'index': ALL}, 'n_clicks'),
@@ -843,24 +857,31 @@ def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, current_chil
     if len(ctx.triggered) == 1:
         print(f"ctx.triggered: {ctx.triggered}")
         button_id = ctx.triggered[0]['prop_id'].split('.')[0]
-        print(button_id)
+        # print(button_id)
         if button_id:
             button_id = eval(button_id)  # Convert string to dict
-            print(button_id)
+            # print(button_id)
             if button_id['type'] in button_content_mapping:
-                print("Alarms' data:\n")
+                # print("Alarms' data:\n")
                 event = button_content_mapping[button_id['type']]
                 pd_df = pivotFrames[event]
+                # print("pivotFrame")
                 print(pd_df)
                 if pd_df.empty:
-                    return dash.no_update, dash.no_update
+                    return dash.no_update, dash.no_update, {}
                 else:
                     if event == 'hosts not found':
-                        
+                        print("createDictionaryWithHistoricalData site report")
+                        print('from')
+                        print(pd_df.describe())
                         histData = createDictionaryWithHistoricalData(pd_df)
+                        print('to')
+                        print(histData)
+                        
                         site_name, id = button_id['index'].split(', ')
-                        fig, test_types, hosts, site = create_heatmap(histData, site, fromDay, toDay)
-                        return dcc.Graph(figure=fig), event
+                        fig, test_types, hosts, site = create_heatmap(pd_df, site, fromDay, toDay)
+                        alarm = qrs.getAlarm(id)['source']
+                        return dcc.Graph(figure=fig), event, alarm
 
                     
                     if event == 'ASN path anomalies':
@@ -879,27 +900,88 @@ def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, current_chil
                             else:
                                 figure = generate_plotly_heatmap_with_anomalies(data)
                                 figures = [dcc.Graph(figure=figure, id="asn-sankey-ipv4")]
-                        
-                            return html.Div(figures), event
-
-                    if event == "path changed":
+                            # alarm = qrs.getAlarm(q)['source']
+                            return html.Div(figures), event, data.to_dict()
+                    else: 
                         id, event = button_id['index'].split(', ')
-                        print(f"site: {site}, id: {id}")
-                        alarm, chdf, posDf, baseline, altPaths, dateFrom, dateTo, topDownList, frame, pivFrames, selectedTab, pairCount = extractAlarm(id)
-                        comp = siteBoxPathChanged(site, pairCount, chdf, posDf, baseline, altPaths, alarm, pivFrames, alarmsInst)
-                        return comp, event
+                        print(f"id: {id}, event: {event}")
+                        if event == "path changed":
+                            
+                            print(f"site: {site}, id: {id}")
+                            global chdf
+                            global posDf
+                            global baseline
+                            global altPaths 
+                            alarm, chdf, posDf, baseline, altPaths, dateFrom, dateTo, topDownList, frame, pivFrames, selectedTab, pairCount = extractAlarm(id)
+                            comp = siteBoxPathChanged(site, pairCount, chdf, posDf, baseline, altPaths, alarm, pivFrames, alarmsInst, '-p2')
+                            return comp, event, alarm
+                        
+                        if event in ["complete packet loss", "high packet loss"]:
+                            alarm_cont = qrs.getAlarm(id)
+                            print('URL query:', id)
+                            print()
+                            print('Alarm content:', alarm_cont)
+                            alarmsInst = Alarms()
+                            alrmContent = alarm_cont['source']
+                            event = alarm_cont['event']
+                            summary = dbc.Row([dbc.Row([
+                                        html.H1(f"Summary", className="text-left"),
+                                        html.Hr(className="my-2")]),
+                                        dbc.Row([
+                                            html.P(alarmsInst.buildSummary(alarm_cont), className='subtitle'),
+                                        ], justify="start"),
+                                        ])
+                            kibana_row = html.Div(children=[summary, loss_delay_kibana(alrmContent, event)])
+                            return kibana_row, event, alrmContent
+                        
+                        if event in ["bandwidth decreased", "bandwidth increased"]:
+                            print("here I am")
+                            alarm_cont = qrs.getAlarm(id)
+                            print('URL query:', id)
+                            sitePairs = getSitePairs(alarm_cont)
+                            alarmData = alarm_cont['source']
+                            dateFrom, dateTo = hp.getPriorNhPeriod(alarmData['to'])
+                            print('Alarm\'s content:', alarmData)
+                            pivotFrames = alarmsInst.loadData(dateFrom, dateTo)[1]
+
+                            data = alarmsInst.getOtherAlarms(
+                                                            currEvent=alarm_cont['event'],
+                                                            alarmEnd=alarmData['to'],
+                                                            pivotFrames=pivotFrames,
+                                                            site=alarmData['site'] if 'site' in alarmData.keys() else None,
+                                                            src_site=alarmData['src_site'] if 'src_site' in alarmData.keys() else None,
+                                                            dest_site=alarmData['dest_site'] if 'dest_site' in alarmData.keys() else None
+                                                            )
+
+                            otherAlarms = alarmsInst.formatOtherAlarms(data)
+
+                            expand = True
+                            alarmsIn48h = ''
+                            if alarm_cont['event'] not in ['bandwidth decreased', 'bandwidth increased']:
+                                expand = False
+                                alarmsIn48h = dbc.Row([
+                                                dbc.Row([
+                                                        html.P(f'Site {alarmData["site"]} takes part in the following alarms in the period 24h prior \
+                                                        and up to 24h after the current alarm end ({alarmData["to"]})', className='subtitle'),
+                                                        html.B(otherAlarms, className='subtitle')
+                                                    ], className="boxwithshadow alarm-header pair-details g-0 p-3", justify="between", align="center"),
+                                                ], style={"padding": "0.5% 1.5%"}, className='g-0')
+
+                            print("Trying to build graph for bandwidth decreased/increased")
+                            return html.Div(bandwidth_increased_decreased(alarm_cont, alarmData, alarmsInst,alarmsIn48h, sitePairs, expand, '-2')), event, alarmData
+
 
                     
                     
                     
                     
-           
+
                 
         
         # df = pd.DataFrame(df)
         # print(df)
         
-    return html.Div(), ""
+    return html.Div(), "", {}
 
 dash.clientside_callback(
     """
@@ -950,58 +1032,73 @@ dash.clientside_callback(
     prevent_initial_call=True
 )
 
-# dash.clientside_callback(
-#     """
-#     function(n_clicks) {
-#         // Only scroll if the button was actually clicked
-#         if (n_clicks && n_clicks > 0) {
-#             setTimeout(() => {
-#                 const target = document.getElementById('site-measurements');
-#                 if (target) {
-#                     // Calculate position with optional offset
-#                     const yOffset = -20;  // Adjust this value as needed
-#                     const y = target.getBoundingClientRect().top + 
-#                               window.pageYOffset + 
-#                               yOffset;
-                    
-#                     window.scrollTo({
-#                         top: y,
-#                         behavior: 'smooth'
-#                     });
-                    
-#                     console.log('Scrolled to measurements section');
-#                 } else {
-#                     console.warn('Target element not found');
-#                 }
-#             }, 300);  // Short delay to ensure DOM is ready
-#         }
-#         return window.dash_clientside.no_update;
-#     }
-#     """,
-#     Output('scroll-trigger', 'children'),  # Dummy output
-    
-#     prevent_initial_call=True
-# )
-    
-#     if not ctx.triggered:
-#         return dash.no_update
-#     print(ctx.triggered)
-#     button_id = ctx.triggered[0]['prop_id'].split('.')[0]
-#     button_id = eval(button_id)  # Convert string to dict
-    
-#     print(button_id)
-#     # Determine which button was clicked
-#     if button_id['type'] == 'alarm-link-btn':
-#         alarm_id = button_id['index']
-#         content = generate_alarm_content(alarm_id)  # Replace with your logic
-#     elif button_id['type'] == 'path-anomaly-btn':
-#         src, dest = button_id['index'].split('_')
-#         # content = generate_alarm_content(src, dest)  # Replace with your logic
-#         content = generate_alarm_content(src)
-#     elif button_id['type'] == 'hosts-not-found-btn':
-#         site = button_id['index']
-#         content = generate_alarm_content(site)  # Replace with your logic
-#     else:
-#         return dash.no_update
+@timer
+@dash.callback(
+    [
+      Output({'type': 'collapse-p2', 'index': MATCH},  "is_open"),
+      Output({'type': 'collapse-p2', 'index': MATCH},  "children")
+    ],
+    [
+      Input({'type': 'collapse-button-p2', 'index': MATCH}, "n_clicks"),
+      Input({'type': 'collapse-button-p2', 'index': MATCH}, "value"),
+      Input('alarm-storage', 'data')
+    ],
+    [State({'type': 'collapse-p2', 'index': MATCH},  "is_open")],
+)
+def toggle_collapse_2(n, pair, alarm, is_open):
+    data = ''
+    global chdf
+    global posDf
+    global baseline
+    global altPaths
+    if n:
+      if is_open==False:
+        # chdf, posDf, baseline, altPaths = pq.readFile(f'{location}chdf.parquet'), pq.readFile(f'{location}posDf.parquet'), pq.readFile(f'{location}baseline.parquet'), pq.readFile(f'{location}altPaths.parquet')
+        data = pairDetails(pair, alarm,
+                        chdf[chdf['pair']==pair],
+                        baseline[baseline['pair']==pair],
+                        altPaths[altPaths['pair']==pair],
+                        posDf[posDf['pair']==pair],
+                        pivotFrames,
+                        alarmsInst)
+      return [not is_open, data]
+    return [is_open, data]
 
-#     return content
+@dash.callback(
+    [
+      Output({'type': 'tp-collapse-2', 'index': MATCH},  "is_open"),
+      Output({'type': 'tp-collapse-2', 'index': MATCH},  "children")
+    ],
+    [
+      Input({'type': 'tp-collapse-button-2', 'index': MATCH}, "n_clicks"),
+      Input({'type': 'tp-collapse-button-2', 'index': MATCH}, "value"),
+      Input('alarm-store', 'data')
+    ],
+    [State({'type': 'tp-collapse-2', 'index': MATCH},  "is_open")],
+)
+def toggle_collapse_3(n, alarmData, alarm, is_open):
+  data = ''
+  print("HERE")  
+  dateFrom, dateTo = hp.getPriorNhPeriod(alarm['source']['to'])
+  pivotFrames = alarmsInst.loadData(dateFrom, dateTo)[1]
+  if n:
+    if is_open==False:
+      data = buildGraphComponents(alarmData, alarm['source']['from'], alarm['source']['to'], alarm['event'], pivotFrames)
+    return [not is_open, data]
+  if is_open==True:
+    data = buildGraphComponents(alarmData, alarm['source']['from'], alarm['source']['to'], alarm['event'], pivotFrames)
+    return [is_open, data]
+  return [is_open, data]
+
+
+
+@timer
+def buildGraphComponents(alarmData, dateFrom, dateTo, event, pivotFrames):
+
+  df = getRawDataFromES(alarmData['src_site'], alarmData['dest_site'], alarmData['ipv6'], dateFrom, dateTo)
+  df.loc[:, 'MBps'] = df['throughput'].apply(lambda x: round(x/1e+6, 2))
+
+  data = alarmsInst.getOtherAlarms(currEvent=event, alarmEnd=dateTo, pivotFrames=pivotFrames,
+                                   src_site=alarmData['src_site'], dest_site=alarmData['dest_site'])
+  otherAlarms = alarmsInst.formatOtherAlarms(data)
+  return throughput_graph_components(alarmData, df, otherAlarms)
