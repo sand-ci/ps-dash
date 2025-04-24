@@ -19,7 +19,6 @@ import dash_bootstrap_components as dbc
 
 from dash import Dash, dash_table, dcc, html
 from dash.dependencies import Input, Output, State, ALL, MATCH
-
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
@@ -112,14 +111,7 @@ def layout(q=None, **other_unknown_query_strings):
     #check source dest for complete packet loss, high packet loss,
     all_hosts = []
     for frame in frames:
-        
-        # if 'host' in frames[frame].columns:
-        #     all_hosts.extend(frames[frame]['host'].tolist())
-        # print(frame)
-        # print("----------------")
         df = frames[frame]
-        # pivotFrames[frame] = df.to_dict('records')
-        # print(df.columns)
         site_df = df[df['tag'].apply(lambda x: q in x)]
         
         if not site_df.empty:
@@ -198,15 +190,7 @@ def layout(q=None, **other_unknown_query_strings):
 
                 new_row['Destination Site(s)'] = destination_sites
                 site_alarms = pd.concat([site_alarms, pd.DataFrame([new_row])], ignore_index=True)
-        # print(site_alarms["Destination Site(s)"].head(5))
-        # site_alarms["Destination Site(s)"] = site_alarms["Destination Site(s)"].apply(lambda x: html.Div([html.Div(item) for item in x.split('\n')]) if isinstance(x, str) else x)
-        # print(site_alarms["Destination Site(s)"].head(5))
     print("-----------HOST COUNT------------")
-    # print(hosts_count)
-    # all_hosts = []
-    # for arr in hosts_count:
-    #     print(arr)
-    #     all_hosts.extend(arr.tolist())  # Convert array to list and extend
     host_counts = Counter(all_hosts)
     most_common_host = host_counts.most_common(1)[0] if host_counts else (None, 0)
 
@@ -216,7 +200,9 @@ def layout(q=None, **other_unknown_query_strings):
     print(f"Total alarms collected: {site_alarms_num}")
     # print(site_alarms)
     # get meta data for summary
-    create_horizontal_bar_chart(site_alarms, fromDay, toDay)
+    # create_horizontal_bar_chart(site_alarms, fromDay, toDay)
+    # f = create_combined_status_chart(site_alarms, fromDay, toDay)
+    # f.show()
     meta_df = qrs.getMetaData()
     meta_df['host_ip'] = meta_df.apply(
         lambda row: (row['host'], 'ipv6' if row['ipv6'] else 'ipv4'),
@@ -246,7 +232,92 @@ def layout(q=None, **other_unknown_query_strings):
                         # header line with site name
                         html.H3(f"\t{q}", className="card header-line p-2",  
                                 style={"background-color": "#00245a", "color": "white", "font-size": "25px"}),
-                        # first row of stats: number of alarms, graph with alarms types and summary text
+                        # first row
+                        dbc.Row([
+                            dbc.Col([
+                                html.Div(
+                                        className="boxwithshadowhidden page-cont h-100",
+                                            children=[
+                                            html.Div(
+                                                html.I(
+                                                    className="fas fa-question-circle",
+                                                    id="how-status-modal-trigger",
+                                                    n_clicks=0,
+                                                    style={
+                                                        "position": "absolute",
+                                                        "top": "10px",
+                                                        "right": "10px",
+                                                        "cursor": "pointer",
+                                                        "font-size": "20px",
+                                                        "color": "#6c757d",
+                                                        "z-index": "1000"  # Ensure it stays above other elements
+                                                    }
+                                                ),
+                                                style={
+                                                    "position": "relative"  # Needed for absolute positioning of child
+                                                }
+                                            ),
+                                            # Question mark icon positioned absolutely in top-right corner
+                                            html.H3("Daily Site Status", style={"padding-left": "5px", "padding-top": "5px"}),
+                                            
+                                            # First graph (top)
+                                            html.Div(
+                                                dcc.Graph(
+                                                    id="site-status",
+                                                    figure=create_status_chart(site_alarms),
+                                                    config={'displayModeBar': False},
+                                                    style={
+                                                        'height': '80px',  # Fixed pixel height
+                                                        'width': '90%',
+                                                        'margin': '2px',
+                                                        'margin-bottom': '10px',
+                                                        "align": "center"
+                                                    }
+                                                ),
+                                                style={'flex': '0 0 auto'}  # Prevent flex shrinking
+                                            ),
+                                            # Second graph (alarm details)
+                                            # html.H4("↓ Alarms' Affect ↓", style={"padding-left": "5px", "padding-top": "5px"}),
+                                            html.Div(
+                                                dcc.Graph(
+                                                    id="site-status-alarms",
+                                                    figure=create_horizontal_bar_chart(site_alarms, fromDay, toDay),
+                                                    config={'displayModeBar': False},
+                                                    style={
+                                                        'height': '160px',  # Remaining space (80px + margins)
+                                                        'width': '100%',
+                                                        'margin': '2px 0',
+                                                        'padding-top': '2px'
+                                                    }
+                                                ),
+                                                style={'flex': '1 1 auto'}  # Take remaining space
+                                            ),
+                                        
+                                            dbc.Modal(
+                                                [
+                                                    dbc.ModalHeader(dbc.ModalTitle("How was the status determined?")),
+                                                    dbc.ModalBody(id="how-status-modal-body-report"),
+                                                    dbc.ModalFooter(
+                                                        dbc.Button("Close", id="close-how-status-modal-report", className="ml-auto", n_clicks=0)
+                                                    ),
+                                                ],
+                                                id="how-status-modal-report",
+                                                size="lg",
+                                                is_open=False,
+                                            )
+                                    ], style={
+                                            "height": "350px",  # Fixed container height (adjust as needed)
+                                            "display": "flex",
+                                            "flex-direction": "column",
+                                            "padding": "10px",
+                                            "position": "relative",
+                                            "overflow": "hidden"  # Prevent any overflow
+                                        }
+                                )
+                        ])
+                            ], className="mb-2 pr-1 pl-1", style={"height": "350px"}),
+                        
+                        # second row of stats: number of alarms, graph with alarms types and general site information
                         dbc.Row([
                             dbc.Col(
                                 html.Div(
@@ -372,122 +443,50 @@ def layout(q=None, **other_unknown_query_strings):
                                     )
                             ]), width=4, style={"background-color": "#b9c4d4;", "height": "100%"})
                         ], className="my-3 pr-1 pl-1", style={"height": "300px"}),
+                    
                         
+                        
+                        # third row with alarms list and summary
                         dbc.Row([
                             # Left Column (Site status + Problematic host)
                             dbc.Col([
-                                html.Div(
-                                    className="boxwithshadowhidden page-cont h-100 p-2",
-                                        children=[
-                                        # Question mark icon positioned absolutely in top-right corner
-                                        html.Div(
-                                            html.I(
-                                                className="fas fa-question-circle",
-                                                id="how-status-modal-trigger",
-                                                n_clicks=0,
-                                                style={
-                                                    "position": "absolute",
-                                                    "top": "10px",
-                                                    "right": "10px",
-                                                    "cursor": "pointer",
-                                                    "font-size": "20px",
-                                                    "color": "#6c757d",
-                                                    "z-index": "1000"  # Ensure it stays above other elements
-                                                }
-                                            ),
-                                            style={
-                                                "position": "relative"  # Needed for absolute positioning of child
-                                            }
-                                        ),
-                                        dcc.Graph(id="site-status", figure=create_status_chart(site_alarms), 
-                                                  style={
-                                                        "height": "90%", 
-                                                        "width": "95%",
-                                                        "margin": "auto",
-                                                        "padding": "10px"
-                                                        # "flex-grow": "1",  # Allows graph to expand
-                                                        # "min-height": "0"  # Prevents overflow issues
-                                                    }
-                                        ),
-                                        
-                                        # Navigation arrow at bottom
-                                        html.Div(
-                                            html.I(
-                                                className="fas fa-arrow-down",
-                                                id="status-explanation-trigger",
-                                                n_clicks=0,
-                                                style={
-                                                    "cursor": "pointer",
-                                                    "font-size": "20px",
-                                                    "color": "#6c757d",
-                                                    "text-align": "center",
-                                                    "margin-top": "auto",  # Pushes to bottom
-                                                    "padding": "5px"
-                                                }
-                                            ),
-                                            style={
-                                                "display": "flex",
-                                                "justify-content": "center"
-                                            }
-                                        ),
-        
-                                        # The modal (can be placed here or at app level)
-                                        dbc.Modal(
-                                            [
-                                                dbc.ModalHeader(dbc.ModalTitle("How was the status determined?")),
-                                                dbc.ModalBody(id="how-status-modal-body-report"),
-                                                dbc.ModalFooter(
-                                                    dbc.Button("Close", id="close-how-status-modal-report", className="ml-auto", n_clicks=0)
-                                                ),
-                                            ],
-                                            id="how-status-modal-report",
-                                            size="lg",
-                                            is_open=False,
-                                        )
-                                    ], style={
-                                        "height": "65%",
-                                        "margin-bottom": "1rem",
-                                        "display": "flex",
-                                        "flex-direction": "column",
-                                        "overflow": "hidden"
-                                    }
-                                ),
+                                
                                 html.Div(
                                     className="boxwithshadow page-cont p-2 h-100",
                                     children=[
-                                        html.H3("Most problematic host", 
+                                        html.H3("Summary", 
                                                 style={
                                                     "padding-left": "5%", 
                                                     "padding-top": "5%"
                                                 }),
-                                        html.H2(f"{most_common_host[0]}",
-                                                id="most-problematic-host",
-                                                style={
-                                                # "color": "white", 
-                                                # "font-size": "120px",
-                                                "display": "flex",          # Enables Flexbox
-                                                "justify-content": "center", # Centers horizontally
-                                                "align-items": "center",     # Centers vertically
-                                                "margin-top": "70px",            # Takes full available height
+                                        # html.H2(f"{most_common_host[0]}",
+                                        #         id="most-problematic-host",
+                                        #         style={
+                                        #         # "color": "white", 
+                                        #         # "font-size": "120px",
+                                        #         "display": "flex",          # Enables Flexbox
+                                        #         "justify-content": "center", # Centers horizontally
+                                        #         "align-items": "center",     # Centers vertically
+                                        #         "margin-top": "70px",            # Takes full available height
                     
-                                                "padding-bottom": "5px"    # Optional: Adjusts spacing
-                                            }
-                                                ),
-                                        html.H4(f"(appears {most_common_host[1]} times)",
-                                            # f"{site_alarms_num if site_alarms_num > 0 else 0}", 
-                                            style={
-                                                # "font-size": "120px",
-                                                "display": "flex",          # Enables Flexbox
-                                                "justify-content": "center", # Centers horizontally
-                                                # "align-items": "center",     # Centers vertically
-                                                "height": "5%",            # Takes full available height
-                                                "margin": "10px",               # Removes default margins
-                                                "margin-bottom": "30px",    # Optional: Adjusts spacing
-                                                "padding-top": "0px"
-                                            }
-                                        ),
-                                        html.Div(dbc.Button("HOSTS OVERVIEW", color="secondary"), style={'margin-left':'5%', 'margin-top':'60px'})
-                                    ], style={"height": "35%"}
+                                        #         "padding-bottom": "5px"    # Optional: Adjusts spacing
+                                        #     }
+                                        #         ),
+                                        # html.H4(f"(appears {most_common_host[1]} times)",
+                                        #     # f"{site_alarms_num if site_alarms_num > 0 else 0}", 
+                                        #     style={
+                                        #         # "font-size": "120px",
+                                        #         "display": "flex",          # Enables Flexbox
+                                        #         "justify-content": "center", # Centers horizontally
+                                        #         # "align-items": "center",     # Centers vertically
+                                        #         "height": "5%",            # Takes full available height
+                                        #         "margin": "10px",               # Removes default margins
+                                        #         "margin-bottom": "30px",    # Optional: Adjusts spacing
+                                        #         "padding-top": "0px"
+                                        #     }
+                                        # ),
+                                        # html.Div(dbc.Button("HOSTS OVERVIEW", color="secondary"), style={'margin-left':'5%', 'margin-top':'60px'})
+                                    ], style={"height": "100%"}
                                 )
                             ], width=3, style={
                                 "display": "flex",
@@ -681,8 +680,7 @@ def create_bar_chart(graphData, column_name='alarm group'):
 
     return fig
 
-import plotly.graph_objects as go
-import pandas as pd
+
 
 def create_status_chart(graphData):
     # Process data
@@ -726,16 +724,18 @@ def create_status_chart(graphData):
     tickvals=[x for x in range(1, len(status_data)+1)]
     )
     fig.update_yaxes(
-        tickangle = -90,
+        tickangle = 0,
+        ticklabelposition="inside"
     )
     fig.update_layout(
-        title='Daily Status Overview',
         barmode='stack',
         xaxis=dict(visible=True),  # Hide x-axis
         yaxis=dict(visible=True),
         showlegend=False,
-        height=100,  # Compact height
-        margin=dict(l=0, r=0, t=30, b=0)
+        height=25,  # Fixed height for status bar
+        margin=dict(l=0, r=0, t=30, b=10),
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)'
     )
     # fig.show()
     return fig
@@ -1196,6 +1196,7 @@ def buildGraphComponents(alarmData, dateFrom, dateTo, event, pivotFrames):
   otherAlarms = alarmsInst.formatOtherAlarms(data)
   return throughput_graph_components(alarmData, df, otherAlarms)
 
+
 def create_horizontal_bar_chart(df, fromD, toD):
     print(f"fromD: {fromD}, toD: {toD}")
     df = df.groupby(['to', f"{'alarm name'}"]).size().reset_index(name='count')
@@ -1227,7 +1228,7 @@ def create_horizontal_bar_chart(df, fromD, toD):
     
     # Create the figure
     fig = go.Figure()
-    
+    bar_height = max(20, 300 / max(1, len(alarm_names)))  # Ensures min height of 20px
     # Add a bar segment for each date for each alarm
     for alarm in alarm_names:
         for i, date in enumerate(all_dates):
@@ -1253,7 +1254,7 @@ def create_horizontal_bar_chart(df, fromD, toD):
     
     # Customize layout
     fig.update_layout(
-        title='Alarm Status by Day',
+        # title=dict(text="Alarms affect on status"),
         barmode='stack',
         xaxis=dict(
             visible=True,
@@ -1261,11 +1262,15 @@ def create_horizontal_bar_chart(df, fromD, toD):
             ticktext=[date.strftime('%d %b') for date in all_dates],
             title='Days'
         ),
-        height=150 + 30 * len(alarm_names),  # Dynamic height based on number of alarms
-        # margin=dict(l=150, r=20, t=40, b=20),  # Extra left margin for alarm names
+        height=40 + len(alarm_names) * bar_height,  # Dynamic height based on number of alarms
+        margin=dict(l=150, r=20, t=30, b=20),
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
         showlegend=False
     )
-    fig.update_yaxes(ticklabelposition="inside", title=dict(text="Alarms"), tickvals=list(range(len(alarm_names))), ticktext=alarm_names)
+ 
+        
+    fig.update_yaxes(ticklabelposition="inside", tickvals=list(range(len(alarm_names))), ticktext=alarm_names, automargin=True, fixedrange=True)
     # fig.show()
     return fig
     
