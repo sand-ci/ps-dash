@@ -216,6 +216,7 @@ def layout(q=None, **other_unknown_query_strings):
     print(f"Total alarms collected: {site_alarms_num}")
     # print(site_alarms)
     # get meta data for summary
+    create_horizontal_bar_chart(site_alarms, fromDay, toDay)
     meta_df = qrs.getMetaData()
     meta_df['host_ip'] = meta_df.apply(
         lambda row: (row['host'], 'ipv6' if row['ipv6'] else 'ipv4'),
@@ -225,6 +226,7 @@ def layout(q=None, **other_unknown_query_strings):
     hosts_ip = meta_df_site["host_ip"].tolist()
     if len(hosts_ip) < 1:
         hosts_ip = [("hosts information not available", '-')]
+
     country = meta_df_site["country"].values[0] if len(meta_df_site) > 0 else None
     site_meta_data = qrs.getSiteMetadata(q)
     if site_meta_data is not None:
@@ -321,26 +323,39 @@ def layout(q=None, **other_unknown_query_strings):
                                         ),
                                         dbc.Col([
                                             html.H4(f"{site} hosts:"),
-                                            html.Ul(
-                                                [
-                                                    html.Li(
-                                                        [
-                                                            html.Span(f"{host} ", className="font-weight-bold"),
-                                                            html.Span(
-                                                                f"({ip_ver})",
-                                                                className="badge badge-pill badge-success" if ip_ver == "ipv6" 
-                                                                else "badge badge-pill badge-primary"
-                                                            )
-                                                        ],
-                                                        className=""
-                                                    )
-                                                    for host, ip_ver in hosts_ip
-                                                ],
-                                                className="list-unstyled", style={"padding-top": "5%"},
-                                        )
-                                            
+                                            html.Div([
+                                                
+                                                html.Ul(
+                                                    [
+                                                        html.Li(
+                                                            [
+                                                                html.Span(f"{host} ", className="font-weight-bold"),
+                                                                html.Span(
+                                                                    f"({ip_ver})",
+                                                                    className="badge badge-pill badge-success" if ip_ver == "ipv6" 
+                                                                    else "badge badge-pill badge-primary"
+                                                                )
+                                                            ],
+                                                            className=""
+                                                        )
+                                                        for host, ip_ver in hosts_ip  
+                                                    ],
+                                                    className="list-unstyled", style={"padding-top": "5%"},
+                                            )
+                                            ], style={
+                                                            'height': '200px', 
+                                                            'overflow-y': 'auto',  # Enable vertical scrolling
+                                                            'width': '100%',
+                                                            'mask-image': 'linear-gradient(to top, transparent, black)',
+                                                            'mask-size': '100% 190px',
+                                                            'mask-position': 'bottom',
+                                                            'mask-repeat': 'no-repeat',
+                                                            'padding-bottom': '70px',
+                                                            # 'mask-composite': 'exclude'
+                                                        }
+                                            )
                                     ], width=6
-                                )
+                                    )
                                         
                                 ], className="align-items-stretch",  # Makes columns equal height
                             ),
@@ -350,7 +365,7 @@ def layout(q=None, **other_unknown_query_strings):
                                         color="secondary",
                                         style={
                                             "margin-left": "10%",
-                                            "margin-top": "25px",
+                                            "margin-top": "15px",
                                             "width": "80%",
                                             "border-radius": "5px"
                                         }
@@ -386,13 +401,35 @@ def layout(q=None, **other_unknown_query_strings):
                                         ),
                                         dcc.Graph(id="site-status", figure=create_status_chart(site_alarms), 
                                                   style={
-                                                        "display": "flex",
-                                                        "align-items": "center",
-                                                        "justify-content": "center",
-                                                        "flex-grow": "1",  # Allows graph to expand
-                                                        "min-height": "0"  # Prevents overflow issues
+                                                        "height": "90%", 
+                                                        "width": "95%",
+                                                        "margin": "auto",
+                                                        "padding": "10px"
+                                                        # "flex-grow": "1",  # Allows graph to expand
+                                                        # "min-height": "0"  # Prevents overflow issues
                                                     }
-                                    ),
+                                        ),
+                                        
+                                        # Navigation arrow at bottom
+                                        html.Div(
+                                            html.I(
+                                                className="fas fa-arrow-down",
+                                                id="status-explanation-trigger",
+                                                n_clicks=0,
+                                                style={
+                                                    "cursor": "pointer",
+                                                    "font-size": "20px",
+                                                    "color": "#6c757d",
+                                                    "text-align": "center",
+                                                    "margin-top": "auto",  # Pushes to bottom
+                                                    "padding": "5px"
+                                                }
+                                            ),
+                                            style={
+                                                "display": "flex",
+                                                "justify-content": "center"
+                                            }
+                                        ),
         
                                         # The modal (can be placed here or at app level)
                                         dbc.Modal(
@@ -506,17 +543,6 @@ def layout(q=None, **other_unknown_query_strings):
                                                 ))
                                         ], className="p-1 mb-2"),
                                         dbc.Col([
-                                            # style={
-                                            #     "flex": "1",
-                                            #     "overflow": "hidden",
-                                            #     "display": "flex",
-                                            #     "flex-direction": "column"
-                                            # },
-                                            # children=[
-                                                # dbc.Col([
-                                                    # html.Hr(className="my-2"),
-                                                    # html.Br(),
-                                                 # Changed to 'records' format
                                                 dcc.Loading(
                                                     html.Div(  # Changed from html.Div to DataTable
                                                         id='alarms-table',
@@ -585,6 +611,14 @@ def layout(q=None, **other_unknown_query_strings):
                 children=siteMeasurements(q, pq),
                 style={'margin-top': "20px"},
                             ),
+        html.Div(id="dummy-output", style={"display": "none"}),
+        html.Div(
+                id="site-status-explanation",
+                className="boxwithshadow p-0 mt-3",
+                children=[
+                    # Your explanation content here
+                ]
+            )
     ], className="scroll-container")
     
 
@@ -647,52 +681,111 @@ def create_bar_chart(graphData, column_name='alarm group'):
 
     return fig
 
-def create_status_chart(graphData):
-    graphData= graphData.groupby(['to', f"alarm name"]).size().reset_index(name='cnt')
-    red_status_days, yellow_status_days, grey_status_days = defineStatus(graphData, "alarm name", 'to')
-    days = sorted(graphData['to'].unique())
-    colors = []
-    for day in days:
-        if day in red_status_days:
-            colors.append('darkred')
-        elif day in yellow_status_days:
-            colors.append('goldenrod')
-        elif day in grey_status_days:
-            colors.append('grey')
-        else:
-            colors.append('green')
+import plotly.graph_objects as go
+import pandas as pd
 
-    # Create the figure
+def create_status_chart(graphData):
+    # Process data
+    graphData = graphData.groupby(['to', "alarm name"]).size().reset_index(name='cnt')
+    red_status_days, yellow_status_days, grey_status_days = defineStatus(graphData, "alarm name", 'to')
+    days = sorted(pd.to_datetime(graphData['to'].unique()))
+
+    # Create status mapping (1 = colored segment, 0 = no segment)
+    status_data = []
+    for day in days:
+        day_str = day.strftime('%Y-%m-%d')
+        day_formated = day.strftime('%d %b')
+        if day_str in red_status_days:
+            status_data.append(('darkred', 1, day_formated))
+        elif day_str in yellow_status_days:
+            status_data.append(('goldenrod', 1, day_formated))
+        elif day_str in grey_status_days:
+            status_data.append(('grey', 1, day_formated))
+        else:
+            status_data.append(('green', 1, day_formated))
+    
+    # Create horizontal stacked bar
     fig = go.Figure()
-    # Add dots (markers) for each date
-    fig.add_trace(go.Scatter(
-        x=days,
-        y=[1]*len(days),  # Constant y-value to make a straight line
-        mode='markers',
-        marker=dict(
-            color=colors,
-            size=16,
-            symbol='circle',
-            opacity=0.9
-        ),
-        name='Status'
-    ))
-    fig.update_xaxes(
-        tickangle = 45
-        )
+    
+    # Add each day as a separate bar segment
+    for i, (color, value, date) in enumerate(status_data):
+        fig.add_trace(go.Bar(
+            y=['Status'],  # Single row
+            x=[value],    # Value (always 1)
+            orientation='h',
+            marker=dict(color=color),
+            width=0.8,    # Bar thickness
+            name=days[i].strftime('%Y-%m-%d'),  # Day as label
+            hoverinfo='name',
+            base=sum(x[1] for x in status_data[:i])  # Stacking position
+        ))
+    
     # Customize layout
-    fig.update_layout(
-        title=dict(text='Daily Status Overview',
-                   font=dict(
-                       size=14
-                       )
-                   ),
-        margin=dict(l=0, r=0, t=25, b=0),
-        
-        yaxis=dict(visible=False),  # Hide y-axis as it's just for visual spacing
-        showlegend=False
+    fig.update_xaxes(
+    ticktext=[x[2] for x in status_data],
+    tickvals=[x for x in range(1, len(status_data)+1)]
     )
+    fig.update_yaxes(
+        tickangle = -90,
+    )
+    fig.update_layout(
+        title='Daily Status Overview',
+        barmode='stack',
+        xaxis=dict(visible=True),  # Hide x-axis
+        yaxis=dict(visible=True),
+        showlegend=False,
+        height=100,  # Compact height
+        margin=dict(l=0, r=0, t=30, b=0)
+    )
+    # fig.show()
     return fig
+    
+# def create_status_chart(graphData):
+#     graphData= graphData.groupby(['to', f"alarm name"]).size().reset_index(name='cnt')
+#     red_status_days, yellow_status_days, grey_status_days = defineStatus(graphData, "alarm name", 'to')
+#     days = sorted(graphData['to'].unique())
+#     colors = []
+#     for day in days:
+#         if day in red_status_days:
+#             colors.append('darkred')
+#         elif day in yellow_status_days:
+#             colors.append('goldenrod')
+#         elif day in grey_status_days:
+#             colors.append('grey')
+#         else:
+#             colors.append('green')
+
+#     # Create the figure
+#     fig = go.Figure()
+#     # Add dots (markers) for each date
+#     fig.add_trace(go.Scatter(
+#         x=days,
+#         y=[1]*len(days),  # Constant y-value to make a straight line
+#         mode='markers',
+#         marker=dict(
+#             color=colors,
+#             size=16,
+#             symbol='circle',
+#             opacity=0.9
+#         ),
+#         name='Status'
+#     ))
+#     fig.update_xaxes(
+#         tickangle = 45
+#         )
+#     # Customize layout
+#     fig.update_layout(
+#         title=dict(text='Daily Status Overview',
+#                    font=dict(
+#                        size=14
+#                        )
+#                    ),
+#         margin=dict(l=0, r=0, t=25, b=0),
+        
+#         yaxis=dict(visible=False),  # Hide y-axis as it's just for visual spacing
+#         showlegend=False
+#     )
+#     return fig
 
 @dash.callback(
     [
@@ -1102,3 +1195,153 @@ def buildGraphComponents(alarmData, dateFrom, dateTo, event, pivotFrames):
                                    src_site=alarmData['src_site'], dest_site=alarmData['dest_site'])
   otherAlarms = alarmsInst.formatOtherAlarms(data)
   return throughput_graph_components(alarmData, df, otherAlarms)
+
+def create_horizontal_bar_chart(df, fromD, toD):
+    print(f"fromD: {fromD}, toD: {toD}")
+    df = df.groupby(['to', f"{'alarm name'}"]).size().reset_index(name='count')
+    # graphData['percentage'] = graphData['count'].transform(lambda x: x / x.sum() * 100)
+    df.rename(columns={'to':'day'}, inplace=True)
+    df['day'] = pd.to_datetime(df['day'])
+    
+    # Create complete date range
+    all_dates = pd.date_range(start=fromD, end= pd.to_datetime(toD)-timedelta(days=1))
+
+
+    # Get all unique alarm names
+    alarm_names = df['alarm name'].unique()
+    status_colors = {
+        'bandwidth decreased from multiple': ('darkred','critical'),
+        'path changed': ('goldenrod', 'significant'),
+        'firewall issue': ('grey', 'moderate'),
+        'source cannot reach any': ('grey', 'moderate'),
+        'complete packet loss': ('grey', 'moderate')
+    }
+    # Create a pivot table with alarm names as rows and dates as columns
+    pivot_df = df.pivot_table(
+        index='alarm name',
+        columns='day',
+        values='count',
+        aggfunc='sum',
+        fill_value=0
+    ).reindex(columns=all_dates, fill_value=0)
+    
+    # Create the figure
+    fig = go.Figure()
+    
+    # Add a bar segment for each date for each alarm
+    for alarm in alarm_names:
+        for i, date in enumerate(all_dates):
+            count = pivot_df.loc[alarm, date]
+            color, influence = 'green', 'None'
+            if count >= 1:
+                if alarm in status_colors:
+                    color, influence = status_colors[alarm][0], status_colors[alarm][1]
+                else:
+                    color, influence = 'lightgrey', 'insignificant' 
+            
+            fig.add_trace(go.Bar(
+                y=[alarm],
+                x=[1],  # Each segment has width 1
+                orientation='h',
+                marker=dict(color=color),
+                name=date.strftime('%Y-%m-%d'),
+                hoverinfo='text',
+                hovertext=f"Alarm: {alarm}<br>Date: {date.strftime('%Y-%m-%d')}<br>Count: {count}<br>Impact: {influence}",
+                width=0.8,
+                base=i  # Position along the x-axis
+            ))
+    
+    # Customize layout
+    fig.update_layout(
+        title='Alarm Status by Day',
+        barmode='stack',
+        xaxis=dict(
+            visible=True,
+            tickvals=list(range(len(all_dates))),
+            ticktext=[date.strftime('%d %b') for date in all_dates],
+            title='Days'
+        ),
+        height=150 + 30 * len(alarm_names),  # Dynamic height based on number of alarms
+        # margin=dict(l=150, r=20, t=40, b=20),  # Extra left margin for alarm names
+        showlegend=False
+    )
+    fig.update_yaxes(ticklabelposition="inside", title=dict(text="Alarms"), tickvals=list(range(len(alarm_names))), ticktext=alarm_names)
+    # fig.show()
+    return fig
+    
+# # @dash.callback(
+# #     Output("site-status-explanation", "style"),
+# #     Input("status-explanation-trigger", "n_clicks"),
+# #     State("site-status-explanation", "style")
+# # )
+# # def toggle_explanation(n_clicks, current_style):
+# #     if n_clicks and n_clicks > 0:
+# #         if current_style.get("display") == "none":
+# #             return {"display": "block"}
+# #         else:
+# #             return {"display": "none"}
+# #     return current_style
+
+
+
+# dash.clientside_callback(
+#     """
+#     function(alarmClicks, pathClicks, hostsClicks, measurementsClick) {
+#         const ctx = dash_clientside.callback_context;
+#         // Only proceed if something was triggered
+#         if (ctx.triggered.length > 1) return dash_clientside.no_update;
+        
+#         const triggered = ctx.triggered[0];
+#         console.log('Triggered by:', triggered.prop_id);
+
+#         // Check if measurements button was clicked
+#         if (triggered.prop_id === 'view-measurements-btn.n_clicks') {
+#             setTimeout(() => {
+#                 const element = document.getElementById('site-measurements');
+#                 if (element) {
+#                     element.scrollIntoView({
+#                         behavior: 'smooth',
+#                         block: 'start'
+#                     });
+#                 }
+#             }, 300);
+#         } 
+#         // Handle pattern-matched buttons (original logic)
+#         else {
+#             const isInitialLoad = triggered.prop_id === '.' && triggered.value === null;
+#             if (!isInitialLoad) {
+#                 setTimeout(() => {
+#                     const element = document.getElementById('alarm-content-section');
+#                     if (element) {
+#                         const yOffset = -100;
+#                         const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+#                         window.scrollTo({top: y, behavior: 'smooth'});
+#                     }
+#                 }, 350);
+#             }
+#         }
+#         return dash_clientside.no_update;
+#     }
+#     """,
+#     Output('scroll-trigger', 'children'),
+#     [
+#         Input({'type': 'alarm-link-btn', 'index': ALL}, 'n_clicks'),
+#         Input({'type': 'path-anomaly-btn', 'index': ALL}, 'n_clicks'),
+#         Input({'type': 'hosts-not-found-btn', 'index': ALL}, 'n_clicks'),
+#         Input('view-measurements-btn', 'n_clicks'),
+#     ],
+#     prevent_initial_call=True
+# )
+# @dash.callback(
+#     Output("site-status-explanation", "children"),  # This can be any output you're not using
+#     Input("status-explanation-trigger", "n_clicks"),
+#     prevent_initial_call=True
+# )
+# def scroll_to_explanation(n_clicks):
+#     print(n_clicks)
+#     ctx = dash.callback_context
+#     print(f"ctx.triggered: {ctx.triggered}")
+#     # ctx.triggered: [{'prop_id': 'status-explanation-trigger.n_clicks', 'value': 1}]
+#     if n_clicks:
+#         return dcc.Location(id="dummy-location", pathname="site_report/MWT2_IU#site-status-explanation")
+#     return None
