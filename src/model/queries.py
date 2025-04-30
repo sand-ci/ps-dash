@@ -246,7 +246,7 @@ def queryAlarms(dateFrom, dateTo):
             }
         }
       }
-  # print(str(q).replace("\'", "\""))
+  print(str(q).replace("\'", "\""))
   try:
     result = scan(client=hp.es, index='aaas_alarms', query=q)
     data = {}
@@ -527,7 +527,7 @@ def queryTraceChanges(dateFrom, dateTo, asn=None):
 	  }
 	}
 
-  print(str(q).replace("\'", "\""))
+  # print(str(q).replace("\'", "\""))
   result = scan(client=hp.es, index='ps_traces_changes',query=q)
   data, positions, baseline, altPaths = [],[],[],[]
   positions = []
