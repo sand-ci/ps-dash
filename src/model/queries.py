@@ -516,7 +516,12 @@ def queryTraceChanges(dateFrom, dateTo, asn=None):
 	          "term": {
 	            "event.keyword": "ASN path anomalies"
 	          }
-	        }
+	        },
+          {
+            "exists": {
+              "field": "transitions"
+              }
+          }
 	      ]
 	    }
 	  }
