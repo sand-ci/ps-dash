@@ -452,16 +452,7 @@ class Alarms(object):
             df['alarm_link'] = df.apply(
               lambda row: f"<a class='btn btn-secondary' role='button' href='{request.host_url}hosts_not_found/{row['site']}' target='_blank'>VIEW IN A NEW TAB</a>" if row['site'] else '-', axis=1)
     else:
-        if 'alarm_link' in df.columns:
-            df['alarm_link'] = df['alarm_link'].apply(
-                lambda id: dbc.Button(
-                    "VIEW DETAILS",
-                    id={'type': 'alarm-link-btn', 'index': f"{id}, {event}"},
-                    className="btn btn-secondary",
-                    n_clicks=0
-                ) if id else '-'
-            )
-
+        
         if event == 'ASN path anomalies':
             df['alarm_link'] = df.apply(
                 lambda row: dbc.Button(
@@ -473,7 +464,7 @@ class Alarms(object):
                 axis=1
             )
 
-        if event == "hosts not found":
+        elif event == "hosts not found":
             df['alarm_link'] = df.apply(
                 lambda row: dbc.Button(
                     "VIEW DETAILS",
@@ -483,12 +474,16 @@ class Alarms(object):
                 ) if row['site'] else '-',
                 axis=1
             )  
-        # if event == "path changed":
-        #     df['alarm_link'] = df.apply(
-        #         lambda row: dbc.Button(
-        #             "VIEW DETAILS",
-        #             id={'type': 'path-changed-btn', 'index': f"{row['src_site']}*{row['dest_site']}"},
-        #     )
+        else:
+          if 'alarm_link' in df.columns:
+              df['alarm_link'] = df['alarm_link'].apply(
+                  lambda id: dbc.Button(
+                      "VIEW DETAILS",
+                      id={'type': 'alarm-link-btn', 'index': f"{id}, {event}"},
+                      className="btn btn-secondary",
+                      n_clicks=0
+                  ) if id else '-'
+              )
     return df
   
   @staticmethod

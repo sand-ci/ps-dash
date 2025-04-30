@@ -688,6 +688,7 @@ count-box {
     /* margin: -1rem -1rem 1rem -1rem !important; Counteracts the parent padding */
     width: calc(100% + 2rem) !important; /* Expands to full width including padding */
 }
+
 /* This ensures smooth scrolling behavior */
 /* html {
     scroll-behavior: smooth;
