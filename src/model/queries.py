@@ -439,7 +439,7 @@ def query_ASN_anomalies(src, dest):
   }
 
   # print(str(q).replace("\'", "\""))
-  fields = ['ipv6', 'src_netsite', 'dest_netsite', 'last_appearance_path', 'repaired_asn_path', 'asn_list', 'paths']
+  fields = ['ipv6', 'src_netsite', 'dest_netsite', 'last_appearance_path', 'repaired_asn_path', 'anomalies', 'paths']
   result = scan(client=hp.es, index='ps_traces_changes', query=q, source=fields)
 
   data = []
