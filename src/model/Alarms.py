@@ -348,7 +348,7 @@ class Alarms(object):
         if 'src_sites' in df.columns:
             df = self.replaceCol('src_sites', df, '\n')
         if 'dest_sites' in df.columns:
-            df = self.replaceCol('dest_sites', df, '\n'),
+            df = self.replaceCol('dest_sites', df, '\n')
         if 'anomalies' in df.columns:
             df['anomalies'] = df['anomalies'].apply(lambda x: ', '.join(map(str, x)))
             df.rename(columns={'anomalies': 'new ASN(s)'}, inplace=True)
