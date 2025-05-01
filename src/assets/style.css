@@ -6,10 +6,11 @@
 body{
     background-color: #f1efef;
     font-family: Arial, Helvetica, sans-serif;
+    font-size: 12px !important;
 }
 
 .subtitle {
-    font-size: 1.8em !important;
+    font-size: 1.5em !important;
     margin-bottom: 1rem;
 }
 
@@ -53,7 +54,7 @@ body{
 .navbar-light .navbar-nav .show>.nav-link {
     font-weight: 700;
     color: #eff5ff;
-    font-size: 2.5em;
+    font-size: 2.3em;
     transition: all 0.2s ease;
 }
 
@@ -147,14 +148,14 @@ body{
     max-width: 1550px !important;
   }
 
-.dash-table-container th {
+/* .dash-table-container th {
     border-left: 0px !important;
     border-right: 0px !important;
     border-top-color: white !important;
     border-bottom-color: white !important;
     background-color: #ebf1fd !important;
     color: black;
-}
+} */
 
 .dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner td div.dash-cell-value.cell-markdown, 
 .dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner th div.dash-cell-value.cell-markdown {
@@ -182,7 +183,7 @@ body{
     display: none;
 }
 
-.table-container th {
+.table-container th, .dash-table-container th {
     border-left: 0px !important;
     border-right: 0px !important;
     border-top-color: white !important;
@@ -211,7 +212,7 @@ body{
 }
 
 .site-alarms-tables .card-title {
-    font-size: 2.4rem;
+    font-size: 2.1rem;
     padding: 2rem;
     text-align: center;
 }
@@ -561,7 +562,7 @@ body{
     flex: 0.8;
     margin: 0 2px;
     min-height: 100px;
-    padding: 1%;
+    padding: 2%;
     text-align: center;
     color: rgb(47, 46, 46);
     background-color: #ffffff;
@@ -650,7 +651,7 @@ count-box {
 .status-title-cont {
     text-align: right;
     font-weight: 300;
-    font-size: 2.5em;
+    font-size: 2.1em;
     padding: 0 20px;
 }
 
