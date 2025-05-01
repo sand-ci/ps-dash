@@ -42,11 +42,12 @@ def get_dropdown_data(asn_anomalies, pivotFrames, changeDf):
 
     # ASNs
     unique_asns = pd.unique(asn_anomalies['anomalies'].explode()).tolist()
+    unique_asns = [str(a) for a in unique_asns if str(a) != 'nan']
     sortedDf = changeDf[changeDf['jumpedFrom'] > 0].sort_values('count')
     asnsDropdownData = list(set(sortedDf['diff'].unique().tolist() +
                                 sortedDf['jumpedFrom'].unique().tolist()))
     asnsDropdownData = list(set(asnsDropdownData + unique_asns))
-    asnsDropdownData = [{"label": str(a), "value": a} for a in sorted(asnsDropdownData, key=lambda x: str(x))]
+    asnsDropdownData = [{"label": str(a), "value": str(a)} for a in sorted(asnsDropdownData, key=lambda x: str(x))]
 
     print(f"Unique sites: {len(sitesDropdownData)}, Unique ASNs: {len(asnsDropdownData)}")
 
