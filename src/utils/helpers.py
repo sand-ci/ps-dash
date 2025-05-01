@@ -28,7 +28,7 @@ def ConnectES():
             es = Elasticsearch('https://localhost:9200', verify_certs=False, http_auth=credentials, max_retries=20)
         else:
             es = Elasticsearch([{'host': 'atlas-kibana.mwt2.org', 'port': 9200, 'scheme': 'https'}],
-                                timeout=240, http_auth=credentials, max_retries=10)
+                                http_auth=credentials, max_retries=10)
         print('Success' if es.ping()==True else 'Fail')
         return es
     except Exception as error:
