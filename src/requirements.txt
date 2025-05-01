@@ -2,7 +2,7 @@ dash>=2.9.3
 dash_bootstrap_components>=1.2.1
 dash_loading_spinners==1.0.0
 dask>=2023.5.0
-elasticsearch==8.3.1
+elasticsearch==8.18.0
 Flask>=2.1.2
 matplotlib>=3.7.1
 numpy>=1.22.4
