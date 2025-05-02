@@ -456,6 +456,33 @@ def query_ASN_anomalies(src, dest):
   return ddf
 
 
+def queryPathAnomaliesDetails(dateFrom, dateTo, idx='ps_traces_changes'):
+    query = {
+        "bool": {
+            "must": [
+                {"exists": {"field": "transitions"}},
+                  {
+                  "range": {
+                    "to_date": {
+                      "format": "strict_date_optional_time",
+                      "gte": dateFrom,
+                      # "lte": dateTo,
+                    }
+                  }
+                }
+            ]
+        }
+    }
+    res = hp.es.search(index=idx, query=query, size=10000)
+    # collect every transition record from every hit
+    records = []
+    for hit in res["hits"]["hits"]:
+        for t in hit["_source"].get("transitions", []):
+            records.append(t)
+    df = pd.DataFrame(records).drop_duplicates()
+    return df
+
+
 def queryTraceChanges(dateFrom, dateTo, asn=None):
   dateFrom = hp.convertDate(dateFrom)
   dateTo = hp.convertDate(dateTo)

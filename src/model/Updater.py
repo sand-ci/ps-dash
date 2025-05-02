@@ -38,17 +38,19 @@ class ParquetUpdater(object):
                 self.storeMetaData()
                 self.cacheIndexData()
                 self.storeAlarms()
+                self.storeASNPathChanged()
                 self.storePathChangeDescDf()
                 # self.storeThroughputDataAndModel()
                 # self.storePacketLossDataAndModel()
 
             # Set the schedulers
+            Scheduler(60*60*12, self.storeMetaData)
             Scheduler(60*60, self.cacheIndexData)
             Scheduler(60*30, self.storeAlarms)
+            Scheduler(60*60*12, self.storeASNPathChanged)
             Scheduler(60*30, self.storePathChangeDescDf)
-            Scheduler(60*60*12, self.storeMetaData)
-            # Scheduler(60*60*12, self.storeThroughputDataAndModel)
-            # Scheduler(60*60*12, self.storePacketLossDataAndModel)
+            Scheduler(60*60*12, self.storeThroughputDataAndModel)
+            Scheduler(60*60*12, self.storePacketLossDataAndModel)
         except Exception as e:
             print(traceback.format_exc())
 
@@ -192,6 +194,13 @@ class ParquetUpdater(object):
             if len(fdf)>0:
                 self.pq.writeToFile(df, f"parquet/pivot/{filename}.parquet")
                 self.pq.writeToFile(fdf, f"parquet/frames/{filename}.parquet")
+
+    @timer
+    def storeASNPathChanged(self):
+        dateFrom, dateTo = hp.defaultTimeRange(2)
+        df = qrs.queryPathAnomaliesDetails(dateFrom, dateTo)
+        self.pq.writeToFile(df, f"parquet/asn_path_changes.parquet")
+                
 
 
     @staticmethod
