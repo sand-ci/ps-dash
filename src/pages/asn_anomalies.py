@@ -36,14 +36,19 @@ dash.register_page(
 
 
 def layout(q=None, **other_unknown_query_strings):
+    params = q.split('&') if q else []
+    query_params = {param.split('=')[0]: param.split('=')[1] for param in params}
+    src = query_params.get('src_netsite')
+    dest = query_params.get('dest_netsite')
+    # dt = query_params.get('dt')
+
     return html.Div([
         dcc.Location(id='url', refresh=False),
         dcc.Store(id='alarm-data-store'),
         html.Div(id='asn-anomalies-content'),
         html.Div([
           html.Div([
-            html.H1(f"The most recent ASN paths"),
-            html.P('The plot shows new ASNs framed in white. The data is based on the alarms of type "ASN path anomalies"', style={"font-size": "1.2rem"})
+            html.H2(f"{src} → {dest}"),
           ], className="l-h-3 p-2"),
           dcc.Loading(id='loading-spinner', type='default', children=[
               html.Div(id='asn-anomalies-graphs')
@@ -99,9 +104,15 @@ def update_graphs(query_params):
                     ipv4_figure = generate_plotly_heatmap_with_anomalies(data)
         
                     figures =  html.Div([
-                        dbc.Row([
-                            dbc.Col(dcc.Graph(figure=ipv4_figure, id="asn-sankey-ipv4")),
-                            dbc.Col(dcc.Graph(figure=get_heatmap_fig(src, dest, dt, -1), id="asn-path-prob-ipv4")),
+                        html.Div([
+                            dbc.Col([
+                                dcc.Graph(figure=ipv4_figure, id="asn-sankey-ipv4"),
+                                html.P('This is a sample of the paths between the pair of sites. The plot shows new (anomalous) ASNs framed in white. The data is based on the alarms of type "ASN path anomalies"', style={"font-size": "1.8rem"})
+                            ], lg=12, xl=12, xxl=12),
+                            dbc.Col([
+                                dcc.Graph(figure=get_heatmap_fig(src, dest, dt, -1), id="asn-path-prob-ipv4"),
+                                html.P('The plot shows how often each ASN appears on a position, where 1 is 100% of time."', style={"font-size": "1.8rem"})
+                            ], lg=12, xl=12, xxl=12),
                         ], className="graph-pair")
                     ], className="responsive-graphs")
 
@@ -120,53 +131,10 @@ def get_heatmap_fig(src, dest, dt, ipv) -> go.Figure:
     """
     Fetch the document with this alarm_id, and render its heatmap.
     """
-    ipv_str = None
-    if ipv >= 0:
-        ipv_str = {
-            "term": {
-                "ipv6": ipv
-            }
-        }
+    doc = qrs.query_ASN_paths_pos_probs(src, dest, dt, ipv)
 
-    try:
-        q = {
-                "bool": {
-                      "must": [
-                        {
-                          "exists": {
-                            "field": "transitions"
-                          }
-                        },
-                        {
-                          "range": {
-                            "to_date": {
-                              "gte": dt,
-                              "format": "strict_date_optional_time"
-                            }
-                          }
-                        },
-                        {
-                          "term": {
-                            "src_netsite.keyword": src
-                          }
-                        },
-                        {
-                          "term": {
-                            "dest_netsite.keyword": dest
-                          }
-                        },
-                        *([ipv_str] if ipv_str else [])
-                      ]
-                    }
-          }
-        # print(str(q).replace('\'', '"'))
-        res = hp.es.search(index='ps_traces_changes', query=q)
-    except Exception:
-        # not found / error
-        return go.Figure()
-
-    doc = res['hits']['hits'][0]["_source"]
     hm  = doc["heatmap"]
+    ipv = 'IPv6' if doc['ipv6'] else 'IPv4'
 
     fig = go.Figure(go.Heatmap(
         z=hm["probs"],
@@ -175,12 +143,12 @@ def get_heatmap_fig(src, dest, dt, ipv) -> go.Figure:
         colorscale=[[0.0, "white"], [0.001, "#caf0f8"], [0.5, "#00b4d8"], [1.0, "#03045e"]],\
         zmin=0, zmax=1,
         xgap=1, ygap=1,
-        hovertemplate="ASN %{y}<br>Position %{x}<br>Prob %{z:.2%}<extra></extra>"
+        hovertemplate="ASN %{y}<br>Position %{x}<br>Frequency: %{z:.2%}<extra></extra>"
     ))
     fig.update_layout(
         title=(
-            f"{doc['src_netsite']} → {doc['dest_netsite']}  "
-            f"(IPv6={doc['ipv6']}), anomalies={doc['anomalies']}"
+            f"{doc['src_netsite']} → {doc['dest_netsite']} for "
+            f"{ipv} paths, anomalies={doc['anomalies']}"
         ),
         xaxis_title="Position in Path",
         yaxis_title="ASN",
@@ -267,7 +235,7 @@ def generate_plotly_heatmap_with_anomalies(subset_sample):
                     )
 
     fig.update_layout(
-        title=f"ASN path signature between {src_site} and {dest_site} for {ipv} paths",
+        title=f"ASN path signature: {src_site} → {dest_site} for {ipv} paths",
         xaxis_title='Position',
         yaxis_title='Path Observation Date',
         margin=dict(r=150),
