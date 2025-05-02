@@ -8,8 +8,10 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
+import dash_bootstrap_components as dbc
 
 import model.queries as qrs
+import utils.helpers as hp
 
 urllib3.disable_warnings()
 
@@ -73,7 +75,8 @@ def update_graphs(query_params):
     if query_params:
         src = query_params.get('src_netsite')
         dest = query_params.get('dest_netsite')
-        print(src, dest)
+        dt = query_params.get('dt')
+        print(src, dest, dt)
         if src and dest:
             data = qrs.query_ASN_anomalies(src, dest)
 
@@ -81,13 +84,26 @@ def update_graphs(query_params):
                 if len(data['ipv6'].unique()) == 2:
                     ipv6_figure = generate_plotly_heatmap_with_anomalies(data[data['ipv6'] == True])
                     ipv4_figure = generate_plotly_heatmap_with_anomalies(data[data['ipv6'] == False])
-                    figures = [
-                        dcc.Graph(figure=ipv4_figure, id="asn-sankey-ipv4"),
-                        dcc.Graph(figure=ipv6_figure, id="asn-sankey-ipv6")
-                    ]
+                    
+                    figures = html.Div([
+                        dbc.Row([
+                            dcc.Graph(figure=ipv4_figure, id="asn-sankey-ipv4"),
+                            dcc.Graph(figure=get_heatmap_fig(src, dest, dt, 0), id="asn-path-prob-ipv4"),
+                        ], className="graph-pair"),
+                        dbc.Row([
+                            dcc.Graph(figure=ipv6_figure, id="asn-sankey-ipv6"),
+                            dcc.Graph(figure=get_heatmap_fig(src, dest, dt, 1), id="asn-path-prob-ipv6"),
+                        ], className="graph-pair"),
+                    ], className="responsive-graphs")
                 else:
-                    figure = generate_plotly_heatmap_with_anomalies(data)
-                    figures = [dcc.Graph(figure=figure, id="asn-sankey-ipv4")]
+                    ipv4_figure = generate_plotly_heatmap_with_anomalies(data)
+        
+                    figures =  html.Div([
+                        dbc.Row([
+                            dbc.Col(dcc.Graph(figure=ipv4_figure, id="asn-sankey-ipv4")),
+                            dbc.Col(dcc.Graph(figure=get_heatmap_fig(src, dest, dt, -1), id="asn-path-prob-ipv4")),
+                        ], className="graph-pair")
+                    ], className="responsive-graphs")
 
                 return html.Div(figures)
             else:
@@ -96,6 +112,82 @@ def update_graphs(query_params):
                     html.P('No data was found for the alarm selected. Please try another alarm.', style={"font-size": "1.2rem"})
                 ], className="l-h-3 p-2 boxwithshadow page-cont ml-1 p-1")
     return html.Div()
+
+
+
+
+def get_heatmap_fig(src, dest, dt, ipv) -> go.Figure:
+    """
+    Fetch the document with this alarm_id, and render its heatmap.
+    """
+    ipv_str = None
+    if ipv >= 0:
+        ipv_str = {
+            "term": {
+                "ipv6": ipv
+            }
+        }
+
+    try:
+        q = {
+                "bool": {
+                      "must": [
+                        {
+                          "exists": {
+                            "field": "transitions"
+                          }
+                        },
+                        {
+                          "range": {
+                            "to_date": {
+                              "gte": dt,
+                              "format": "strict_date_optional_time"
+                            }
+                          }
+                        },
+                        {
+                          "term": {
+                            "src_netsite.keyword": src
+                          }
+                        },
+                        {
+                          "term": {
+                            "dest_netsite.keyword": dest
+                          }
+                        },
+                        *([ipv_str] if ipv_str else [])
+                      ]
+                    }
+          }
+        # print(str(q).replace('\'', '"'))
+        res = hp.es.search(index='ps_traces_changes', query=q)
+    except Exception:
+        # not found / error
+        return go.Figure()
+
+    doc = res['hits']['hits'][0]["_source"]
+    hm  = doc["heatmap"]
+
+    fig = go.Figure(go.Heatmap(
+        z=hm["probs"],
+        x=[f"pos {p}" for p in hm["positions"]],
+        y=[str(a)   for a in hm["asns"]],
+        colorscale=[[0.0, "white"], [0.001, "#caf0f8"], [0.5, "#00b4d8"], [1.0, "#03045e"]],\
+        zmin=0, zmax=1,
+        xgap=1, ygap=1,
+        hovertemplate="ASN %{y}<br>Position %{x}<br>Prob %{z:.2%}<extra></extra>"
+    ))
+    fig.update_layout(
+        title=(
+            f"{doc['src_netsite']} → {doc['dest_netsite']}  "
+            f"(IPv6={doc['ipv6']}), anomalies={doc['anomalies']}"
+        ),
+        xaxis_title="Position in Path",
+        yaxis_title="ASN",
+        height=500, margin=dict(t=80, l=80, r=80, b=50)
+    )
+
+    return fig
 
 
 def generate_plotly_heatmap_with_anomalies(subset_sample):
