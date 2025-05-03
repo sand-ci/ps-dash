@@ -244,11 +244,16 @@ body{
 .sites-anomalies-title {
     font-weight: bold;
     font-size: 1.3em;
-    color: #00245A;
+    color: #33363b;
 }
 
 .responsive-graphs {
     margin-bottom: 2rem;
+}
+
+.card-title {
+    font-family: Consolas !important;
+    color: #353535;
 }
 
 @media (min-width: 1700px) {

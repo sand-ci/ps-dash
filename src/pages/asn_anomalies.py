@@ -98,17 +98,17 @@ def generate_asn_cards(asn_data):
     cards = [
         dbc.Card(
             dbc.CardBody([
-                html.H2(f"AS {asn['asn']}", className="card-title plot-subtitle text-left", style={"color": "black"}),
+                html.H2(f"AS {asn['asn']}", className="card-title plot-subtitle text-left"),
                 html.P(f"{asn['owner']}", className="card-text plot-subtitle text-left"),
             ]),
-            className="mb-3 shadow-sm",
-            style={"height": "100px", "width": "100%", "overflow": "hidden", "display": "flex", "flexDirection": "column", "justifyContent": "space-between"}
+            className="mb-3 shadow-sm h-100",
+            style={"width": "100%", "overflow": "hidden", "display": "flex", "flexDirection": "column", "justifyContent": "space-between"}
         )
         for asn in asn_data
     ]
 
-    # Wrap cards in a responsive grid
-    return dbc.Row([dbc.Col(card, lg=2, md=2, sm=3) for card in cards], className="g-3")
+    # Wrap cards in a responsive grid with align-items-stretch
+    return dbc.Row([dbc.Col(card, lg=2, md=2, sm=3, className="d-flex") for card in cards], className="g-3 align-items-stretch")
 
 
 def generate_graphs(data, src, dest, dt):
