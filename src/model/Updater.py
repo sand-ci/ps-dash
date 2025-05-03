@@ -49,8 +49,8 @@ class ParquetUpdater(object):
             Scheduler(60*30, self.storeAlarms)
             Scheduler(60*60*12, self.storeASNPathChanged)
             Scheduler(60*30, self.storePathChangeDescDf)
-            Scheduler(60*60*12, self.storeThroughputDataAndModel)
-            Scheduler(60*60*12, self.storePacketLossDataAndModel)
+            # Scheduler(60*60*12, self.storeThroughputDataAndModel)
+            # Scheduler(60*60*12, self.storePacketLossDataAndModel)
         except Exception as e:
             print(traceback.format_exc())
 
@@ -238,7 +238,7 @@ class ParquetUpdater(object):
 
     @timer
     def storePathChangeDescDf(self):
-        dateFrom, dateTo = hp.defaultTimeRange(days=2)
+        dateFrom, dateTo = hp.defaultTimeRange(days=1)
         chdf, posDf, baseline = qrs.queryTraceChanges(dateFrom, dateTo)[:3]
 
         try:
