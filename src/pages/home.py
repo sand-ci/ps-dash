@@ -2,7 +2,7 @@ import numpy as np
 import dash
 from dash import Dash, dash_table, dcc, html
 import dash_bootstrap_components as dbc
-import dash_bootstrap_components as dbc
+
 from dash.dependencies import Input, Output, State
 
 import plotly.graph_objects as go
@@ -317,7 +317,7 @@ def explainStatuses():
 
   # this way we can then have network like this:
   # if 'bandwidth decreased from multiple' -> red
-  # elif 'path changed' -> yellow
+  # elif 'ASN path anomalies' -> yellow
   # elif Infrastructure = 'red' -> grey
   # else -> green
 
@@ -335,7 +335,7 @@ def explainStatuses():
   {
     'status category': 'Global',
       'resulted status': '🟡',
-      'considered alarm types': '\n'.join(['path changed']),
+      'considered alarm types': '\n'.join(['ASN path anomalies']),
       'trigger': 'any type has > 0 alarms'
   },
   {
@@ -681,47 +681,51 @@ def create_bar_chart(graphData):
 # '''Takes selected site from the dropdpwn and generates a Dash datatable'''
 def generate_tables(frame, unpacked, event, alarmsInst):
     ids = unpacked['id'].values
+
     dfr = frame[frame.index.isin(ids)]
     dfr = alarmsInst.formatDfValues(dfr, event)
+    
     dfr.sort_values('to', ascending=False, inplace=True)
-    print('Home page,', event, "Number of alarms:", len(dfr))
+
+    # Replace NaN or empty values with valid defaults
+    dfr = dfr.fillna("")  # Replace NaN with an empty string for all columns
+    dfr = dfr.astype({col: str for col in dfr.select_dtypes(include=['object', 'category']).columns})  # Ensure all object columns are strings
 
     try:
         element = html.Div([
-                    html.Br(),
-                    html.H3(event.upper()),
-                    dash_table.DataTable(
-                        data=dfr.to_dict('records'),
-                        columns=[{"name": i, "id": i, "presentation": "markdown"} for i in dfr.columns],
-                        markdown_options={"html": True},
-                        id=f'search-tbl-{event}',
-                        page_current=0,
-                        page_size=10,
-                        style_cell={
-                            'padding': '2px',
-                            'font-size': '13px',
-                            'whiteSpace': 'pre-line'
-                            },
-                        style_header={
-                            'backgroundColor': 'white',
-                            'fontWeight': 'bold'
-                        },
-                        style_data={
-                            'height': 'auto',
-                            'lineHeight': '15px',
-                            'overflowX': 'auto'
-                        },
-                        style_table={
-                        'overflowY': 'auto',
-                        'overflowX': 'auto'
-                        },
-                        filter_action="native",
-                        filter_options={"case": "insensitive"},
-                        sort_action="native",
-                    ),
-                ], className='single-table')
+            html.Br(),
+            html.H3(event.upper()),
+            dash_table.DataTable(
+                data=dfr.to_dict('records'),
+                columns=[{"name": i, "id": i, "presentation": "markdown"} for i in dfr.columns],
+                markdown_options={"html": True},
+                id=f'search-tbl-{event.replace(" ", "-")}',  # Replace spaces with dashes for consistency
+                page_current=0,
+                page_size=10,
+                style_cell={
+                    'padding': '2px',
+                    'font-size': '13px',
+                    'whiteSpace': 'pre-line'
+                },
+                style_header={
+                    'backgroundColor': 'white',
+                    'fontWeight': 'bold'
+                },
+                style_data={
+                    'height': 'auto',
+                    'lineHeight': '15px',
+                    'overflowX': 'auto'
+                },
+                style_table={
+                    'overflowY': 'auto',
+                    'overflowX': 'auto'
+                },
+                filter_action="native",
+                filter_options={"case": "insensitive"},
+                sort_action="native",
+            ),
+        ], className='single-table')
         return element
     except Exception as e:
         print('dash_table.DataTable expects each cell to contain a string, number, or boolean value', e)
         return html.Div()
-

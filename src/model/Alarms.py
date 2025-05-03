@@ -107,11 +107,7 @@ class Alarms(object):
   @staticmethod
   def oneInBothWaysUnfold(odf):
     data = []
-    # the field name changed on the DB side
-    if 'dest_loss%' in odf.columns and 'src_loss%' in odf.columns:
-      odf['dest_loss%'] = odf['dest_loss%'].fillna(odf['dest_loss'])
-      odf['src_loss%'] = odf['src_loss%'].fillna(odf['src_loss'])
-      odf.drop(columns=['dest_loss', 'src_loss'], inplace=True)
+    print(odf.columns)
 
     for r in odf.to_dict('records'):
       for i, dest_site in enumerate(r['dest_sites']):
@@ -123,8 +119,8 @@ class Alarms(object):
           'id': r['id'],
           'tag': r['tag'][0]
         }
-        if 'dest_loss%' in r.keys():
-          rec['dest_loss%'] = r['dest_loss%'][i]
+        if 'dest_loss' in r.keys():
+          rec['dest_loss'] = r['dest_loss'][i]
         elif 'dest_change' in r.keys():
           rec['dest_change'] = r['dest_change'][i]
 
@@ -142,8 +138,8 @@ class Alarms(object):
           'id': r['id'],
           'tag': r['tag'][0]
         }
-        if 'src_loss%' in r.keys():
-          rec['src_loss%'] = r['src_loss%'][i]
+        if 'src_loss' in r.keys():
+          rec['src_loss'] = r['src_loss'][i]
         elif 'src_change' in r.keys():
           rec['src_change'] = r['src_change'][i]
 
@@ -336,13 +332,13 @@ class Alarms(object):
             # df.drop('src_change', axis=1, inplace=True)
             df.drop('src_sites', axis=1, inplace=True)
 
-        if 'dest_loss%' in df.columns:
-            df['to_dest_loss'] = df[['dest_sites', 'dest_loss%']].apply(lambda x: self.list2str(x, ''), axis=1)
-            df.drop('dest_loss%', axis=1, inplace=True)
+        if 'dest_loss' in df.columns:
+            df['to_dest_loss'] = df[['dest_sites', 'dest_loss']].apply(lambda x: self.list2str(x, ''), axis=1)
+            df.drop('dest_loss', axis=1, inplace=True)
             df.drop('dest_sites', axis=1, inplace=True)
-        if 'src_loss%' in df.columns:
-            df['from_src_loss'] = df[['src_sites', 'src_loss%']].apply(lambda x: self.list2str(x, ''), axis=1)
-            df.drop('src_loss%', axis=1, inplace=True)
+        if 'src_loss' in df.columns:
+            df['from_src_loss'] = df[['src_sites', 'src_loss']].apply(lambda x: self.list2str(x, ''), axis=1)
+            df.drop('src_loss', axis=1, inplace=True)
             df.drop('src_sites', axis=1, inplace=True)
 
         if 'src_sites' in df.columns:
@@ -441,10 +437,10 @@ class Alarms(object):
     try:
       for k, v in alarm['source'].items():
           field = '%{'+k+'}' if not k == 'avg_value' else 'p{'+k+'}'
-          if k == 'dest_loss%':
-            field = '%{dest_loss}'
-          elif k == 'src_loss%':
-            field = '%{src_loss}'
+          if k == 'dest_loss':
+            field = '{dest_loss}'
+          elif k == 'src_loss':
+            field = '{src_loss}'
           if k == '%change':
             field = '%{%change}%'
           if k == 'change':
