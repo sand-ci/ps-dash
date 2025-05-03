@@ -242,6 +242,9 @@ def build_anomaly_heatmap(subset_sample):
     index_to_color = {i: color_list[i] for i in range(len(color_list))}
     hover_bgcolor = np.array([index_to_color.get(z, '#FFFFFF') for row in index_df.values for z in row]).reshape(index_df.shape)
 
+    # Ensure customdata values are strings
+    customdata = pivot_df.applymap(lambda x: str(int(x)) if pd.notna(x) else "").values
+
     fig = go.Figure()
     heatmap = go.Heatmap(
         z=index_df.values,
@@ -251,7 +254,7 @@ def build_anomaly_heatmap(subset_sample):
         zmin=0,
         zmax=len(unique_rids),
         xgap=0.5, ygap=0.5,
-        customdata=pivot_df.values,
+        customdata=customdata,  # Use formatted customdata
         hoverlabel=dict(bgcolor=hover_bgcolor),
         hovertemplate="<b>Position: %{x}</b><br><b>ASN: %{customdata}</b><extra></extra>",
         showscale=False,
