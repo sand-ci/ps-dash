@@ -79,7 +79,7 @@ def layout(q=None, **other_unknown_query_strings):
       kibanaIframe = []
       if alarm['event'] == 'high packet loss on multiple links':
         if len(alrmContent["dest_sites"])>0:
-          original_names = metaDf[metaDf['netsite'].isin(alrmContent["dest_sites"])]['netsite_original'].unique()
+          original_names = metaDf[metaDf['netsite'].isin(alrmContent["dest_sites"])]['netsite'].unique()
           dest_sites = str(list(s for s in set(original_names))).replace('\'', '"').replace('[','').replace(']','').replace(',', ' OR')
           query = f'src_host: {alrmContent["host"]} and {fieldName["dest"]}:({dest_sites})'
           url = f'https://atlas-kibana.mwt2.org:5601/s/networking/app/dashboards?auth_provider_hint=anonymous1#/view/ee5a6310-8c40-11ed-8156-b9b28813464d?embed=true&_g=(filters%3A!()%2CrefreshInterval%3A(pause%3A!t%2Cvalue%3A0)%2Ctime%3A{timeRange})&show-query-input=true&show-time-filter=true&hide-filter-bar=true&_a=(query:(language:kuery,query:\'{query}\'))'
@@ -90,7 +90,7 @@ def layout(q=None, **other_unknown_query_strings):
             ], className="boxwithshadow pair-details g-0 mb-1 p-3"))
         
         if len(alrmContent["src_sites"]) > 0:
-          original_names = metaDf[metaDf['netsite'].isin(alrmContent["src_sites"])]['netsite_original'].unique()
+          original_names = metaDf[metaDf['netsite'].isin(alrmContent["src_sites"])]['netsite'].unique()
           src_sites = str(list(s for s in set(original_names))).replace('\'', '"').replace('[','').replace(']','').replace(',', ' OR')
           query = f'dest_host: {alrmContent["host"]} and {fieldName["src"]}:({src_sites})'
           url = f'https://atlas-kibana.mwt2.org:5601/s/networking/app/dashboards?auth_provider_hint=anonymous1#/view/920cd1f0-8c41-11ed-8156-b9b28813464d?embed=true&_g=(filters%3A!()%2CrefreshInterval%3A(pause%3A!t%2Cvalue%3A0)%2Ctime%3A{timeRange})&show-query-input=true&show-time-filter=true&_a=(query:(language:kuery,query:\'{query}\'))'
