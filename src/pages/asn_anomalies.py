@@ -89,20 +89,11 @@ def update_graphs_and_title(query_params):
 
 def addNetworkOwners(asn_list):
     owners = qrs.getASNInfo(asn_list)
-    customdata = []
-    for asn in asn_list:
-        asn = str(asn)
-        if asn in owners.keys():
-            customdata.append(f'{asn}: {owners[asn]}')
-        else:
-            customdata.append(f'{asn}: Unknown')
-    return customdata
+    asn_data = [{"asn": str(asn), "owner": owners.get(str(asn), "Unknown")} for asn in asn_list]
+    return asn_data
 
 
-def generate_asn_cards(asn_owners):
-    # Split ASN and owner into separate fields
-    asn_data = [{"asn": item.split(":")[0], "owner": item.split(":")[1].strip()} for item in asn_owners]
-
+def generate_asn_cards(asn_data):
     # Create a card for each ASN
     cards = [
         dbc.Card(
