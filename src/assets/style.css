@@ -230,6 +230,25 @@ body{
     font-size: 1.3em !important;
     margin: 1rem;
     text-align: center;
+    line-height: 1.2em;
+    font-weight: 200;
+    color: #858789;
+}
+
+.anomalies-title {
+    font-weight: normal; 
+    font-size: 1.1em; 
+    color: #aa0011;
+}
+
+.sites-anomalies-title {
+    font-weight: bold;
+    font-size: 1.3em;
+    color: #00245A;
+}
+
+.responsive-graphs {
+    margin-bottom: 2rem;
 }
 
 @media (min-width: 1700px) {
@@ -246,10 +265,6 @@ body{
         /* Each column takes 100% of the width */
         max-width: 100%;
     }
-}
-
-.site-title {
-    font-size: 3rem !important;
 }
 
 .badge {
