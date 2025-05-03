@@ -61,14 +61,12 @@ class Alarms(object):
             df = df.round(3)
 
           elif event in ['high packet loss',
-                         'path changed',
                          'ASN path anomalies',
                          'destination cannot be reached from any',
                          'source cannot reach any',
                          'bandwidth decreased',
                          'bandwidth increased',
                          'complete packet loss',
-                         'path changed between sites',
                          'hosts not found',
                          'unresolvable host']:
             df = self.list2rows(df)
@@ -403,8 +401,6 @@ class Alarms(object):
   def createAlarmURL(df, event):
     if event.startswith('bandwidth'):
           page = 'throughput/'
-    elif event == 'path changed':
-        page = 'paths/'
     elif event == 'ASN path anomalies':
         page = 'anomalous_paths/'
     elif event in ['firewall issue', 'complete packet loss', 'bandwidth decreased from/to multiple sites',

@@ -39,7 +39,7 @@ class ParquetUpdater(object):
                 self.cacheIndexData()
                 self.storeAlarms()
                 self.storeASNPathChanged()
-                self.storePathChangeDescDf()
+
                 # self.storeThroughputDataAndModel()
                 # self.storePacketLossDataAndModel()
 
@@ -48,7 +48,7 @@ class ParquetUpdater(object):
             Scheduler(60*60, self.cacheIndexData)
             Scheduler(60*30, self.storeAlarms)
             Scheduler(60*60*12, self.storeASNPathChanged)
-            Scheduler(60*30, self.storePathChangeDescDf)
+
             # Scheduler(60*60*12, self.storeThroughputDataAndModel)
             # Scheduler(60*60*12, self.storePacketLossDataAndModel)
         except Exception as e:
@@ -200,68 +200,6 @@ class ParquetUpdater(object):
         dateFrom, dateTo = hp.defaultTimeRange(2)
         df = qrs.queryPathAnomaliesDetails(dateFrom, dateTo)
         self.pq.writeToFile(df, f"parquet/asn_path_changes.parquet")
-                
-
-
-    @staticmethod
-    def descChange(chdf, posDf):
-        owners = qrs.getASNInfo(posDf['asn'].values.tolist())
-        owners['-1'] = 'OFF/Unavailable'
-        howPathChanged = []
-        for diff in chdf['diff'].values.tolist()[0]:
-
-            for pos, P in posDf[(posDf['asn'] == diff)][['pos', 'P']].values:
-                atPos = list(set(posDf[(posDf['pos'] == pos)]['asn'].values.tolist()))
-
-                if len(atPos) > 0:
-                    atPos.remove(diff)
-                    for newASN in atPos:
-                        if newASN not in [0, -1]:
-                            if P < 1:
-                                if str(newASN) in owners.keys():
-                                    owner = owners[str(newASN)]
-                                howPathChanged.append({'diff': diff,
-                                            'diffOwner': owners[str(diff)], 'atPos': pos,
-                                            'jumpedFrom': newASN, 'jumpedFromOwner': owner})
-                # the following check is covering the cases when the change happened at the very end of the path
-                # i.e. the only ASN that appears at that position is the diff detected
-                if len(atPos) == 0:
-                    howPathChanged.append({'diff': diff,
-                                        'diffOwner': owners[str(diff)], 'atPos': pos,
-                                        'jumpedFrom': 0, 'jumpedFromOwner': ''})
-
-        if len(howPathChanged) > 0:
-            return pd.DataFrame(howPathChanged).sort_values('atPos')
-
-        return pd.DataFrame()
-
-
-    @timer
-    def storePathChangeDescDf(self):
-        dateFrom, dateTo = hp.defaultTimeRange(days=1)
-        chdf, posDf, baseline = qrs.queryTraceChanges(dateFrom, dateTo)[:3]
-
-        try:
-            df = pd.DataFrame()
-            if len(chdf) > 0:
-                for p in posDf['pair'].unique():
-                    # print(p)
-                    temp = self.descChange(chdf[chdf['pair'] == p], posDf[posDf['pair'] == p])
-                    temp['src_site'] = baseline[baseline['pair'] == p]['src_site'].values[0]
-                    temp['dest_site'] = baseline[baseline['pair'] == p]['dest_site'].values[0]
-                    temp = self.descChange(chdf[chdf['pair'] == p], posDf[posDf['pair'] == p])
-                    if not temp.empty:
-                        temp['src_site'] = baseline[baseline['pair'] == p]['src_site'].values[0]
-                        temp['dest_site'] = baseline[baseline['pair'] == p]['dest_site'].values[0]
-                        temp['count'] = len(chdf[chdf['pair'] == p])
-                        df = pd.concat([df, temp])
-
-                df['jumpedFrom'] = df['jumpedFrom'].astype(int)
-                df['diff'] = df['diff'].astype(int)
-                self.pq.writeToFile(df, f"{self.location}prev_next_asn.parquet")
-        except Exception as e:
-            print(f"Error: {e}")
-            # print(traceback.format_exc())
 
 
     def createLocation(self, required_folders):

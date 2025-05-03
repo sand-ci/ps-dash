@@ -138,13 +138,6 @@ def update_output(start_date, end_date, sites, all, events, allevents, sitesStat
     alarmsInst = Alarms()
     frames, pivotFrames = alarmsInst.loadData(start_date, end_date)
 
-    # Drop that event because it is dominating the chart and "path changed" is a sumarized version of it
-    event_to_drop = 'path changed between sites'
-    if event_to_drop in frames:
-        del frames[event_to_drop]
-    if event_to_drop in pivotFrames:
-        del pivotFrames[event_to_drop]
-
     scntdf = pd.DataFrame()
     for e, df in pivotFrames.items():
         if len(df) > 0:

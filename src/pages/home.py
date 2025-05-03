@@ -85,9 +85,6 @@ def builMap(mapDf):
 
 @timer
 def generate_status_table(alarmCnt):
-    # remove the path changed between sites event because sites tend to show big numbers for this event
-    # and it dominates the table. Use the summary event "path changed" instead
-    alarmCnt = alarmCnt[alarmCnt['event'] != 'path changed between sites']
 
     red_sites = alarmCnt[(alarmCnt['event']=='bandwidth decreased from/to multiple sites')
             & (alarmCnt['cnt']>0)]['site'].unique().tolist()
@@ -537,9 +534,8 @@ def update_output(n_clicks, start_date, end_date, sites, all, events, allevents,
                     df = df[df['tag'] != ''].groupby('tag')[['id']].count().reset_index().rename(columns={'id': 'cnt', 'tag': 'site'})
                 else: df = df[df['site'] != ''].groupby('site')[['id']].count().reset_index().rename(columns={'id': 'cnt'})
                 
-                if e != 'path changed between sites':
-                    df['event'] = e
-                    scntdf = pd.concat([scntdf, df])
+                df['event'] = e
+                scntdf = pd.concat([scntdf, df])
 
         # sites
         graphData = scntdf
