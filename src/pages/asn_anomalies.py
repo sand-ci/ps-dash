@@ -77,52 +77,70 @@ def update_store(pathname):
     Input('alarm-data-store', 'data')
 )
 def update_graphs(query_params):
-    if query_params:
-        src = query_params.get('src_netsite')
-        dest = query_params.get('dest_netsite')
-        dt = query_params.get('dt')
-        print(src, dest, dt)
-        if src and dest:
-            data = qrs.query_ASN_anomalies(src, dest)
+    if not query_params:
+        return html.Div()
 
-            if len(data) > 0:
-                if len(data['ipv6'].unique()) == 2:
-                    ipv6_figure = generate_plotly_heatmap_with_anomalies(data[data['ipv6'] == True])
-                    ipv4_figure = generate_plotly_heatmap_with_anomalies(data[data['ipv6'] == False])
-                    
-                    figures = html.Div([
-                        dbc.Row([
-                            dcc.Graph(figure=ipv4_figure, id="asn-sankey-ipv4"),
-                            dcc.Graph(figure=get_heatmap_fig(src, dest, dt, 0), id="asn-path-prob-ipv4"),
-                        ], className="graph-pair"),
-                        dbc.Row([
-                            dcc.Graph(figure=ipv6_figure, id="asn-sankey-ipv6"),
-                            dcc.Graph(figure=get_heatmap_fig(src, dest, dt, 1), id="asn-path-prob-ipv6"),
-                        ], className="graph-pair"),
-                    ], className="responsive-graphs")
-                else:
-                    ipv4_figure = generate_plotly_heatmap_with_anomalies(data)
-        
-                    figures =  html.Div([
-                        html.Div([
-                            dbc.Col([
-                                dcc.Graph(figure=ipv4_figure, id="asn-sankey-ipv4"),
-                                html.P('This is a sample of the paths between the pair of sites. The plot shows new (anomalous) ASNs framed in white. The data is based on the alarms of type "ASN path anomalies"', style={"font-size": "1.8rem"})
-                            ], lg=12, xl=12, xxl=12),
-                            dbc.Col([
-                                dcc.Graph(figure=get_heatmap_fig(src, dest, dt, -1), id="asn-path-prob-ipv4"),
-                                html.P('The plot shows how often each ASN appears on a position, where 1 is 100% of time."', style={"font-size": "1.8rem"})
-                            ], lg=12, xl=12, xxl=12),
-                        ], className="graph-pair")
-                    ], className="responsive-graphs")
+    src = query_params.get('src_netsite')
+    dest = query_params.get('dest_netsite')
+    dt = query_params.get('dt')
 
-                return html.Div(figures)
-            else:
-                return html.Div([
-                    html.H1(f"No data found for alarm {src} to {dest}"),
-                    html.P('No data was found for the alarm selected. Please try another alarm.', style={"font-size": "1.2rem"})
-                ], className="l-h-3 p-2 boxwithshadow page-cont ml-1 p-1")
-    return html.Div()
+    if not (src and dest):
+        return html.Div()
+
+    data = qrs.query_ASN_anomalies(src, dest)
+    if len(data) == 0:
+        return html.Div([
+            html.H1(f"No data found for alarm {src} to {dest}"),
+            html.P('No data was found for the alarm selected. Please try another alarm.',
+                   className="plot-subtitle")
+        ], className="l-h-3 p-2 boxwithshadow page-cont ml-1 p-1")
+
+    anom_plot_message = (
+        'This is a sample of the paths between the pair of sites. '
+        'The plot shows new (anomalous) ASNs framed in white. '
+        'The data is based on the alarms of type "ASN path anomalies".'
+    )
+    pos_plot_message = (
+        'The plot shows how often each ASN appears on a position, '
+        'where 1 is 100% of time.'
+    )
+
+    def create_graphs(ipv6_filter):
+        heatmap_figure = generate_plotly_heatmap_with_anomalies(data[data['ipv6'] == ipv6_filter])
+        path_prob_figure = get_heatmap_fig(src, dest, dt, int(ipv6_filter))
+        return dbc.Row([
+            dbc.Col([
+                dcc.Graph(figure=heatmap_figure, id=f"asn-sankey-ipv{'6' if ipv6_filter else '4'}"),
+                html.P(anom_plot_message, className="plot-subtitle"),
+            ], lg=12, xl=12, xxl=6, align="top", className="responsive-col"),
+            dbc.Col([
+                dcc.Graph(figure=path_prob_figure, id=f"asn-path-prob-ipv{'6' if ipv6_filter else '4'}"),
+                html.P(pos_plot_message, className="plot-subtitle"),
+            ], lg=12, xl=12, xxl=6, align="top", className="responsive-col"),
+        ], className="graph-pair")
+
+    if len(data['ipv6'].unique()) == 2:
+        figures = html.Div([
+            create_graphs(False),  # IPv4
+            create_graphs(True),   # IPv6
+        ], className="responsive-graphs")
+    else:
+        heatmap_figure = generate_plotly_heatmap_with_anomalies(data)
+        path_prob_figure = get_heatmap_fig(src, dest, dt, -1)
+        figures = html.Div([
+            dbc.Row([
+                dbc.Col([
+                    dcc.Graph(figure=heatmap_figure, id="asn-sankey-ipv4"),
+                    html.P(anom_plot_message, className="plot-subtitle"),
+                ], lg=12, xl=12, xxl=6, align="top", className="responsive-col"),
+                dbc.Col([
+                    dcc.Graph(figure=path_prob_figure, id="asn-path-prob-ipv4"),
+                    html.P(pos_plot_message, className="plot-subtitle"),
+                ], lg=12, xl=12, xxl=6, align="top", className="responsive-col"),
+            ], className="graph-pair", justify="between"),
+        ], className="responsive-graphs")
+
+    return html.Div(figures)
 
 
 
@@ -140,19 +158,16 @@ def get_heatmap_fig(src, dest, dt, ipv) -> go.Figure:
         z=hm["probs"],
         x=[f"pos {p}" for p in hm["positions"]],
         y=[str(a)   for a in hm["asns"]],
-        colorscale=[[0.0, "white"], [0.001, "#caf0f8"], [0.5, "#00b4d8"], [1.0, "#03045e"]],\
+        colorscale=[[0.0, "white"], [0.001, "#caf0f8"], [0.4, "#00b4d8"], [0.9, "#03045e"], [1, "black"]],
         zmin=0, zmax=1,
-        xgap=1, ygap=1,
+        xgap=0.8, ygap=0.8,
         hovertemplate="ASN %{y}<br>Position %{x}<br>Frequency: %{z:.2%}<extra></extra>"
     ))
     fig.update_layout(
-        title=(
-            f"{doc['src_netsite']} → {doc['dest_netsite']} for "
-            f"{ipv} paths, anomalies={doc['anomalies']}"
-        ),
-        xaxis_title="Position in Path",
+        title=(f"{ipv} paths - position-based ASN frequency"),
+        xaxis_title="Position on Path",
         yaxis_title="ASN",
-        height=500, margin=dict(t=80, l=80, r=80, b=50)
+        height=600
     )
 
     return fig
@@ -205,6 +220,7 @@ def generate_plotly_heatmap_with_anomalies(subset_sample):
         colorscale=color_list,
         zmin=0,
         zmax=len(unique_rids),
+        xgap=0.5, ygap=0.5,
         customdata=pivot_df.values,
         hoverlabel=dict(bgcolor=hover_bgcolor),
         hovertemplate="<b>Position: %{x}</b><br><b>ASN: %{customdata}</b><extra></extra>",
@@ -235,7 +251,7 @@ def generate_plotly_heatmap_with_anomalies(subset_sample):
                     )
 
     fig.update_layout(
-        title=f"ASN path signature: {src_site} → {dest_site} for {ipv} paths",
+        title=f"{ipv} ASN paths",
         xaxis_title='Position',
         yaxis_title='Path Observation Date',
         margin=dict(r=150),

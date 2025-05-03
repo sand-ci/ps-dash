@@ -6,7 +6,7 @@
 body{
     background-color: #f1efef;
     font-family: Arial, Helvetica, sans-serif;
-    font-size: 12px !important;
+    font-size: 14px !important;
 }
 
 .subtitle {
@@ -224,6 +224,28 @@ body{
 .asn-header {
     background-color: #EEF6FC !important;
     color: rgb(9, 9, 9);
+}
+
+.plot-subtitle {
+    font-size: 1.3em !important;
+    margin: 1rem;
+    text-align: center;
+}
+
+@media (min-width: 1700px) {
+    .responsive-col {
+        flex: 0 0 48%;
+        /* Each column takes 48% of the width */
+        max-width: 48%;
+    }
+}
+
+@media (max-width: 1700px) {
+    .responsive-col {
+        flex: 0 0 100%;
+        /* Each column takes 100% of the width */
+        max-width: 100%;
+    }
 }
 
 .site-title {

@@ -194,6 +194,60 @@ def queryPathChanged(dateFrom, dateTo):
     return data
 
 
+def query_ASN_paths_pos_probs(src, dest, dt, ipv):
+  """
+  Fetch the document with this alarm_id, and render its heatmap.
+  """
+  try:
+      must_conditions = [
+          {
+            "exists": {
+              "field": "transitions"
+            }
+              },
+              {
+            "range": {
+              "to_date": {
+                "gte": dt,
+                "format": "strict_date_optional_time"
+              }
+            }
+              },
+              {
+            "term": {
+              "src_netsite.keyword": src
+            }
+              },
+              {
+            "term": {
+              "dest_netsite.keyword": dest
+            }
+          }
+      ]
+
+      if ipv != -1:
+          ipv_q = {
+            "term": {
+              "ipv6": ipv
+            }
+          }
+          must_conditions.append(ipv_q)
+
+      q = {
+          "bool": {
+          "must": must_conditions
+          }
+      }
+      # print(str(q).replace('\'', '"'))
+      res = hp.es.search(index='ps_traces_changes', query=q)
+  except Exception:
+      # not found / error
+      return []
+
+  doc = res['hits']['hits'][0]["_source"]
+  return doc
+
+
 
 def queryAlarms(dateFrom, dateTo):
   period = hp.GetTimeRanges(dateFrom, dateTo)
@@ -246,7 +300,7 @@ def queryAlarms(dateFrom, dateTo):
             }
         }
       }
-  print(str(q).replace("\'", "\""))
+  # print(str(q).replace("\'", "\""))
   try:
     result = scan(client=hp.es, index='aaas_alarms', query=q)
     data = {}
@@ -270,6 +324,9 @@ def queryAlarms(dateFrom, dateTo):
           if 'from' in desc.keys() and 'to' in desc.keys():
             desc['from'] = desc['from'].replace('T', ' ')
             desc['to'] = desc['to'].replace('T', ' ')
+          
+          if 'to_date' in desc.keys():
+             desc['to'] = desc['to_date'].split('T')[0]
 
           if 'avg_value%' in desc.keys():
               desc['avg_value'] = desc['avg_value%']
