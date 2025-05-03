@@ -12,6 +12,11 @@ import utils.helpers as hp
 import model.queries as qrs
 from model.Alarms import Alarms
 from utils.parquet import Parquet
+from flask_caching import Cache
+
+# Initialize Flask-Caching
+cache = Cache()
+cache.init_app(dash.get_app().server, config={"CACHE_TYPE": "SimpleCache"})
 
 
 def title():
@@ -58,8 +63,11 @@ def layout(**other_unknown_query_strings):
     frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
     period_to_display = hp.defaultTimeRange(days=2, datesOnly=True)
 
-    dataTables, parallel_cat_fig = load_initial_data(selected_keys, asn_anomalies)
-    heatmap_fig = create_anomalies_heatmap(asn_anomalies, dateFrom, dateTo)
+
+    dataTables = generate_data_tables(selected_keys, asn_anomalies)
+
+    heatmap_fig = get_heatmap_fig(asn_anomalies, dateFrom, dateTo)
+    parallel_cat_fig = get_parallel_cat_fig([], [])
 
     sitesDropdownData, asnsDropdownData = get_dropdown_data(asn_anomalies, pivotFrames)
 
@@ -80,7 +88,7 @@ def layout(**other_unknown_query_strings):
                 html.Div(id="asn-alarms-container", children=[
                     html.Div([
                         html.H1(f"ASN-path Anomalies Affected Links"),
-                        html.P('The plot shows the number new ASNs that appeared between two sites. The data is based on the alarms of type "ASN path anomalies"', style={"font-size": "1.2rem"})
+                        html.P('The plot shows the number of new ASNs that appeared between two sites. The data is based on the alarms of type "ASN path anomalies"', style={"font-size": "1.2rem"})
                     ], className="l-h-3 p-2"),
                     dcc.Loading(
                         dcc.Graph(figure=heatmap_fig, id="asn-heatmap", style={"max-width": "1000px", "margin": "0 auto"}),
@@ -167,7 +175,7 @@ def load_initial_data(selected_keys, asn_anomalies):
             df = pivotFrames[event]
             if len(df) > 0:
                 dataTables.append(generate_tables(frames[event], df, event, alarmsInst))
-    fig = build_parallel_categories_plot([], [])
+    fig = get_parallel_cat_fig([], [])
     return [dataTables, fig]
 
 
@@ -192,8 +200,8 @@ def update_figures(n_clicks, asnStateValue, sitesStateValue):
         sitesState = sitesStateValue if sitesStateValue else []
         asnState = asnStateValue if asnStateValue else []
 
-        parallel_cat_fig = build_parallel_categories_plot(sitesState, asnState)
-        heatmap_fig = create_anomalies_heatmap(asn_anomalies, dateFrom, dateTo, selected_asns=asnState, selected_sites=sitesState)
+        parallel_cat_fig = get_parallel_cat_fig(sitesState, asnState)
+        heatmap_fig = get_heatmap_fig(asn_anomalies, dateFrom, dateTo)
         datatables = create_data_tables(sitesState, asnState, selected_keys)
         return parallel_cat_fig, heatmap_fig, datatables
 
@@ -241,6 +249,35 @@ def create_data_tables(sitesState, asnState, selected_keys):
 
     return html.Div(dataTables)
 
+
+def generate_data_tables(selected_keys, asn_anomalies):
+    dateFrom, dateTo = hp.defaultTimeRange(2)
+    frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
+    dataTables = []
+
+    for event in sorted(selected_keys):
+        if event in pivotFrames.keys():
+            df = pivotFrames[event]
+            if len(df) > 0:
+                dataTables.append(generate_tables(frames[event], df, event, alarmsInst))
+
+    if len(dataTables) == 0:
+        dataTables.append(html.P(
+            f'There are no alarms related to the selected criteria',
+            style={"padding-left": "1.5%", "font-size": "14px"}
+        ))
+
+    return html.Div(dataTables)
+
+
+@cache.memoize(timeout=21600)  # Cache for 6 hours
+def get_heatmap_fig(asn_anomalies, dateFrom, dateTo):
+    return create_anomalies_heatmap(asn_anomalies, dateFrom, dateTo)
+
+
+@cache.memoize(timeout=21600)  # Cache for 6 hours
+def get_parallel_cat_fig(sitesState, asnState):
+    return build_parallel_categories_plot(sitesState, asnState)
 
 
 def create_anomalies_heatmap(asn_anomalies, dateFrom, dateTo, selected_asns=[], selected_sites=[]):
@@ -445,9 +482,28 @@ def build_parallel_categories_plot(sitesState, asnState) -> go.Figure:
 
     # Keep only the number in the plot
     fig.update_layout(
+        margin=dict(t=20, b=20, l=150, r=150),
         height=600,
         showlegend=False,
-        coloraxis_showscale=False
+        coloraxis_showscale=False,
+        font=dict(size=14)  # Increase font size for all text
+    )
+    # Update specific axis labels font size
+    fig.update_layout(
+        xaxis=dict(title=dict(font=dict(size=16))),
+        yaxis=dict(title=dict(font=dict(size=16)))
     )
 
     return fig
+
+
+def generate_figures(asn_anomalies):
+    dateFrom, dateTo = hp.defaultTimeRange(2)
+
+    # Generate the heatmap figure
+    heatmap_fig = get_heatmap_fig(asn_anomalies, dateFrom, dateTo)
+
+    # Generate the parallel categories figure
+    parallel_cat_fig = get_parallel_cat_fig([], [])
+
+    return heatmap_fig, parallel_cat_fig
