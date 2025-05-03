@@ -107,11 +107,11 @@ def generate_asn_cards(asn_owners):
     cards = [
         dbc.Card(
             dbc.CardBody([
-                html.H2(f"AS: {asn['asn']}", className="card-title text-truncate plot-subtitle text-left"),
-                html.P(f"{asn['owner']}", className="card-text text-truncate plot-subtitle text-left"),
+                html.H2(f"AS {asn['asn']}", className="card-title plot-subtitle text-left", style={"color": "black"}),
+                html.P(f"{asn['owner']}", className="card-text plot-subtitle text-left"),
             ]),
             className="mb-3 shadow-sm",
-            style={"height": "100px", "width": "100%", "overflow": "hidden"}  # Fixed height and width
+            style={"height": "100px", "width": "100%", "overflow": "hidden", "display": "flex", "flexDirection": "column", "justifyContent": "space-between"}
         )
         for asn in asn_data
     ]
@@ -277,7 +277,7 @@ def build_anomaly_heatmap(subset_sample):
                         text=int(asn),
                         showarrow=False,
                         bordercolor='white',
-                        font=dict(color='white', size=12, family="Arial", weight='bold'),
+                        font=dict(color='white', size=15, family="Arial"),
                     )
                 else:
                     fig.add_annotation(
@@ -285,7 +285,7 @@ def build_anomaly_heatmap(subset_sample):
                         y=subset_sample['last_appearance_short'].iloc[idx],
                         text=int(asn),
                         showarrow=False,
-                        font=dict(color='white', size=10, family="Arial", weight='bold'),
+                        font=dict(color='white', size=15, family="Arial"),
                     )
 
     fig.update_layout(
