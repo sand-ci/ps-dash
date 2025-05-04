@@ -59,10 +59,33 @@ def get_dropdown_data(asn_anomalies, pivotFrames):
 def layout(**other_unknown_query_strings):
     asn_anomalies = pq.readFile('parquet/frames/ASN_path_anomalies.parquet')
 
+    if asn_anomalies.empty:
+        return dbc.Row([
+            dbc.Col([
+                html.Div([
+                    html.H1("No Data Available", className="text-center"),
+                    html.P("There is currently no data to display on this page. Please check back later.", className="text-center")
+                ], className="boxwithshadow page-cont ml-1 p-1")
+            ], xl=12, lg=12, md=12, sm=12, className="mb-1 flex-grow-1")
+        ])
+
     dateFrom, dateTo = hp.defaultTimeRange(2)
     frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
     period_to_display = hp.defaultTimeRange(days=2, datesOnly=True)
 
+    # Skip plot creation if there is no data
+    if asn_anomalies.empty:
+        dataTables = html.Div([
+            html.P("No data available for the selected criteria.", className="text-center")
+        ])
+        return dbc.Row([
+            dbc.Col([
+                html.Div([
+                    html.H1("No Data Available", className="text-center"),
+                    html.P("There is currently no data to display on this page. Please check back later.", className="text-center")
+                ], className="boxwithshadow page-cont ml-1 p-1")
+            ], xl=12, lg=12, md=12, sm=12, className="mb-1 flex-grow-1")
+        ])
 
     dataTables = generate_data_tables(selected_keys, asn_anomalies)
 
@@ -444,54 +467,70 @@ def build_parallel_categories_plot(sitesState, asnState) -> go.Figure:
         return go.Figure()
     if df.empty:
         return go.Figure()
-    
+
     if len(sitesState) > 0 and len(asnState) > 0:
-        df = df[((df['source_site'].isin(sitesState)) | (df['destination_site'].isin(sitesState)))\
-                & ((df['new_asn'].isin(asnState)) | (df['previously_used_asn'].isin(asnState)))]
+        df = df[((df['source_site'].isin(sitesState)) | (df['destination_site'].isin(sitesState))) &
+                ((df['new_asn'].isin(asnState)) | (df['previously_used_asn'].isin(asnState)))]
 
     elif len(sitesState) > 0:
         df = df[(df['source_site'].isin(sitesState)) | (df['destination_site'].isin(sitesState))]
     elif len(asnState) > 0:
         df = df[((df['new_asn'].isin(asnState)) | (df['previously_used_asn'].isin(asnState)))]
 
+    if df.empty:
+        return go.Figure()
+
     df['asn_code'] = pd.Categorical(df['new_asn']).codes
-    palette = px.colors.sequential.Viridis_r
+    unique_asn_count = df['asn_code'].nunique()
 
-    # Add custom hover data for ASN owners, this cannot be done currently
-    # df['owner_new'] = addNetworkOwners(df, df['new_asn'].tolist())
-    # df['owner_previous'] = addNetworkOwners(df, df['new_asn'].tolist())
+    # Dynamically determine font size based on label length
+    label_fields = ["source_site", "previously_used_asn", "new_asn", "destination_site"]
+    max_label_len = 0
+    for field in label_fields:
+        if field in df.columns:
+            max_label_len = max(max_label_len, df[field].astype(str).map(len).max())
+    # Set font size: shrink if label is long
+    if max_label_len > 30:
+        font_size = 10
+    elif max_label_len > 20:
+        font_size = 12
+    else:
+        font_size = 14
 
-    fig = px.parallel_categories(
-        df,
-        color_continuous_scale=palette[:df['asn_code'].nunique()],
-        color='asn_code',
-        dimensions=[
-            "source_site",
-            "previously_used_asn",
-            "new_asn",
-            "destination_site"
-        ],
-        labels={
-            "source_site":         "Source site",
-            "previously_used_asn": "Previously used ASN",
-            "new_asn":             "New ASN",
-            "destination_site":    "Destination site"
-        }
-    )
-    
+    if unique_asn_count == 0:
+        return go.Figure()
+    elif unique_asn_count == 1:
+        fig = px.parallel_categories(
+            df,
+            dimensions=label_fields,
+            labels={
+                "source_site": "Source site",
+                "previously_used_asn": "Previously used ASN",
+                "new_asn": "New ASN",
+                "destination_site": "Destination site"
+            }
+        )
+    else:
+        palette = px.colors.sequential.Viridis_r
+        fig = px.parallel_categories(
+            df,
+            color='asn_code',
+            color_continuous_scale=palette[:unique_asn_count],
+            dimensions=label_fields,
+            labels={
+                "source_site": "Source site",
+                "previously_used_asn": "Previously used ASN",
+                "new_asn": "New ASN",
+                "destination_site": "Destination site"
+            }
+        )
 
-    # Keep only the number in the plot
     fig.update_layout(
         margin=dict(t=20, b=20, l=150, r=150),
         height=600,
         showlegend=False,
         coloraxis_showscale=False,
-        font=dict(size=14)  # Increase font size for all text
-    )
-    # Update specific axis labels font size
-    fig.update_layout(
-        xaxis=dict(title=dict(font=dict(size=16))),
-        yaxis=dict(title=dict(font=dict(size=16)))
+        font=dict(size=font_size)
     )
 
     return fig
