@@ -252,7 +252,7 @@ body{
 }
 
 .card-title {
-    font-family: Consolas !important;
+    /* font-family: Consolas !important; */
     color: #353535;
 }
 
@@ -663,7 +663,7 @@ count-box {
     }
 
     .status-number {
-        font-size: 2.5em !important;
+        font-size: 2em !important;
     }
 
     .status-count-header {
