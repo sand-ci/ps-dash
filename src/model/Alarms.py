@@ -350,6 +350,8 @@ class Alarms(object):
             df['to'] = pd.to_datetime(df['to_date'], format='mixed', utc=True)
             df['to'] = df['to'].dt.strftime('%Y-%m-%d')
             df.drop('to_date', axis=1, inplace=True)
+        if 'asn_list' in df.columns:
+            df.drop('asn_list', axis=1, inplace=True)
         if 'ipv' in df.columns:
             df.rename(columns={'ipv': 'IP version'}, inplace=True)
 
