@@ -16,7 +16,6 @@ import dash_bootstrap_components as dbc
 import urllib3
 urllib3.disable_warnings()
 
-
 class Alarms(object):
 
   @staticmethod
@@ -359,9 +358,9 @@ class Alarms(object):
             df = self.replaceCol('src_sites', df, '\n')
         if 'dest_sites' in df.columns:
             df = self.replaceCol('dest_sites', df, '\n'),
-        if 'asn_list' in df.columns:
-            df['asn_list'] = df['asn_list'].apply(lambda x: ', '.join(map(str, x)))
-            df.rename(columns={'asn_list': 'new ASN(s)'}, inplace=True)
+        if 'anomalies' in df.columns:
+            df['anomalies'] = df['anomalies'].apply(lambda x: ', '.join(map(str, x)))
+            df.rename(columns={'anomalies': 'new ASN(s)'}, inplace=True)
         if 'ipv' in df.columns:
             df['ipv'] = df['ipv'].apply(lambda x: x.lower() if x is not None else x)
             df.rename(columns={'ipv': 'IP version'}, inplace=True)

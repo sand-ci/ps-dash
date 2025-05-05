@@ -12,7 +12,7 @@ from model.Updater import ParquetUpdater
 
 # cache the data in /parquet.
 #TODO: uncomment
-ParquetUpdater()
+# ParquetUpdater()
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css',
                         "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css",
@@ -192,4 +192,4 @@ app.clientside_callback(
 
 
 if __name__ == '__main__':
-	app.run_server(debug=False, port=8050, host='0.0.0.0')
+	app.run(debug=False, port=8050, host='0.0.0.0')

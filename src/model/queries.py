@@ -142,56 +142,59 @@ def queryThroughputIdx(dateFrom, dateTo):
 
   return aggrs
 
-def queryPathChanged(dateFrom, dateTo):
-    # if (end - start).days < 2:
-    #   dateFrom, dateTo = hp.getPriorNhPeriod(dateTo)
-    
-    q = {
-        "_source": [
-            "from_date",
-            "to_date",
-            "src",
-            "dest",
-            "src_site",
-            "dest_site",
-            "diff"
-        ],
-        "query": {
-          "bool": {
-            "must": [{
-              "range": {
-                "to_date": {
-                  "gte": dateFrom,
-                  "lte": dateTo,
-                  "format": "strict_date_optional_time"
-                }
+
+def query_ASN_paths_pos_probs(src, dest, dt, ipv):
+  """
+  Fetch the document with this alarm_id, and render its heatmap.
+  """
+  try:
+      must_conditions = [
+          {
+            "exists": {
+              "field": "transitions"
+            }
+              },
+              {
+            "range": {
+              "to_date": {
+                "gte": dt,
+                "format": "strict_date_optional_time"
               }
-            }],
-	    "must_not": [
-	        {
-	          "term": {
-	            "event.keyword": "ASN path anomalies"
-	          }
-	        }
-	      ]
+            }
+              },
+              {
+            "term": {
+              "src_netsite.keyword": src
+            }
+              },
+              {
+            "term": {
+              "dest_netsite.keyword": dest
+            }
           }
-        }
-    }
-    # print(str(q).replace("\'", "\""))
-    result = scan(client=hp.es, index='ps_traces_changes', query=q)
-    data = []
+      ]
 
-    for item in result:
-      temp = item['_source'].copy()
-      if 'src_site' in temp.keys() and 'dest_site' in temp.keys():
-        temp['tag'] = [temp['src_site'], temp['dest_site']]
-        temp['from'] = temp['from_date']
-        temp['to'] = temp['to_date']
-        del temp['from_date']
-        del temp['to_date']
-        data.append(temp)
+      if ipv != -1:
+          ipv_q = {
+            "term": {
+              "ipv6": ipv
+            }
+          }
+          must_conditions.append(ipv_q)
 
-    return data
+      q = {
+          "bool": {
+          "must": must_conditions
+          }
+      }
+      # print(str(q).replace('\'', '"'))
+      res = hp.es.search(index='ps_traces_changes', query=q)
+  except Exception:
+      # not found / error
+      return []
+
+  doc = res['hits']['hits'][0]["_source"]
+  return doc
 
 
 
@@ -205,7 +208,6 @@ def queryAlarms(dateFrom, dateTo):
                     'complete packet loss',
                     'high packet loss on multiple links',
                     'firewall issue',
-                    'path changed',
                     'ASN path anomalies',
                     'destination cannot be reached from any',
                     'destination cannot be reached from multiple',
@@ -229,7 +231,7 @@ def queryAlarms(dateFrom, dateTo):
                             }
                         }
                     },
-                    {
+{
                         "term": {
                             "category": {
                                 "value": "Networking",
@@ -253,7 +255,6 @@ def queryAlarms(dateFrom, dateTo):
 
     for item in result:
         event = item['_source']['event']
-        # if event != 'path changed':
         temp = []
         if event in data.keys():
             temp = data[event]
@@ -270,6 +271,9 @@ def queryAlarms(dateFrom, dateTo):
           if 'from' in desc.keys() and 'to' in desc.keys():
             desc['from'] = desc['from'].replace('T', ' ')
             desc['to'] = desc['to'].replace('T', ' ')
+          
+          if 'to_date' in desc.keys():
+             desc['to'] = desc['to_date'].split('T')[0]
 
           if 'avg_value%' in desc.keys():
               desc['avg_value'] = desc['avg_value%']
@@ -279,9 +283,6 @@ def queryAlarms(dateFrom, dateTo):
 
           data[event] = temp
 
-    # path changed details resides in a separate index
-    pathdf = queryPathChanged(dateFrom, dateTo)
-    data['path changed between sites'] = pathdf
     return data
   except Exception as e:
     print('Exception:', e)
@@ -386,8 +387,8 @@ def getSubcategories():
 			 'source cannot reach any', 'firewall issue', 'complete packet loss',
                        	 'unresolvable host', 'hosts not found'],
 
-  'Network': 		 ['bandwidth decreased from/to multiple sites', 'path changed between sites',
-                          'ASN path anomalies', 'path changed'],
+  'Network': 		 ['bandwidth decreased from/to multiple sites',
+                          'ASN path anomalies'],
 
   'Other': 		 ['bandwidth increased from/to multiple sites', 'bandwidth increased', 'bandwidth decreased',
                           'high packet loss', 'high packet loss on multiple links']
@@ -440,7 +441,7 @@ def query_ASN_anomalies(src, dest, dates=hp.defaultTimeRange(days=2)):
   }
 
   # print(str(q).replace("\'", "\""))
-  fields = ['ipv6', 'src_netsite', 'dest_netsite', 'last_appearance_path', 'repaired_asn_path', 'asn_list', 'paths']
+  fields = ['ipv6', 'src_netsite', 'dest_netsite', 'last_appearance_path', 'repaired_asn_path', 'anomalies', 'paths']
   result = scan(client=hp.es, index='ps_traces_changes', query=q, source=fields)
 
   data = []
@@ -457,131 +458,31 @@ def query_ASN_anomalies(src, dest, dates=hp.defaultTimeRange(days=2)):
   return ddf
 
 
-def queryTraceChanges(dateFrom, dateTo, asn=None):
-  dateFrom = hp.convertDate(dateFrom)
-  dateTo = hp.convertDate(dateTo)
-
-  if asn:
-    q = {
-        "query": {
-            "bool": {
-                "must": [
-                    {
-                        "range": {
-                            "to_date": {
-                                "gte": dateFrom,
-                                "lte": dateTo,
-                                "format": "strict_date_optional_time"
-                            }
-                        }
-                    },
-                    {
-                      "terms": {
-                            "diff": [asn]
-                        }
-                    }
-                ],
-                "must_not": [
+def queryPathAnomaliesDetails(dateFrom, dateTo, idx='ps_traces_changes'):
+    query = {
+        "bool": {
+            "must": [
+                {"exists": {"field": "transitions"}},
                   {
-                    "term": {
-                      "event": "ASN path anomalies"
+                  "range": {
+                    "to_date": {
+                      "format": "strict_date_optional_time",
+                      "gte": dateFrom,
+                      # "lte": dateTo,
                     }
                   }
-                ]
-            }
+                }
+            ]
         }
     }
-
-  else:
-    q = {
-	  "query": {
-	    "bool": {
-	      "must": [
-	        {
-	          "range": {
-	            "to_date": {
-	              "gte": dateFrom,
-                "lte": dateTo,
-	              "format": "strict_date_optional_time"
-	            }
-	          }
-	        }
-	      ],
-	      "must_not": [
-	        {
-	          "term": {
-	            "event.keyword": "ASN path anomalies"
-	          }
-	        }
-	      ]
-	    }
-	  }
-	}
-
-  print(str(q).replace("\'", "\""))
-  result = scan(client=hp.es, index='ps_traces_changes',query=q)
-  data, positions, baseline, altPaths = [],[],[],[]
-  positions = []
-  for item in result:
-      item['_source']['src'] = item['_source']['src'].upper()
-      item['_source']['dest'] = item['_source']['dest'].upper()
-      item['_source']['src_site'] = item['_source']['src_site'].upper()
-      item['_source']['dest_site'] = item['_source']['dest_site'].upper()
-
-      tempD = {}
-      for k,v in item['_source'].items():
-          if k not in ['positions', 'baseline', 'alt_paths', 'created_at']:
-              tempD[k] = v
-      data.append(tempD)
-
-      src = item['_source']['src']
-      dest = item['_source']['dest']
-      src_site = item['_source']['src_site']
-      dest_site = item['_source']['dest_site']
-      from_date,to_date = item['_source']['from_date'], item['_source']['to_date']
-
-      temp = item['_source']['positions']
-      for p in temp:
-          p['src'] = src
-          p['dest'] = dest
-          p['src_site'] = src_site
-          p['dest_site'] = dest_site
-          p['from_date'] = from_date
-          p['to_date'] = to_date
-      positions.extend(temp)
-      
-      temp = item['_source']['baseline']
-      for p in temp:
-          p['src'] = src
-          p['dest'] = dest
-          p['src_site'] = src_site
-          p['dest_site'] = dest_site
-          p['from_date'] = from_date
-          p['to_date'] = to_date
-      baseline.extend(temp)
-
-      temp = item['_source']['alt_paths']
-      for p in temp:
-          p['src'] = src
-          p['dest'] = dest
-          p['src_site'] = src_site
-          p['dest_site'] = dest_site
-          p['from_date'] = from_date
-          p['to_date'] = to_date
-      altPaths.extend(temp)
-
-  df = pd.DataFrame(data)
-  posDf = pd.DataFrame(positions)
-  baseline = pd.DataFrame(baseline)
-  altPaths = pd.DataFrame(altPaths)
-  
-  if len(df) > 0:
-    posDf['pair'] = posDf['src']+' -> '+posDf['dest']
-    df['pair'] = df['src']+' -> '+df['dest']
-    baseline['pair'] = baseline['src']+' -> '+baseline['dest']
-    altPaths['pair'] = altPaths['src']+' -> '+altPaths['dest']
-
-  return df, posDf, baseline, altPaths
+    res = hp.es.search(index=idx, query=query, size=10000)
+    # collect every transition record from every hit
+    records = []
+    for hit in res["hits"]["hits"]:
+        for t in hit["_source"].get("transitions", []):
+            records.append(t)
+    df = pd.DataFrame(records).drop_duplicates()
+    return df
 
 
 def query4Avg(idx, dateFrom, dateTo):
@@ -691,6 +592,7 @@ def query4Avg(idx, dateFrom, dateTo):
                     })
 
   return aggrs
+
 
 def queryBandwidthIncreasedDecreased(dateFrom, dateTo, sips, dips, ipv6):
     q = {

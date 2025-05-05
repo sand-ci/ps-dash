@@ -425,7 +425,7 @@ def create_heatmap(site_dict, site, date_from, date_to, test_types=None, hostnam
 
 
 def generate_plotly_heatmap_with_anomalies(subset_sample):
-    columns = ['src_netsite', 'dest_netsite', 'asn_list', 'ipv6']
+    columns = ['src_netsite', 'dest_netsite', 'anomalies', 'ipv6']
     src_site, dest_site, anomaly, ipv = subset_sample[columns].values[0]
     ipv = 'IPv6' if ipv else 'IPv4'
 

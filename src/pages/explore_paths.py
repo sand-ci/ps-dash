@@ -41,7 +41,7 @@ def get_dropdown_data(asn_anomalies, pivotFrames, changeDf):
     sitesDropdownData = [{"label": str(a), "value": a} for a in sorted(list(set(unique_sites)))]
 
     # ASNs
-    unique_asns = pd.unique(asn_anomalies['asn_list'].explode()).tolist()
+    unique_asns = pd.unique(asn_anomalies['anomalies'].explode()).tolist()
     sortedDf = changeDf[changeDf['jumpedFrom'] > 0].sort_values('count')
     asnsDropdownData = list(set(sortedDf['diff'].unique().tolist() +
                                 sortedDf['jumpedFrom'].unique().tolist()))
@@ -218,7 +218,7 @@ def update_figures(n_clicks, asnStateValue, sitesStateValue):
 def filterASN(df, selected_asns=[], selected_sites=[]):
 
   if selected_asns:
-      s = df.apply(lambda x: pd.Series(x['asn_list']), axis=1).stack().reset_index(level=1, drop=True)
+      s = df.apply(lambda x: pd.Series(x['anomalies']), axis=1).stack().reset_index(level=1, drop=True)
       s.name = 'asn'
       df = df.join(s)
       df = df[df['asn'].isin(selected_asns)]
@@ -241,8 +241,8 @@ def create_data_tables(sitesState, asnState, selected_keys):
             df = df[df['diff'].isin(asnState)]
         elif 'asn' in df.columns and len(asnState) > 0:
             df = df[df['asn'].isin(asnState)]
-        elif 'asn_list' in df.columns and len(asnState) > 0:
-            df = df[df['asn_list'].isin(asnState)]
+        elif 'anomalies' in df.columns and len(asnState) > 0:
+            df = df[df['anomalies'].isin(asnState)]
 
         if 'src_site' in df.columns and 'dest_site' in df.columns and len(sitesState) > 0:
             df = df[(df['src_site'].isin(sitesState)) | (df['dest_site'].isin(sitesState))]
@@ -267,7 +267,7 @@ def create_anomalies_heatmap(asn_anomalies, dateFrom, dateTo, selected_asns=[], 
     if len(df) > 0:
         # Create a summary table with counts and ASN list per IPv6 and IPv4
         heatmap_summary = df.groupby(['src_netsite', 'dest_netsite', 'ipv6']).agg(
-                        asn_details=('asn_list', lambda x: [item for sublist in x for item in set(sublist)])
+                        asn_details=('anomalies', lambda x: [item for sublist in x for item in set(sublist)])
                     ).reset_index()
 
         # heatmap_summary['asn_details'] = heatmap_summary['asn_details'].apply(lambda x: ', '.join(map(str, x)))
