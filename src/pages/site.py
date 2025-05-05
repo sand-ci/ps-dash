@@ -296,7 +296,7 @@ def layout(q=None, **other_unknown_query_strings):
   pq = Parquet()
   alarmsInst = Alarms()
   # that period should match on /home page
-  dateFrom, dateTo = hp.defaultTimeRange(2)
+  dateFrom, dateTo = hp.defaultTimeRange(days=2)
   frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
 
   alarmCnt = pq.readFile('parquet/alarmsGrouped.parquet')

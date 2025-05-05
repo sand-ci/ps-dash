@@ -58,7 +58,7 @@ class ParquetUpdater(object):
     # The following function is used to group alarms by site 
     # taking into account the most recent 24 hours only
     def groupAlarms(self, pivotFrames):
-        dateFrom, dateTo = hp.defaultTimeRange(2)
+        dateFrom, dateTo = hp.defaultTimeRange(days=2)
         metaDf = self.pq.readFile('parquet/raw/metaDf.parquet')
         # frames, pivotFrames = self.alarms.loadData(dateFrom, dateTo)
 
@@ -130,7 +130,7 @@ class ParquetUpdater(object):
     def queryData(self, idx, dateFrom, dateTo):
         intv = int(hp.CalcMinutes4Period(dateFrom, dateTo)/30)
         if idx in ['ps_throughput']:
-            dateFrom, dateTo = hp.defaultTimeRange(21)
+            dateFrom, dateTo = hp.defaultTimeRange(days=21)
             intv = 42  # 12 hour bins
 
         data = []
@@ -197,7 +197,7 @@ class ParquetUpdater(object):
 
     @timer
     def storeASNPathChanged(self):
-        dateFrom, dateTo = hp.defaultTimeRange(2)
+        dateFrom, dateTo = hp.defaultTimeRange(days=2)
         df = qrs.queryPathAnomaliesDetails(dateFrom, dateTo)
         self.pq.writeToFile(df, f"parquet/asn_path_changes.parquet")
 

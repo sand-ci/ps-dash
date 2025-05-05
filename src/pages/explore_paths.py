@@ -69,7 +69,7 @@ def layout(**other_unknown_query_strings):
             ], xl=12, lg=12, md=12, sm=12, className="mb-1 flex-grow-1")
         ])
 
-    dateFrom, dateTo = hp.defaultTimeRange(2)
+    dateFrom, dateTo = hp.defaultTimeRange(days=2)
     frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
     period_to_display = hp.defaultTimeRange(days=2, datesOnly=True)
 
@@ -189,7 +189,7 @@ def colorMap(eventTypes):
 
 
 def load_initial_data(selected_keys, asn_anomalies):
-    dateFrom, dateTo = hp.defaultTimeRange(2)
+    dateFrom, dateTo = hp.defaultTimeRange(days=2)
     frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
     dataTables = []
 
@@ -218,7 +218,7 @@ def load_initial_data(selected_keys, asn_anomalies):
 def update_figures(n_clicks, asnStateValue, sitesStateValue):
     if n_clicks is not None:
         asn_anomalies = pq.readFile('parquet/frames/ASN_path_anomalies.parquet')
-        dateFrom, dateTo = hp.defaultTimeRange(2)
+        dateFrom, dateTo = hp.defaultTimeRange(days=2)
 
         sitesState = sitesStateValue if sitesStateValue else []
         asnState = asnStateValue if asnStateValue else []
@@ -246,7 +246,7 @@ def filterASN(df, selected_asns=[], selected_sites=[]):
 
 
 def create_data_tables(sitesState, asnState, selected_keys):
-    dateFrom, dateTo = hp.defaultTimeRange(2)
+    dateFrom, dateTo = hp.defaultTimeRange(days=2)
     frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
     dataTables = []
     for event in sorted(selected_keys):
@@ -274,7 +274,7 @@ def create_data_tables(sitesState, asnState, selected_keys):
 
 
 def generate_data_tables(selected_keys, asn_anomalies):
-    dateFrom, dateTo = hp.defaultTimeRange(2)
+    dateFrom, dateTo = hp.defaultTimeRange(days=2)
     frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
     dataTables = []
 
@@ -537,7 +537,7 @@ def build_parallel_categories_plot(sitesState, asnState) -> go.Figure:
 
 
 def generate_figures(asn_anomalies):
-    dateFrom, dateTo = hp.defaultTimeRange(2)
+    dateFrom, dateTo = hp.defaultTimeRange(days=2)
 
     # Generate the heatmap figure
     heatmap_fig = get_heatmap_fig(asn_anomalies, dateFrom, dateTo)
