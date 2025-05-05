@@ -83,11 +83,11 @@ def layout(q=None, **other_unknown_query_strings):
     
     now = datetime.now()
     fromDay = (now - timedelta(days=8)).replace(hour=0, minute=0, second=0, microsecond=0)
-    fromDay = fromDay.strftime("%Y-%m-%d %H:%M:%S")  # "2024-02-20 00:00:00"
+    fromDay = fromDay.strftime('%Y-%m-%dT%H:%M:%S.000Z')  # "2024-02-20 00:00:00"
 
     # Calculate toDay (2 days ago at 23:59:59)
     toDay = (now - timedelta(days=1)).replace(hour=00, minute=00, second=00, microsecond=00000)
-    toDay = toDay.strftime("%Y-%m-%d %H:%M:%S")  # "2024-02-26 23:59:59"
+    toDay = toDay.strftime('%Y-%m-%dT%H:%M:%S.000Z')  # "2024-02-26 23:59:59"
     
     # toDay = toDay - timedelta(days=2)
     global pivotFrames
@@ -147,7 +147,6 @@ def layout(q=None, **other_unknown_query_strings):
             site_df['to'] = site_df['to'].dt.normalize()  # or .dt.floor('D')
             site_df['to'] = site_df['to'].dt.strftime('%Y-%m-%d')
             if frame == "hosts not found":
-                print(site_df['hosts_not_found'].head(5))
                 site_df['hosts'] = None
                 site_df['hosts list'] = None
                 for i, row in site_df.iterrows():
@@ -1070,7 +1069,7 @@ def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, visibility, 
                     print(histData)
                     
                     site_name, id = button_id['index'].split(', ')
-                    fig, test_types, hosts, site = create_heatmap(pd_df, site, fromDay, toDay)
+                    fig, test_types, hosts, site = create_heatmap(pd_df, site, fromDay.replace("T", " ").replace(".000Z", ""), toDay.replace("T", " ").replace(".000Z", ""))
                     alarm = qrs.getAlarm(id)['source']
                     return dcc.Graph(figure=fig), event, alarm, visibility
 

@@ -46,10 +46,10 @@ class ParquetUpdater(object):
                 # self.storePacketLossDataAndModel()
 
             # Set the schedulers
+            Scheduler(60*60*12, self.storeMetaData)
             Scheduler(60*60, self.cacheIndexData)
             Scheduler(60*30, self.storeAlarms)
-            Scheduler(60*30, self.storePathChangeDescDf)
-            Scheduler(60*60*12, self.storeMetaData)
+            Scheduler(60*60*12, self.storeASNPathChanged)
             Scheduler(60*60*24, self.psConfigData)
             # Scheduler(60*60*12, self.storeThroughputDataAndModel)
             # Scheduler(60*60*12, self.storePacketLossDataAndModel)
@@ -60,7 +60,7 @@ class ParquetUpdater(object):
     # The following function is used to group alarms by site 
     # taking into account the most recent 48 hours only
     def groupAlarms(self, pivotFrames):
-        dateFrom, dateTo = hp.defaultTimeRange(2)
+        dateFrom, dateTo = hp.defaultTimeRange(days=2)
         metaDf = self.pq.readFile('parquet/raw/metaDf.parquet')
         # frames, pivotFrames = self.alarms.loadData(dateFrom, dateTo)
 
@@ -132,7 +132,7 @@ class ParquetUpdater(object):
     def queryData(self, idx, dateFrom, dateTo):
         intv = int(hp.CalcMinutes4Period(dateFrom, dateTo)/30)
         if idx in ['ps_throughput']:
-            dateFrom, dateTo = hp.defaultTimeRange(21)
+            dateFrom, dateTo = hp.defaultTimeRange(days=21)
             intv = 42  # 12 hour bins
 
         data = []
@@ -159,23 +159,6 @@ class ParquetUpdater(object):
             df['idx'] = idx
             measures = pd.concat([measures, df])
         self.pq.writeToFile(measures, f'{self.location}raw/measures.parquet')
-
-
-    # @timer  
-    # def cacheTraceChanges(self, days=60):
-    #     location = 'parquet/raw/'
-    #     dateFrom, dateTo = hp.defaultTimeRange(days)
-    #     chdf, posDf, baseline, altPaths = qrs.queryTraceChanges(dateFrom, dateTo)
-    #     chdf = chdf.round(2)
-    #     posDf = posDf.round(2)
-    #     baseline = baseline.round(2)
-    #     altPaths = altPaths.round(2)
-
-    #     self.pq.writeToFile(chdf, f'{location}chdf.parquet')
-    #     self.pq.writeToFile(posDf, f'{location}posDf.parquet')
-    #     self.pq.writeToFile(baseline, f'{location}baseline.parquet')
-    #     self.pq.writeToFile(altPaths, f'{location}altPaths.parquet')
-
 
     @timer
     def storeMetaData(self):
@@ -228,66 +211,71 @@ class ParquetUpdater(object):
                 self.pq.writeToFile(fdf, f"parquet/frames/{filename}.parquet")
 
 
-    @staticmethod
-    def descChange(chdf, posDf):
-        owners = qrs.getASNInfo(posDf['asn'].values.tolist())
-        owners['-1'] = 'OFF/Unavailable'
-        howPathChanged = []
-        for diff in chdf['diff'].values.tolist()[0]:
+    # @staticmethod
+    # def descChange(chdf, posDf):
+    #     owners = qrs.getASNInfo(posDf['asn'].values.tolist())
+    #     owners['-1'] = 'OFF/Unavailable'
+    #     howPathChanged = []
+    #     for diff in chdf['diff'].values.tolist()[0]:
 
-            for pos, P in posDf[(posDf['asn'] == diff)][['pos', 'P']].values:
-                atPos = list(set(posDf[(posDf['pos'] == pos)]['asn'].values.tolist()))
+    #         for pos, P in posDf[(posDf['asn'] == diff)][['pos', 'P']].values:
+    #             atPos = list(set(posDf[(posDf['pos'] == pos)]['asn'].values.tolist()))
 
-                if len(atPos) > 0:
-                    atPos.remove(diff)
-                    for newASN in atPos:
-                        if newASN not in [0, -1]:
-                            if P < 1:
-                                if str(newASN) in owners.keys():
-                                    owner = owners[str(newASN)]
-                                howPathChanged.append({'diff': diff,
-                                            'diffOwner': owners[str(diff)], 'atPos': pos,
-                                            'jumpedFrom': newASN, 'jumpedFromOwner': owner})
-                # the following check is covering the cases when the change happened at the very end of the path
-                # i.e. the only ASN that appears at that position is the diff detected
-                if len(atPos) == 0:
-                    howPathChanged.append({'diff': diff,
-                                        'diffOwner': owners[str(diff)], 'atPos': pos,
-                                        'jumpedFrom': 0, 'jumpedFromOwner': ''})
+    #             if len(atPos) > 0:
+    #                 atPos.remove(diff)
+    #                 for newASN in atPos:
+    #                     if newASN not in [0, -1]:
+    #                         if P < 1:
+    #                             if str(newASN) in owners.keys():
+    #                                 owner = owners[str(newASN)]
+    #                             howPathChanged.append({'diff': diff,
+    #                                         'diffOwner': owners[str(diff)], 'atPos': pos,
+    #                                         'jumpedFrom': newASN, 'jumpedFromOwner': owner})
+    #             # the following check is covering the cases when the change happened at the very end of the path
+    #             # i.e. the only ASN that appears at that position is the diff detected
+    #             if len(atPos) == 0:
+    #                 howPathChanged.append({'diff': diff,
+    #                                     'diffOwner': owners[str(diff)], 'atPos': pos,
+    #                                     'jumpedFrom': 0, 'jumpedFromOwner': ''})
 
-        if len(howPathChanged) > 0:
-            return pd.DataFrame(howPathChanged).sort_values('atPos')
+    #     if len(howPathChanged) > 0:
+    #         return pd.DataFrame(howPathChanged).sort_values('atPos')
 
-        return pd.DataFrame()
+    #     return pd.DataFrame()
 
 
+    # @timer
+    # def storePathChangeDescDf(self):
+    #     dateFrom, dateTo = hp.defaultTimeRange(days=2)
+    #     chdf, posDf, baseline = qrs.queryTraceChanges(dateFrom, dateTo)[:3]
+
+    #     try:
+    #         df = pd.DataFrame()
+    #         if len(chdf) > 0:
+    #             for p in posDf['pair'].unique():
+    #                 # print(p)
+    #                 temp = self.descChange(chdf[chdf['pair'] == p], posDf[posDf['pair'] == p])
+    #                 temp['src_site'] = baseline[baseline['pair'] == p]['src_site'].values[0]
+    #                 temp['dest_site'] = baseline[baseline['pair'] == p]['dest_site'].values[0]
+    #                 temp = self.descChange(chdf[chdf['pair'] == p], posDf[posDf['pair'] == p])
+    #                 if not temp.empty:
+    #                     temp['src_site'] = baseline[baseline['pair'] == p]['src_site'].values[0]
+    #                     temp['dest_site'] = baseline[baseline['pair'] == p]['dest_site'].values[0]
+    #                     temp['count'] = len(chdf[chdf['pair'] == p])
+    #                     df = pd.concat([df, temp])
+
+    #             df['jumpedFrom'] = df['jumpedFrom'].astype(int)
+    #             df['diff'] = df['diff'].astype(int)
+    #             self.pq.writeToFile(df, f"{self.location}prev_next_asn.parquet")
+    #     except Exception as e:
+    #         print(f"Error: {e}")
+    #         # print(traceback.format_exc())
+    
     @timer
-    def storePathChangeDescDf(self):
+    def storeASNPathChanged(self):
         dateFrom, dateTo = hp.defaultTimeRange(days=2)
-        chdf, posDf, baseline = qrs.queryTraceChanges(dateFrom, dateTo)[:3]
-
-        try:
-            df = pd.DataFrame()
-            if len(chdf) > 0:
-                for p in posDf['pair'].unique():
-                    # print(p)
-                    temp = self.descChange(chdf[chdf['pair'] == p], posDf[posDf['pair'] == p])
-                    temp['src_site'] = baseline[baseline['pair'] == p]['src_site'].values[0]
-                    temp['dest_site'] = baseline[baseline['pair'] == p]['dest_site'].values[0]
-                    temp = self.descChange(chdf[chdf['pair'] == p], posDf[posDf['pair'] == p])
-                    if not temp.empty:
-                        temp['src_site'] = baseline[baseline['pair'] == p]['src_site'].values[0]
-                        temp['dest_site'] = baseline[baseline['pair'] == p]['dest_site'].values[0]
-                        temp['count'] = len(chdf[chdf['pair'] == p])
-                        df = pd.concat([df, temp])
-
-                df['jumpedFrom'] = df['jumpedFrom'].astype(int)
-                df['diff'] = df['diff'].astype(int)
-                self.pq.writeToFile(df, f"{self.location}prev_next_asn.parquet")
-        except Exception as e:
-            print(f"Error: {e}")
-            # print(traceback.format_exc())
-
+        df = qrs.queryPathAnomaliesDetails(dateFrom, dateTo)
+        self.pq.writeToFile(df, f"parquet/asn_path_changes.parquet")
 
     def createLocation(self, required_folders):
 

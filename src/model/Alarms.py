@@ -61,14 +61,12 @@ class Alarms(object):
             df = df.round(3)
 
           elif event in ['high packet loss',
-                         'path changed',
                          'ASN path anomalies',
                          'destination cannot be reached from any',
                          'source cannot reach any',
                          'bandwidth decreased',
                          'bandwidth increased',
                          'complete packet loss',
-                         'path changed between sites',
                          'hosts not found',
                          'unresolvable host']:
             df = self.list2rows(df)
@@ -107,12 +105,8 @@ class Alarms(object):
   @staticmethod
   def oneInBothWaysUnfold(odf):
     data = []
-    # the field name changed on the DB side
-    if 'dest_loss%' in odf.columns and 'src_loss%' in odf.columns:
-      odf['dest_loss%'] = odf['dest_loss%'].fillna(odf['dest_loss'])
-      odf['src_loss%'] = odf['src_loss%'].fillna(odf['src_loss'])
-      odf.drop(columns=['dest_loss', 'src_loss'], inplace=True)
-
+    print(odf.columns)
+    
     for r in odf.to_dict('records'):
       for i, dest_site in enumerate(r['dest_sites']):
         rec = {
@@ -123,8 +117,8 @@ class Alarms(object):
           'id': r['id'],
           'tag': r['tag'][0]
         }
-        if 'dest_loss%' in r.keys():
-          rec['dest_loss%'] = r['dest_loss%'][i]
+        if 'dest_loss' in r.keys():
+          rec['dest_loss'] = r['dest_loss'][i]
         elif 'dest_change' in r.keys():
           rec['dest_change'] = r['dest_change'][i]
 
@@ -142,8 +136,8 @@ class Alarms(object):
           'id': r['id'],
           'tag': r['tag'][0]
         }
-        if 'src_loss%' in r.keys():
-          rec['src_loss%'] = r['src_loss%'][i]
+        if 'src_loss' in r.keys():
+          rec['src_loss'] = r['src_loss'][i]
         elif 'src_change' in r.keys():
           rec['src_change'] = r['src_change'][i]
 
@@ -184,8 +178,6 @@ class Alarms(object):
             event = self.eventUF(event)
 
             df = pq.readFile(f)
-            # print("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n")
-            # print(df)
             df['to'] = pd.to_datetime(df['to'], utc=True)
             modification_time = os.path.getmtime(f)
 
@@ -194,8 +186,7 @@ class Alarms(object):
             time_difference_hours = time_difference / (60 * 60)
 
             # Check if the file was modified more than 1 hour ago
-            # TODO: change this to time_difference_hours <  1
-            if time_difference_hours <  24:
+            if time_difference_hours <  1:
               # print('>>>>>>>', df['to'].min(), df['to'].max() , dateFrom, dateTo)
               # print("The file was modified within the last hour.")
               frames[event] = df[(df['to']>=dateFrom) & (df['to'] <= dateTo)]
@@ -211,6 +202,7 @@ class Alarms(object):
       if len(folder)==0 or isTooOld == True:
           print('Query ES')
           frames, pivotFrames = self.getAllAlarms(dateFrom, dateTo)
+
 
     except Exception as e:
       print(e, traceback.format_exc())
@@ -236,7 +228,9 @@ class Alarms(object):
     dateFrom, dateTo = hp.getPriorNhPeriod(alarmEnd)
     # frames, pivotFrames = self.loadData(dateFrom, dateTo)
     print('getOtherAlarms')
+    
     # print(dateFrom, dateTo, currEvent, alarmEnd, '# alarms:', [len(d) for d in pivotFrames], site, src_site, dest_site)
+
 
     alarmsListed = {}
 
@@ -345,22 +339,28 @@ class Alarms(object):
             # df.drop('src_change', axis=1, inplace=True)
             df.drop('src_sites', axis=1, inplace=True)
 
-        if 'dest_loss%' in df.columns:
-            df['to_dest_loss'] = df[['dest_sites', 'dest_loss%']].apply(lambda x: self.list2str(x, ''), axis=1)
-            df.drop('dest_loss%', axis=1, inplace=True)
+        if 'dest_loss' in df.columns:
+            df['to_dest_loss'] = df[['dest_sites', 'dest_loss']].apply(lambda x: self.list2str(x, ''), axis=1)
+            df.drop('dest_loss', axis=1, inplace=True)
             df.drop('dest_sites', axis=1, inplace=True)
-        if 'src_loss%' in df.columns:
-            df['from_src_loss'] = df[['src_sites', 'src_loss%']].apply(lambda x: self.list2str(x, ''), axis=1)
-            df.drop('src_loss%', axis=1, inplace=True)
+        if 'src_loss' in df.columns:
+            df['from_src_loss'] = df[['src_sites', 'src_loss']].apply(lambda x: self.list2str(x, ''), axis=1)
+            df.drop('src_loss', axis=1, inplace=True)
             df.drop('src_sites', axis=1, inplace=True)
 
         if 'src_sites' in df.columns:
             df = self.replaceCol('src_sites', df, '\n')
         if 'dest_sites' in df.columns:
-            df = self.replaceCol('dest_sites', df, '\n'),
+            df = self.replaceCol('dest_sites', df, '\n')
         if 'anomalies' in df.columns:
             df['anomalies'] = df['anomalies'].apply(lambda x: ', '.join(map(str, x)))
             df.rename(columns={'anomalies': 'new ASN(s)'}, inplace=True)
+        if 'to_date' in df.columns:
+            df['to'] = pd.to_datetime(df['to_date'], format='mixed', utc=True)
+            df['to'] = df['to'].dt.strftime('%Y-%m-%d')
+            df.drop('to_date', axis=1, inplace=True)
+        if 'asn_list' in df.columns:
+            df.drop('asn_list', axis=1, inplace=True)
         if 'ipv' in df.columns:
             df['ipv'] = df['ipv'].apply(lambda x: x.lower() if x is not None else x)
             df.rename(columns={'ipv': 'IP version'}, inplace=True)
@@ -396,7 +396,7 @@ class Alarms(object):
         if event == 'complete packet loss':
           df.drop(columns=['avg_value'], inplace=True)
         elif event == 'ASN path anomalies':
-          df.drop(columns=['to_date', 'ipv6', 'asn_count'], inplace=True)
+          df.drop(columns=['asn_count'], inplace=True)
 
         # TODO: create pages/visualizatios for the following events then remove the df.drop('alarm_link') below
         if event not in ['unresolvable host']:
@@ -423,7 +423,6 @@ class Alarms(object):
   # Create dynamically the URLs leading to a page for a specific alarm
   def createAlarmURL(df, event, site_report=False):
     event_page_map = {
-        'path changed': 'paths/',
         'ASN path anomalies': 'anomalous_paths/',
         'firewall issue': 'loss-delay/',
         'complete packet loss': 'loss-delay/',
@@ -432,10 +431,13 @@ class Alarms(object):
         'high packet loss': 'loss-delay/',
         'hosts not found': 'hosts_not_found/'
     }
-    if event.startswith('bandwidth') and event != 'bandwidth decreased from/to multiple sites':
+    if event.startswith('bandwidth'):
         page = 'throughput/'
-    else:
+    elif event in event_page_map:
         page = event_page_map.get(event, '')
+    # else:
+    #     print("Event page in ps-dash was not found.")
+    #     return KeyError
     if not site_report:
     # create clickable cells leading to alarm pages
       if 'alarm_link' in df.columns:
@@ -511,10 +513,10 @@ class Alarms(object):
     try:
       for k, v in alarm['source'].items():
           field = '%{'+k+'}' if not k == 'avg_value' else 'p{'+k+'}'
-          if k == 'dest_loss%':
-            field = '%{dest_loss}'
-          elif k == 'src_loss%':
-            field = '%{src_loss}'
+          if k == 'dest_loss':
+            field = '{dest_loss}'
+          elif k == 'src_loss':
+            field = '{src_loss}'
           if k == '%change':
             field = '%{%change}%'
           if k == 'change':
