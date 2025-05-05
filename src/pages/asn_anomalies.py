@@ -67,13 +67,13 @@ def update_graphs_and_title(query_params):
     if not (src and dest):
         return html.Div(), "ASN-path anomalies"
 
-    data = qrs.query_ASN_anomalies(src, dest)
+    data = qrs.query_ASN_anomalies(src, dest, dt)
     if len(data) == 0:
         return html.Div([
             html.H1(f"No data found for alarm {src} to {dest}"),
             html.P('No data was found for the alarm selected. Please try another alarm.',
                    className="plot-subtitle")
-        ], className="l-h-3 p-2 boxwithshadow page-cont ml-1 p-1"), "ASN-path anomalies", "ASN-path anomalies"
+        ], className="l-h-3 p-2 boxwithshadow page-cont ml-1 p-1"), "ASN-path anomalies"
 
     anomalies = data['anomalies'].values[0]
     title = html.Div([

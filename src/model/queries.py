@@ -404,8 +404,9 @@ def getSubcategories():
   return catdf
 
 
-def query_ASN_anomalies(src, dest):
-  dateFrom, dateTo = hp.defaultTimeRange(days=2)
+def query_ASN_anomalies(src, dest, dt):
+  dateFrom = f"{dt}T00:00:00"
+  dateTo = f"{dt}T23:59:59"
   q = {
     "query": {
       "bool": {
