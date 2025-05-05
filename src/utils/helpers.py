@@ -1,4 +1,3 @@
-
 import multiprocessing as mp
 from datetime import datetime, timedelta
 import time
@@ -101,10 +100,24 @@ def roundTime(dt=None, round_to=60*60):
 
 # Expected values: time in miliseconds or string (%Y-%m-%dT%H:%M:%S.000Z')
 def FindPeriodDiff(dateFrom, dateTo):
-    d1 = datetime.strptime(dateFrom, DATE_FORMAT)
-    d2 = datetime.strptime(dateTo, DATE_FORMAT)
-    time_delta = d2-d1
-    return time_delta
+    # Try multiple formats to handle both with and without .000Z
+    for fmt in [DATE_FORMAT, "%Y-%m-%dT%H:%M:%S"]:
+        try:
+            d1 = datetime.strptime(dateFrom, fmt)
+            d2 = datetime.strptime(dateTo, fmt)
+            return d2 - d1
+        except ValueError:
+            continue
+    raise ValueError(f"Time data '{dateFrom}' or '{dateTo}' does not match expected formats.")
+
+
+def parse_datetime_multi(date_str):
+    for fmt in [DATE_FORMAT, "%Y-%m-%dT%H:%M:%S"]:
+        try:
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            continue
+    raise ValueError(f"Time data '{date_str}' does not match expected formats.")
 
 
 def GetTimeRanges(dateFrom, dateTo, intv=1):
@@ -114,7 +127,7 @@ def GetTimeRanges(dateFrom, dateTo, intv=1):
         if isinstance(dateFrom, int):
             t = (datetime.fromtimestamp(dateFrom/1000) + diff * i).strftime(DATE_FORMAT)
         else:
-            t = (datetime.strptime(dateFrom, DATE_FORMAT) + diff * i).strftime(DATE_FORMAT)
+            t = (parse_datetime_multi(dateFrom) + diff * i).strftime(DATE_FORMAT)
         tl.append(t)
     return tl
 
