@@ -27,6 +27,10 @@ def builMap(mapDf):
     mapDf['lat'] = mapDf['lat'].astype(float) + np.random.normal(scale=0.01, size=len(mapDf))
     mapDf['lon'] = mapDf['lon'].astype(float) + np.random.normal(scale=0.01, size=len(mapDf))
 
+    # Sort so that '🔴' and '🟡' are last (drawn on top)
+    status_order = {'⚪': 0, '🟢': 1, '🟡': 2, '🔴': 3}
+    mapDf = mapDf.sort_values(by='Status', key=lambda x: x.map(status_order))
+
     color_mapping = {
     '⚪': '#6a6969',
     '🔴': '#c21515',
@@ -35,9 +39,9 @@ def builMap(mapDf):
     }
 
     size_mapping = {
-    '⚪': 4,
-    '🔴': 3,
-    '🟡': 2,
+    '⚪': 1,
+    '🔴': 1,
+    '🟡': 1,
     '🟢': 1
     }
 
@@ -46,7 +50,7 @@ def builMap(mapDf):
     fig = px.scatter_mapbox(data_frame=mapDf, lat="lat", lon="lon",
                         color="Status",
                         color_discrete_map=color_mapping,
-                        size_max=11,
+                        size_max=6,
                         size='size',
                         hover_name="site",
                         custom_data=['Infrastructure','Network','Other'],
