@@ -347,7 +347,7 @@ class Alarms(object):
             df['anomalies'] = df['anomalies'].apply(lambda x: ', '.join(map(str, x)))
             df.rename(columns={'anomalies': 'new ASN(s)'}, inplace=True)
         if 'to_date' in df.columns:
-            df['to'] = pd.to_datetime(df['to_date'], utc=True)
+            df['to'] = pd.to_datetime(df['to_date'], format='mixed', utc=True)
             df['to'] = df['to'].dt.strftime('%Y-%m-%d')
             df.drop('to_date', axis=1, inplace=True)
         if 'ipv' in df.columns:
