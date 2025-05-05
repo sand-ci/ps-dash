@@ -215,7 +215,7 @@ def build_anomaly_heatmap(subset_sample):
 
     subset_sample['last_appearance_path'] = pd.to_datetime(subset_sample['last_appearance_path'], errors='coerce')
 
-    subset_sample['last_appearance_short'] = subset_sample['last_appearance_path'].dt.strftime('%H:%M %d-%b')
+    subset_sample['last_appearance_short'] = subset_sample['last_appearance_path'].dt.strftime('%H:%M:%S %d-%b')
 
     print('Size of dataset:', len(subset_sample))
     max_length = subset_sample["path_len"].max()
