@@ -177,7 +177,7 @@ def query_ASN_paths_pos_probs(src, dest, dt, ipv):
       if ipv != -1:
           ipv_q = {
             "term": {
-              "ipv6": ipv
+              "ipv6": True if ipv == 1 else False
             }
           }
           must_conditions.append(ipv_q)
