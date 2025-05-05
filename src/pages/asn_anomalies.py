@@ -88,6 +88,7 @@ def update_graphs_and_title(query_params):
 
 
 def addNetworkOwners(asn_list):
+    asn_list = sorted(asn_list, key=lambda x: int(x) if str(x).isdigit() else float('inf'))
     owners = qrs.getASNInfo(asn_list)
     asn_data = [{"asn": str(asn), "owner": owners.get(str(asn), "Unknown")} for asn in asn_list]
     return asn_data
