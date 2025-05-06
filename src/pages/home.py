@@ -186,7 +186,7 @@ def generate_status_table(alarmCnt):
 
     return element, pd.merge(df_pivot, alarmCnt[['site', 'lat', 'lon']].drop_duplicates(subset='site', keep='first'), on='site', how='left')
 
-
+@timer
 def get_country_code(country_name):
     try:
         country = pycountry.countries.search_fuzzy(country_name)[0]
@@ -195,6 +195,7 @@ def get_country_code(country_name):
         return ''
 
 
+@timer
 def total_number_of_alarms(sitesDf):
     metaDf = pq.readFile('parquet/raw/metaDf.parquet')
     sitesDf = pd.merge(sitesDf, metaDf[['lat', 'lon', 'country']], on=['lat', 'lon'], how='left').drop_duplicates()
@@ -269,7 +270,7 @@ def total_number_of_alarms(sitesDf):
 
     return html_elements
 
-
+@timer
 def createTable(df, id):
     return dash_table.DataTable(
             df.to_dict('records'),
@@ -309,7 +310,7 @@ def createTable(df, id):
             ],
             id=id)
 
-
+@timer
 def explainStatuses():
 
   # Infrastructure:
@@ -376,7 +377,9 @@ pq = Parquet()
 alarmsInst = Alarms()
 
 
-def layout(**other_unknown_query_strings):
+@timer
+def layout():
+    df = pd.read_parquet('parquet/alarmsGrouped.parquet')
     dateFrom, dateTo = hp.defaultTimeRange(days=2)
     now = hp.defaultTimeRange(days=2, datesOnly=True)
     alarmCnt = pq.readFile('parquet/alarmsGrouped.parquet')
@@ -502,6 +505,7 @@ def layout(**other_unknown_query_strings):
     ], className='', style={"padding": "0.5% 1% 0 1%"})
 
 
+@timer
 @dash.callback(
     [
         Output("sites-dropdown", "options"),
@@ -584,7 +588,7 @@ def update_output(n_clicks, start_date, end_date, sites, all, events, allevents,
     else:
         raise dash.exceptions.PreventUpdate
     
-
+@timer
 @dash.callback(
     [
     Output("how-status-modal", "is_open"),
@@ -615,6 +619,7 @@ def toggle_modal(n1, n2, is_open):
     return is_open, dash.no_update
 
 
+@timer
 def create_bar_chart(graphData):
     # Calculate the total counts for each event type
     # event_totals = graphData.groupby('event')['cnt'].transform('sum')
@@ -680,7 +685,7 @@ def create_bar_chart(graphData):
 
     return fig
 
-
+@timer
 # '''Takes selected site from the dropdpwn and generates a Dash datatable'''
 def generate_tables(frame, unpacked, event, alarmsInst):
     ids = unpacked['id'].values

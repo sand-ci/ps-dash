@@ -12,11 +12,7 @@ import utils.helpers as hp
 import model.queries as qrs
 from model.Alarms import Alarms
 from utils.parquet import Parquet
-from flask_caching import Cache
-
-# Initialize Flask-Caching
-cache = Cache()
-cache.init_app(dash.get_app().server, config={"CACHE_TYPE": "SimpleCache"})
+from utils.helpers import timer
 
 
 def title():
@@ -56,6 +52,7 @@ def get_dropdown_data(asn_anomalies, pivotFrames):
     return sitesDropdownData, asnsDropdownData
 
 
+@timer
 def layout(**other_unknown_query_strings):
     asn_anomalies = pq.readFile('parquet/frames/ASN_path_anomalies.parquet')
 
@@ -187,7 +184,7 @@ def colorMap(eventTypes):
 
   return paletteDict
 
-
+@timer
 def load_initial_data(selected_keys, asn_anomalies):
     dateFrom, dateTo = hp.defaultTimeRange(days=2)
     frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
@@ -245,6 +242,7 @@ def filterASN(df, selected_asns=[], selected_sites=[]):
   return df
 
 
+@timer
 def create_data_tables(sitesState, asnState, selected_keys):
     dateFrom, dateTo = hp.defaultTimeRange(days=2)
     frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
@@ -272,7 +270,7 @@ def create_data_tables(sitesState, asnState, selected_keys):
 
     return html.Div(dataTables)
 
-
+@timer
 def generate_data_tables(selected_keys, asn_anomalies):
     dateFrom, dateTo = hp.defaultTimeRange(days=2)
     frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
@@ -293,18 +291,16 @@ def generate_data_tables(selected_keys, asn_anomalies):
     return html.Div(dataTables)
 
 
-@cache.memoize(timeout=21600)  # Cache for 6 hours
 def get_heatmap_fig(asn_anomalies, dateFrom, dateTo):
     return create_anomalies_heatmap(asn_anomalies, dateFrom, dateTo)
 
 
-@cache.memoize(timeout=21600)  # Cache for 6 hours
 def get_parallel_cat_fig(sitesState, asnState):
     return build_parallel_categories_plot(sitesState, asnState)
 
 
+@timer
 def create_anomalies_heatmap(asn_anomalies, dateFrom, dateTo, selected_asns=[], selected_sites=[]):
-    print('Creating heatmap', dateFrom, dateTo, selected_asns, selected_sites)
     df = asn_anomalies.copy()
     df = df[df['to_date'] >= dateFrom]
     df = filterASN(df, selected_asns=selected_asns, selected_sites=selected_sites)
@@ -398,12 +394,13 @@ def create_anomalies_heatmap(asn_anomalies, dateFrom, dateTo, selected_asns=[], 
     return fig
 
 
+@timer
 # '''Takes the sites from the dropdown list and generates a Dash datatable'''
 def generate_tables(frame, pivotFrame, event, alarmsInst):
     ids = pivotFrame['id'].values
     dfr = frame[frame.index.isin(ids)]
     dfr = alarmsInst.formatDfValues(dfr, event).sort_values('to', ascending=False)
-    print('Paths page,', event, "Number of alarms:", len(dfr))
+    # print('Paths page,', event, "Number of alarms:", len(dfr))
 
     element = html.Div([
         html.Br(),
@@ -442,6 +439,7 @@ def generate_tables(frame, pivotFrame, event, alarmsInst):
     return element
 
 
+@timer
 # '''Creates a list of labels with network providers'''
 def addNetworkOwners(df, asn_list):
     owners = qrs.getASNInfo(asn_list)
@@ -454,6 +452,7 @@ def addNetworkOwners(df, asn_list):
     return customdata
 
 
+@timer
 def build_parallel_categories_plot(sitesState, asnState) -> go.Figure:
     """
     Query all docs with transitions existing and to_date==to_date,
@@ -534,6 +533,7 @@ def build_parallel_categories_plot(sitesState, asnState) -> go.Figure:
     )
 
     return fig
+
 
 
 def generate_figures(asn_anomalies):

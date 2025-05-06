@@ -10,6 +10,7 @@ import plotly.express as px
 import dash_bootstrap_components as dbc
 
 import model.queries as qrs
+from utils.helpers import timer
 
 urllib3.disable_warnings()
 
@@ -86,7 +87,7 @@ def update_graphs_and_title(query_params):
 
     return figures, title
 
-
+@timer
 def addNetworkOwners(asn_list):
     asn_list = sorted(asn_list, key=lambda x: int(x) if str(x).isdigit() else float('inf'))
     owners = qrs.getASNInfo(asn_list)
@@ -112,6 +113,7 @@ def generate_asn_cards(asn_data):
     return dbc.Row([dbc.Col(card, lg=2, md=2, sm=3, className="d-flex") for card in cards], className="g-3 align-items-stretch")
 
 
+@timer
 def generate_graphs(data, src, dest, dt):
     def create_graphs(ipv6_filter):
         heatmap_figure = build_anomaly_heatmap(data[data['ipv6'] == ipv6_filter])
@@ -184,6 +186,7 @@ def generate_graphs(data, src, dest, dt):
     ])
 
 
+@timer
 def build_position_based_heatmap(src, dest, dt, ipv) -> go.Figure:
     doc = qrs.query_ASN_paths_pos_probs(src, dest, dt, ipv)
 
@@ -209,6 +212,7 @@ def build_position_based_heatmap(src, dest, dt, ipv) -> go.Figure:
     return fig
 
 
+@timer
 def build_anomaly_heatmap(subset_sample):
     columns = ['src_netsite', 'dest_netsite', 'anomalies', 'ipv6']
     src_site, dest_site, anomaly, ipv = subset_sample[columns].values[0]
