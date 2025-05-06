@@ -31,7 +31,7 @@ import utils.helpers as hp
 from utils.helpers import timer
 import model.queries as qrs
 from utils.parquet import Parquet
-from utils.utils import defineStatus, explainStatuses, create_heatmap, createDictionaryWithHistoricalData, generate_plotly_heatmap_with_anomalies, extractAlarm, getSitePairs, getRawDataFromES
+from utils.utils import defineStatus, explainStatuses, create_heatmap, createDictionaryWithHistoricalData, generate_graphs, extractAlarm, getSitePairs, getRawDataFromES
 from utils.components import siteBoxPathChanged, siteMeasurements, toggleCollapse, pairDetails, loss_delay_kibana, bandwidth_increased_decreased, throughput_graph_components
 import functools
 from collections import Counter
@@ -1075,23 +1075,46 @@ def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, visibility, 
 
                     
                 if event == 'ASN path anomalies':
-                    src, dest = button_id['index'].split('*')
+                    src, dest, dt = button_id['index'].split('*')
                     # print(f"src: {src}, dest: {dest}")
-                    data = qrs.query_ASN_anomalies(src, dest, dates=[f"{fromDay.replace(' ', 'T')}.000Z", f"{toDay.replace(' ', 'T')}.000Z"])
+                    # dt = [f"{fromDay.replace(' ', 'T')}.000Z", f"{toDay.replace(' ', 'T')}.000Z"]
+                    print("==========================")
+                    print(dt)
+                    data = qrs.query_ASN_anomalies(src, dest, dt)
                     # print(data)
                     if len(data) > 0:
-                        if len(data['ipv6'].unique()) == 2:
-                            ipv6_figure = generate_plotly_heatmap_with_anomalies(data[data['ipv6'] == True])
-                            ipv4_figure = generate_plotly_heatmap_with_anomalies(data[data['ipv6'] == False])
-                            figures = [
-                                dcc.Graph(figure=ipv4_figure, id="asn-sankey-ipv4"),
-                                dcc.Graph(figure=ipv6_figure, id="asn-sankey-ipv6")
-                            ]
-                        else:
-                            figure = generate_plotly_heatmap_with_anomalies(data)
-                            figures = [dcc.Graph(figure=figure, id="asn-sankey-ipv4")]
-                        # alarm = qrs.getAlarm(q)['source']
-                        return html.Div(figures), event, data.to_dict(), visibility
+                        # if len(data['ipv6'].unique()) == 2:
+                            # ipv6_figure = generate_plotly_heatmap_with_anomalies(data[data['ipv6'] == True])
+                            # ipv4_figure = generate_plotly_heatmap_with_anomalies(data[data['ipv6'] == False])
+                            # figures = [
+                            #     dcc.Graph(figure=ipv4_figure, id="asn-sankey-ipv4"),
+                            #     dcc.Graph(figure=ipv6_figure, id="asn-sankey-ipv6")
+                            # ]
+                            anomalies = data['anomalies'].values[0]
+                            title = html.Div([
+                                html.Span(f"{src} → {dest}", className="sites-anomalies-title"),
+                                html.Span(" ||| ", style={"margin": "0 10px", "color": "#6c757d", "fontSize": "20px"}),
+                                html.Span(f"Anomalies: {anomalies}", className="anomalies-title"),
+                            ], style={"textAlign": "center", "marginBottom": "20px"})
+
+                            figures = generate_graphs(data, src, dest, dt)
+                            
+                    else:
+                        # figure = generate_plotly_heatmap_with_anomalies(data)
+                        # figures = [dcc.Graph(figure=figure, id="asn-sankey-ipv4")]
+                        return html.Div([
+                                    html.H1(f"No data found for alarm {src} to {dest}"),
+                                    html.P('No data was found for the alarm selected. Please try another alarm.',
+                                        className="plot-subtitle")
+                                ], className="l-h-3 p-2 boxwithshadow page-cont ml-1 p-1"), event, data.to_dict(), visibility
+                    return html.Div([
+                                html.Div([
+                                    html.H1(children=title),
+                                ], className="l-h-3 p-2"),
+                                dcc.Loading(id='loading-spinner-2', type='default', children=[
+                                    html.Div(children=figures)
+                                ], color='#00245A'),
+                            ], className="l-h-3 p-2 boxwithshadow page-cont ml-1 p-1"), event, data.to_dict(), visibility
                 else:
                     print(f"id: {id}, event: {event}")
                     alarm_cont = qrs.getAlarm(id)

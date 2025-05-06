@@ -404,9 +404,9 @@ def getSubcategories():
   return catdf
 
 
-def query_ASN_anomalies(src, dest, dates=hp.defaultTimeRange(days=2)):
-  print(dates)
-  dateFrom, dateTo = dates
+def query_ASN_anomalies(src, dest, dt):
+  dateFrom = f"{dt}T00:00:00"
+  dateTo = f"{dt}T23:59:59"
   q = {
     "query": {
       "bool": {
@@ -456,6 +456,7 @@ def query_ASN_anomalies(src, dest, dates=hp.defaultTimeRange(days=2)):
 
   ddf = pd.DataFrame(data)
   return ddf
+
 
 
 def queryPathAnomaliesDetails(dateFrom, dateTo, idx='ps_traces_changes'):

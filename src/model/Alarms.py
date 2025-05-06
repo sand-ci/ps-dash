@@ -446,9 +446,9 @@ class Alarms(object):
             lambda id: f"<a class='btn btn-secondary' role='button' href='{url}{id}' target='_blank'>VIEW IN A NEW TAB</a>" if id else '-')
       
       if event == 'ASN path anomalies':
-        df['alarm_link'] = df.apply(
-          lambda row: f"<a class='btn btn-secondary' role='button' href='{request.host_url}anomalous_paths/src_netsite={row['src_netsite']}&dest_netsite={row['dest_netsite']}' target='_blank'>VIEW IN A NEW TAB</a>" if row['src_netsite'] and row['dest_netsite'] else '-', axis=1)
-      
+            df['alarm_link'] = df.apply(
+              lambda row: f"<a class='btn btn-secondary' role='button' href='{request.host_url}anomalous_paths/src_netsite={row['src_netsite']}&dest_netsite={row['dest_netsite']}&dt={row['to']}' target='_blank'>VIEW IN A NEW TAB</a>" if row['src_netsite'] and row['dest_netsite'] else '-', axis=1)
+        
       if event == "hosts not found":
             df['alarm_link'] = df.apply(
               lambda row: f"<a class='btn btn-secondary' role='button' href='{request.host_url}hosts_not_found/{row['site']}' target='_blank'>VIEW IN A NEW TAB</a>" if row['site'] else '-', axis=1)
@@ -458,7 +458,7 @@ class Alarms(object):
             df['alarm_link'] = df.apply(
                 lambda row: dbc.Button(
                     "VIEW DETAILS",
-                    id={'type': 'path-anomaly-btn', 'index': f"{row['src_netsite']}*{row['dest_netsite']}"},
+                    id={'type': 'path-anomaly-btn', 'index': f"{row['src_netsite']}*{row['dest_netsite']}*{row['to']}"},
                     className="btn btn-secondary",
                     n_clicks=0
                 ) if row['src_netsite'] and row['dest_netsite'] else '-',
