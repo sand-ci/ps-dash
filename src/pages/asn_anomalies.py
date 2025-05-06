@@ -73,8 +73,6 @@ def update_graphs_and_title(query_params):
     print(src, dest, dt)
     if not (src and dest):
         return html.Div(), "ASN-path anomalies"
-    print("==================================")
-    print(dt)
     data = qrs.query_ASN_anomalies(src, dest, dt)
     if len(data) == 0:
         return html.Div([

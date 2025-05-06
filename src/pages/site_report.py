@@ -82,12 +82,12 @@ def layout(q=None, **other_unknown_query_strings):
     pq = Parquet()
     
     now = datetime.now()
-    fromDay = (now - timedelta(days=8)).replace(hour=0, minute=0, second=0, microsecond=0)
-    fromDay = fromDay.strftime('%Y-%m-%dT%H:%M:%S.000Z')  # "2024-02-20 00:00:00"
+    fromDay_date = (now - timedelta(days=8)).replace(hour=0, minute=0, second=0, microsecond=0)
+    fromDay = fromDay_date.strftime('%Y-%m-%dT%H:%M:%S.000Z')  # "2024-02-20 00:00:00"
 
     # Calculate toDay (2 days ago at 23:59:59)
-    toDay = (now - timedelta(days=1)).replace(hour=00, minute=00, second=00, microsecond=00000)
-    toDay = toDay.strftime('%Y-%m-%dT%H:%M:%S.000Z')  # "2024-02-26 23:59:59"
+    toDay_date = (now - timedelta(days=1)).replace(hour=00, minute=00, second=00, microsecond=00000)
+    toDay = toDay_date.strftime('%Y-%m-%dT%H:%M:%S.000Z')  # "2024-02-26 23:59:59"
     
     # toDay = toDay - timedelta(days=2)
     global pivotFrames
@@ -107,7 +107,6 @@ def layout(q=None, **other_unknown_query_strings):
     if 'path changed' in frames:
         frames.pop("path changed", None)
     
-        
     
     ########TODO: count the most frequent host
     alarms_with_hosts = {'destination cannot be reached from any':'hosts', 'destination cannot be reached from multiple':'hosts', 
@@ -118,6 +117,8 @@ def layout(q=None, **other_unknown_query_strings):
     all_hosts = []
     for frame in frames:
         df = frames[frame]
+        # pivotFrames = pivotFrames[pivotFrames['to'] >= fromDay_date]
+        df = df[pd.to_datetime(df['to']).dt.date >= fromDay_date.date()]
         site_df = df[df['tag'].apply(lambda x: q in x)]
         
         if not site_df.empty:
@@ -652,9 +653,13 @@ def create_bar_chart(graphData, column_name='alarm group'):
 
 def create_status_chart_explained(graphData, fromDay, toDay):
     # Convert input dates to datetime
+    # print("====================================")
     fromDay = pd.to_datetime(fromDay)
     toDay = pd.to_datetime(toDay)
-    
+    # print(fromDay)
+    # print(toDay)
+    # print(graphData['to'].head(1))
+    # print("=================================")
     # Create figure with proper spacing
     fig = make_subplots(
         rows=2, 
@@ -663,6 +668,8 @@ def create_status_chart_explained(graphData, fromDay, toDay):
         vertical_spacing=0.15,
         row_heights=[0.2, 0.8]  # 20% for status bar, 80% for alarms
     )
+    # graphData['to'] = pd.to_datetime(graphData['to'])
+    graphData = graphData[(pd.to_datetime(graphData['to']).dt.date >= fromDay.date()) & (pd.to_datetime(graphData['to']).dt.date <= toDay.date())]
     graphData = graphData.groupby(['to', "alarm name"]).size().reset_index(name='cnt')
     red_status_days, yellow_status_days, grey_status_days = defineStatus(graphData, "alarm name", 'to')
     days = sorted(pd.to_datetime(graphData['to'].unique()))
@@ -833,53 +840,6 @@ def create_status_chart(graphData):
     # fig.show()
     return fig
     
-# def create_status_chart(graphData):
-#     graphData= graphData.groupby(['to', f"alarm name"]).size().reset_index(name='cnt')
-#     red_status_days, yellow_status_days, grey_status_days = defineStatus(graphData, "alarm name", 'to')
-#     days = sorted(graphData['to'].unique())
-#     colors = []
-#     for day in days:
-#         if day in red_status_days:
-#             colors.append('darkred')
-#         elif day in yellow_status_days:
-#             colors.append('goldenrod')
-#         elif day in grey_status_days:
-#             colors.append('grey')
-#         else:
-#             colors.append('green')
-
-#     # Create the figure
-#     fig = go.Figure()
-#     # Add dots (markers) for each date
-#     fig.add_trace(go.Scatter(
-#         x=days,
-#         y=[1]*len(days),  # Constant y-value to make a straight line
-#         mode='markers',
-#         marker=dict(
-#             color=colors,
-#             size=16,
-#             symbol='circle',
-#             opacity=0.9
-#         ),
-#         name='Status'
-#     ))
-#     fig.update_xaxes(
-#         tickangle = 45
-#         )
-#     # Customize layout
-#     fig.update_layout(
-#         title=dict(text='Daily Status Overview',
-#                    font=dict(
-#                        size=14
-#                        )
-#                    ),
-#         margin=dict(l=0, r=0, t=25, b=0),
-        
-#         yaxis=dict(visible=False),  # Hide y-axis as it's just for visual spacing
-#         showlegend=False
-#     )
-#     return fig
-
 @dash.callback(
     [
         Output('alarms-table', 'children'),
@@ -1083,13 +1043,6 @@ def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, visibility, 
                     data = qrs.query_ASN_anomalies(src, dest, dt)
                     # print(data)
                     if len(data) > 0:
-                        # if len(data['ipv6'].unique()) == 2:
-                            # ipv6_figure = generate_plotly_heatmap_with_anomalies(data[data['ipv6'] == True])
-                            # ipv4_figure = generate_plotly_heatmap_with_anomalies(data[data['ipv6'] == False])
-                            # figures = [
-                            #     dcc.Graph(figure=ipv4_figure, id="asn-sankey-ipv4"),
-                            #     dcc.Graph(figure=ipv6_figure, id="asn-sankey-ipv6")
-                            # ]
                             anomalies = data['anomalies'].values[0]
                             title = html.Div([
                                 html.Span(f"{src} → {dest}", className="sites-anomalies-title"),
@@ -1100,8 +1053,6 @@ def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, visibility, 
                             figures = generate_graphs(data, src, dest, dt)
                             
                     else:
-                        # figure = generate_plotly_heatmap_with_anomalies(data)
-                        # figures = [dcc.Graph(figure=figure, id="asn-sankey-ipv4")]
                         return html.Div([
                                     html.H1(f"No data found for alarm {src} to {dest}"),
                                     html.P('No data was found for the alarm selected. Please try another alarm.',
@@ -1118,7 +1069,7 @@ def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, visibility, 
                 else:
                     print(f"id: {id}, event: {event}")
                     alarm_cont = qrs.getAlarm(id)
-                    if event in ["complete packet loss", "high packet loss"]:
+                    if event in ["complete packet loss", "high packet loss", "firewall issue"]:
                         
                         print('URL query:', id)
                         print()
@@ -1383,79 +1334,3 @@ def toggle_container(n_clicks, current_style):
     if n_clicks and n_clicks % 2 == 1:  # Odd click - expand
         return {"height": "400px", "transition": "height 0.3s ease"}, "Hide Details"
     return {"height": "110px", "transition": "height 0.3s ease"}, "Show Details ⬇"
-# # @dash.callback(
-# #     Output("site-status-explanation", "style"),
-# #     Input("status-explanation-trigger", "n_clicks"),
-# #     State("site-status-explanation", "style")
-# # )
-# # def toggle_explanation(n_clicks, current_style):
-# #     if n_clicks and n_clicks > 0:
-# #         if current_style.get("display") == "none":
-# #             return {"display": "block"}
-# #         else:
-# #             return {"display": "none"}
-# #     return current_style
-
-
-
-# dash.clientside_callback(
-#     """
-#     function(alarmClicks, pathClicks, hostsClicks, measurementsClick) {
-#         const ctx = dash_clientside.callback_context;
-#         // Only proceed if something was triggered
-#         if (ctx.triggered.length > 1) return dash_clientside.no_update;
-        
-#         const triggered = ctx.triggered[0];
-#         console.log('Triggered by:', triggered.prop_id);
-
-#         // Check if measurements button was clicked
-#         if (triggered.prop_id === 'view-measurements-btn.n_clicks') {
-#             setTimeout(() => {
-#                 const element = document.getElementById('site-measurements');
-#                 if (element) {
-#                     element.scrollIntoView({
-#                         behavior: 'smooth',
-#                         block: 'start'
-#                     });
-#                 }
-#             }, 300);
-#         } 
-#         // Handle pattern-matched buttons (original logic)
-#         else {
-#             const isInitialLoad = triggered.prop_id === '.' && triggered.value === null;
-#             if (!isInitialLoad) {
-#                 setTimeout(() => {
-#                     const element = document.getElementById('alarm-content-section');
-#                     if (element) {
-#                         const yOffset = -100;
-#                         const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
-#                         window.scrollTo({top: y, behavior: 'smooth'});
-#                     }
-#                 }, 350);
-#             }
-#         }
-#         return dash_clientside.no_update;
-#     }
-#     """,
-#     Output('scroll-trigger', 'children'),
-#     [
-#         Input({'type': 'alarm-link-btn', 'index': ALL}, 'n_clicks'),
-#         Input({'type': 'path-anomaly-btn', 'index': ALL}, 'n_clicks'),
-#         Input({'type': 'hosts-not-found-btn', 'index': ALL}, 'n_clicks'),
-#         Input('view-measurements-btn', 'n_clicks'),
-#     ],
-#     prevent_initial_call=True
-# )
-# @dash.callback(
-#     Output("site-status-explanation", "children"),  # This can be any output you're not using
-#     Input("status-explanation-trigger", "n_clicks"),
-#     prevent_initial_call=True
-# )
-# def scroll_to_explanation(n_clicks):
-#     print(n_clicks)
-#     ctx = dash.callback_context
-#     print(f"ctx.triggered: {ctx.triggered}")
-#     # ctx.triggered: [{'prop_id': 'status-explanation-trigger.n_clicks', 'value': 1}]
-#     if n_clicks:
-#         return dcc.Location(id="dummy-location", pathname="site_report/MWT2_IU#site-status-explanation")
-#     return None
