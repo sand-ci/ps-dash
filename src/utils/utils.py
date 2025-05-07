@@ -315,6 +315,8 @@ def create_heatmap(site_dict, site, date_from, date_to, test_types=None, hostnam
         plotly.graph_objects.Figure: The heatmap figure.
     """
     print("In create_heatmap function site_report...")
+    print(site)
+    print(site_dict)
     site_dict = site_dict[site_dict['site']==site]
     print(site_dict)
     # Get the records for the specified site

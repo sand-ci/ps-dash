@@ -303,7 +303,7 @@ def obtainFieldNames(dateFrom):
     return {'src': 'src_site', 'dest': 'dest_site'}
   
 def loss_delay_kibana(alarmContent, event):
-    query=""
+    query = ''
     if 'src' in alarmContent.keys() and 'dest' in alarmContent.keys():
       query = f'src:{alarmContent["src"]} and dest:{alarmContent["dest"]}'
     if 'src_host' in alarmContent.keys() and 'dest_host' in alarmContent.keys():
@@ -321,13 +321,13 @@ def loss_delay_kibana(alarmContent, event):
     pq = Parquet()
     metaDf = pq.readFile('parquet/raw/metaDf.parquet')
 
-    
+    alarmsInst = Alarms()
     url = f'https://atlas-kibana.mwt2.org:5601/s/networking/app/dashboards?auth_provider_hint=anonymous1#/view/e015c210-65e2-11ed-afcf-d91dad577662?embed=true&_g=(filters%3A!()%2CrefreshInterval%3A(pause%3A!t%2Cvalue%3A0)%2Ctime%3A{timeRange})&show-query-input=true&show-time-filter=true&_a=(query:(language:kuery,query:\'{query}\'))'
-      
+    
     kibanaIframe = []
     if event == 'high packet loss on multiple links':
       if len(alarmContent["dest_sites"])>0:
-        original_names = metaDf[metaDf['netsite'].isin(alarmContent["dest_sites"])]['netsite_original'].unique()
+        original_names = metaDf[metaDf['netsite'].isin(alarmContent["dest_sites"])]['netsite'].unique()
         dest_sites = str(list(s for s in set(original_names))).replace('\'', '"').replace('[','').replace(']','').replace(',', ' OR')
         query = f'src_host: {alarmContent["host"]} and {fieldName["dest"]}:({dest_sites})'
         url = f'https://atlas-kibana.mwt2.org:5601/s/networking/app/dashboards?auth_provider_hint=anonymous1#/view/ee5a6310-8c40-11ed-8156-b9b28813464d?embed=true&_g=(filters%3A!()%2CrefreshInterval%3A(pause%3A!t%2Cvalue%3A0)%2Ctime%3A{timeRange})&show-query-input=true&show-time-filter=true&hide-filter-bar=true&_a=(query:(language:kuery,query:\'{query}\'))'
@@ -336,9 +336,9 @@ def loss_delay_kibana(alarmContent, event):
             dbc.Row(html.H3(f"Issues from {alarmContent['site']}")),
             dbc.Row(html.Iframe(src=url, style={"height": "600px"}))
           ], className="boxwithshadow pair-details g-0 mb-1 p-3"))
-      
+        
       if len(alarmContent["src_sites"]) > 0:
-        original_names = metaDf[metaDf['netsite'].isin(alarmContent["src_sites"])]['netsite_original'].unique()
+        original_names = metaDf[metaDf['netsite'].isin(alarmContent["src_sites"])]['netsite'].unique()
         src_sites = str(list(s for s in set(original_names))).replace('\'', '"').replace('[','').replace(']','').replace(',', ' OR')
         query = f'dest_host: {alarmContent["host"]} and {fieldName["src"]}:({src_sites})'
         url = f'https://atlas-kibana.mwt2.org:5601/s/networking/app/dashboards?auth_provider_hint=anonymous1#/view/920cd1f0-8c41-11ed-8156-b9b28813464d?embed=true&_g=(filters%3A!()%2CrefreshInterval%3A(pause%3A!t%2Cvalue%3A0)%2Ctime%3A{timeRange})&show-query-input=true&show-time-filter=true&_a=(query:(language:kuery,query:\'{query}\'))'
