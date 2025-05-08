@@ -481,7 +481,7 @@ def queryPathAnomaliesDetails(dateFrom, dateTo, idx='ps_traces_changes'):
     for hit in res["hits"]["hits"]:
         for t in hit["_source"].get("transitions", []):
             records.append(t)
-    df = pd.DataFrame(records).drop_duplicates()
+    df = pd.DataFrame(records)
     return df
 
 
