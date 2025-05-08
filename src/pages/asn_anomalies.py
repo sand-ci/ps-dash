@@ -228,7 +228,7 @@ def build_anomaly_heatmap(subset_sample):
         subset_sample['repaired_asn_path'].tolist(),
         index=subset_sample.index,
         columns=[f"pos_{i+1}" for i in range(max_length)]
-    ).applymap(lambda x: int(x) if isinstance(x, (int, float)) and not pd.isna(x) else x)
+    ).map(lambda x: int(x) if isinstance(x, (int, float)) and not pd.isna(x) else x)
 
     font_size = 15
     if max_length > 24: font_size = 10
@@ -246,13 +246,13 @@ def build_anomaly_heatmap(subset_sample):
     color_list = ['#FFFFFF'] + expanded_colors
     color_list[rid_to_index[0]] = '#000000'
 
-    index_df = pivot_df.applymap(lambda x: rid_to_index.get(x, 0))
+    index_df = pivot_df.map(lambda x: rid_to_index.get(x, 0))
 
     index_to_color = {i: color_list[i] for i in range(len(color_list))}
     hover_bgcolor = np.array([index_to_color.get(z, '#FFFFFF') for row in index_df.values for z in row]).reshape(index_df.shape)
 
     # Ensure customdata values are strings
-    customdata = pivot_df.applymap(lambda x: str(int(x)) if pd.notna(x) else "").values
+    customdata = pivot_df.map(lambda x: str(int(x)) if pd.notna(x) else "").values
 
     fig = go.Figure()
     heatmap = go.Heatmap(
