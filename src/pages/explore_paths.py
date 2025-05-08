@@ -221,7 +221,7 @@ def update_figures(n_clicks, asnStateValue, sitesStateValue):
         asnState = asnStateValue if asnStateValue else []
 
         parallel_cat_fig = get_parallel_cat_fig(sitesState, asnState)
-        heatmap_fig = get_heatmap_fig(asn_anomalies, dateFrom, dateTo)
+        heatmap_fig = get_heatmap_fig(asn_anomalies, dateFrom, dateTo, selected_asns=asnState, selected_sites=sitesState)
         datatables = create_data_tables(sitesState, asnState, selected_keys)
         return parallel_cat_fig, heatmap_fig, datatables
 
@@ -229,17 +229,12 @@ def update_figures(n_clicks, asnStateValue, sitesStateValue):
 
 
 def filterASN(df, selected_asns=[], selected_sites=[]):
-
-  if selected_asns:
-      s = df.apply(lambda x: pd.Series(x['anomalies']), axis=1).stack().reset_index(level=1, drop=True)
-      s.name = 'asn'
-      df = df.join(s)
-      df = df[df['asn'].isin(selected_asns)]
-      df = df.drop('asn', axis=1).drop_duplicates(subset=['alarm_id'])
-  if selected_sites:
-      df = df[(df['src_netsite'].isin(selected_sites)) | (df['dest_netsite'].isin(selected_sites))]
-  
-  return df
+    if selected_asns:
+        # Only keep rows where any of the selected ASNs is in the anomalies list
+        df = df[df['anomalies'].apply(lambda asn_list: any(str(a) in [str(x) for x in asn_list] for a in selected_asns))]
+    if selected_sites:
+        df = df[(df['src_netsite'].isin(selected_sites)) | (df['dest_netsite'].isin(selected_sites))]
+    return df
 
 
 @timer
@@ -291,8 +286,8 @@ def generate_data_tables(selected_keys, asn_anomalies):
     return html.Div(dataTables)
 
 
-def get_heatmap_fig(asn_anomalies, dateFrom, dateTo):
-    return create_anomalies_heatmap(asn_anomalies, dateFrom, dateTo)
+def get_heatmap_fig(asn_anomalies, dateFrom, dateTo, selected_asns=[], selected_sites=[]):
+    return create_anomalies_heatmap(asn_anomalies, dateFrom, dateTo, selected_asns=selected_asns, selected_sites=selected_sites)
 
 
 def get_parallel_cat_fig(sitesState, asnState):
