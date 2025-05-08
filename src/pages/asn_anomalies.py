@@ -195,7 +195,7 @@ def build_position_based_heatmap(src, dest, dt, ipv) -> go.Figure:
 
     fig = go.Figure(go.Heatmap(
         z=hm["probs"],
-        x=[f"pos {p+1}" for p in hm["positions"]],
+        x=[f"pos_{p+1}" for p in hm["positions"]],
         y=[str(a) for a in hm["asns"]],
         colorscale=[[0.0, "white"], [0.001, "#caf0f8"], [0.4, "#00b4d8"], [0.9, "#03045e"], [1, "black"]],
         zmin=0, zmax=1,
@@ -219,7 +219,6 @@ def build_anomaly_heatmap(subset_sample):
     ipv = 'IPv6' if ipv else 'IPv4'
 
     subset_sample['last_appearance_path'] = pd.to_datetime(subset_sample['last_appearance_path'], errors='coerce')
-
     subset_sample['last_appearance_short'] = subset_sample['last_appearance_path'].dt.strftime('%H:%M:%S %d-%b')
 
     print('Size of dataset:', len(subset_sample))
@@ -230,6 +229,11 @@ def build_anomaly_heatmap(subset_sample):
         index=subset_sample.index,
         columns=[f"pos_{i+1}" for i in range(max_length)]
     ).applymap(lambda x: int(x) if isinstance(x, (int, float)) and not pd.isna(x) else x)
+
+    font_size = 15
+    if max_length > 24: font_size = 10
+    elif max_length > 18: font_size = 11
+    elif max_length > 16: font_size = 13
 
     unique_rids = pd.Series(pivot_df.stack().unique()).dropna().tolist()
     if 0 not in unique_rids:
@@ -276,7 +280,7 @@ def build_anomaly_heatmap(subset_sample):
                         text=int(asn),
                         showarrow=False,
                         bordercolor='white',
-                        font=dict(color='white', size=15, family="Arial"),
+                        font=dict(color='white', size=font_size, family="Arial"),
                     )
                 else:
                     fig.add_annotation(
@@ -284,7 +288,7 @@ def build_anomaly_heatmap(subset_sample):
                         y=subset_sample['last_appearance_short'].iloc[idx],
                         text=int(asn),
                         showarrow=False,
-                        font=dict(color='white', size=15, family="Arial"),
+                        font=dict(color='white', size=font_size, family="Arial"),
                     )
 
     fig.update_layout(
