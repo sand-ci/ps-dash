@@ -495,7 +495,7 @@ def layout(q=None, **other_unknown_query_strings):
                 )
         ], className="ml-1 mt-1 mr-0 mb-1"),
     
-        # section with alarm visualisation that is shown the the button near an alarm was pressed
+        # section with alarm visualisation that is shown if the button near an alarm was pressed
        dbc.Row([
             dbc.Row(
                 dbc.Col([
@@ -608,7 +608,7 @@ def create_bar_chart(graphData, column_name='alarm group'):
 
 def create_status_chart_explained(graphData, fromDay, toDay):
     """
-    This function creates the statur horizontal bar chart where 
+    This function creates the horizontal bar chart where 
     the status of the site throughout the week is shown and the
     alarms which explain it are highlighted.
     """
@@ -619,7 +619,6 @@ def create_status_chart_explained(graphData, fromDay, toDay):
     # print(toDay)
     # print(graphData['to'].head(1))
     # print("=================================")
-    # Create figure with proper spacing
     fig = make_subplots(
         rows=2, 
         cols=1, 
@@ -627,7 +626,6 @@ def create_status_chart_explained(graphData, fromDay, toDay):
         vertical_spacing=0.15,
         row_heights=[0.2, 0.8]  # 20% for status bar, 80% for alarms
     )
-    # graphData['to'] = pd.to_datetime(graphData['to'])
     graphData = graphData[(pd.to_datetime(graphData['to']).dt.date >= fromDay.date()) & (pd.to_datetime(graphData['to']).dt.date <= toDay.date())]
     graphData = graphData.groupby(['to', "alarm name"]).size().reset_index(name='cnt')
     red_status, yellow_status, grey_status = defineStatus(graphData, "alarm name", ['to', 'alarm name'])
@@ -676,7 +674,6 @@ def create_status_chart_explained(graphData, fromDay, toDay):
         'complete packet loss': ('grey', 'moderate')
     }
     
-    # Create pivot table
     pivot_df = graphData.pivot_table(
         index='alarm name',
         columns='day',
@@ -685,7 +682,6 @@ def create_status_chart_explained(graphData, fromDay, toDay):
         fill_value=0
     ).reindex(columns=days, fill_value=0)
     alarm_names = graphData['alarm name'].unique()
-    # Add bars for each alarm type
     for alarm in alarm_names:
         for i, date in enumerate(days):
             count = pivot_df.loc[alarm, date]
@@ -707,16 +703,6 @@ def create_status_chart_explained(graphData, fromDay, toDay):
                 width=0.8,
                 base=i  # Position along the x-axis
             ), row=2, col=1)
-    # for alarm in pivot_df.index:
-    #     fig.add_trace(go.Bar(
-    #         y=[alarm],
-    #         x=pivot_df.loc[alarm].values,
-    #         orientation='h',
-    #         marker_color=[alarm_colors.get(alarm, 'lightgrey')]*len(days),
-    #         name=alarm,
-    #         hoverinfo='x+name',
-    #         width=0.5
-    #     ), row=2, col=1)
     
     # --- LAYOUT CONFIGURATION ---
     fig.update_layout(
@@ -742,65 +728,6 @@ def create_status_chart_explained(graphData, fromDay, toDay):
     )
     
     return fig
-
-def create_status_chart(graphData):
-    # Process data
-    graphData = graphData.groupby(['to', "alarm name"]).size().reset_index(name='cnt')
-    red_status_days, yellow_status_days, grey_status_days = defineStatus(graphData, "alarm name", 'to')
-    days = sorted(pd.to_datetime(graphData['to'].unique()))
-
-    # Create status mapping (1 = colored segment, 0 = no segment)
-    status_data = []
-    for day in days:
-        day_str = day.strftime('%Y-%m-%d')
-        day_formated = day.strftime('%d %b')
-        if day_str in red_status_days:
-            status_data.append(('darkred', 1, day_formated))
-        elif day_str in yellow_status_days:
-            status_data.append(('goldenrod', 1, day_formated))
-        elif day_str in grey_status_days:
-            status_data.append(('grey', 1, day_formated))
-        else:
-            status_data.append(('green', 1, day_formated))
-    
-    # Create horizontal stacked bar
-    fig = go.Figure()
-    
-    # Add each day as a separate bar segment
-    for i, (color, value, date) in enumerate(status_data):
-        fig.add_trace(go.Bar(
-            y=['Status'],  # Single row
-            x=[value],    # Value (always 1)
-            orientation='h',
-            marker=dict(color=color),
-            width=0.8,    # Bar thickness
-            name=days[i].strftime('%Y-%m-%d'),  # Day as label
-            hoverinfo='name',
-            # xaxis=dict(visible=True),
-            base=sum(x[1] for x in status_data[:i])  # Stacking position
-        ))
-    
-    # Customize layout
-    fig.update_xaxes(
-    ticktext=[x[2] for x in status_data],
-    tickvals=[x for x in range(1, len(status_data)+1)]
-    )
-    fig.update_yaxes(
-        tickangle = 0,
-        ticklabelposition="inside"
-    )
-    fig.update_layout(
-        barmode='stack',
-        xaxis=dict(visible=True),  # Hide x-axis
-        yaxis=dict(visible=True),
-        showlegend=False,
-        height=25,  # Fixed height for status bar
-        margin=dict(l=0, r=0, t=30, b=10),
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)'
-    )
-    # fig.show()
-    return fig
     
 @dash.callback(
     [
@@ -814,7 +741,6 @@ def create_status_chart(graphData):
         Output("num-alarms", "children"),
     ],
     [
-        # Input('alarms-data', 'data'),
         Input('filter-date', 'value'),
         Input('filter-ip', 'value'),
         Input('filter-group', 'value'),
@@ -829,7 +755,10 @@ def create_status_chart(graphData):
     ]
 )
 def update_alarms_table(date_filter, ip_filter, group_filter, type_filter, btn_type_clicks, btn_name_clicks, figure, df, active_btn):
-            
+    """
+    This function creates the table with all the alarms
+    listed and updates it based on chosen filters.
+    """
     print("Debugging update_alarms_table")
     
     df = pd.DataFrame(df)
@@ -871,9 +800,7 @@ def update_alarms_table(date_filter, ip_filter, group_filter, type_filter, btn_t
                                                 "height": "100%",
                                                 "overflowY": "auto",
                                                 "width": "100%"
-                                            },
-                                            
-                                        
+                                            },            
         )
         
     else:
@@ -891,13 +818,6 @@ def update_alarms_table(date_filter, ip_filter, group_filter, type_filter, btn_t
             active_btn,
             str(len(df)))
 
-def generate_alarm_content(alarm=""):
-    return html.Div([
-        html.H4(f"{alarm}"),
-        dbc.Col(),  # Your plotting logic
-        dbc.Button("Close", id="close-btn", className="mt-3")
-    ])
-
 @dash.callback(
     [
     Output("how-status-modal-report", "is_open"),
@@ -911,6 +831,9 @@ def generate_alarm_content(alarm=""):
     
 )
 def toggle_modal(n1, n2, is_open):
+    """
+    This function explains how the status of the site was defined.
+    """
     if n1 or n2:
         if not is_open:
             catTable, statusExplainedTable = explainStatuses()
@@ -942,7 +865,6 @@ def toggle_modal(n1, n2, is_open):
         Input("alarm-content-section", "style")
     ],
     [
-        # State('url', 'pathname'),
         State('dynamic-content-container', 'children'),
         State('fromDay', 'data'),
         State('toDay', 'data')
@@ -950,6 +872,10 @@ def toggle_modal(n1, n2, is_open):
     prevent_initial_call=True
 )
 def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, visibility, current_children, fromDay, toDay):
+    """
+    This function extracts the visualisation of the chosen alarm and shows it under the table with alarms.
+    """
+    print("Dynamic content callback")
     ctx = dash.callback_context
     if not ctx.triggered:
         return dash.no_update, dash.no_update
@@ -957,8 +883,6 @@ def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, visibility, 
     global site
     print("Debugging update_dynamic_content")
     alarmsInst = Alarms()
-    # fromDay, toDay = hp.defaultTimeRange(6)
-    print(f"fromDay: {fromDay}, toDay: {toDay}")
     frames, pivotFrames = alarmsInst.loadData(fromDay, toDay)
     button_content_mapping = {'hosts-not-found-btn': "hosts not found",
                               'path-anomaly-btn': "ASN path anomalies"
@@ -968,42 +892,33 @@ def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, visibility, 
         button_id = ctx.triggered[0]['prop_id'].split('.')[0]
         print(button_id)
         if button_id:
-            button_id = eval(button_id)  # Convert string to dictlink-btn
-            # print(button_id)
+            button_id = eval(button_id)
             if button_id['type'] in button_content_mapping:
                 event = button_content_mapping[button_id['type']]
             else:
                 id, event = button_id['index'].split(', ')
                 
             pd_df = pivotFrames[event]
-            # print("pivotFrame")
-            print(pd_df)
             if pd_df.empty:
                 return dash.no_update, dash.no_update, {}, visibility
+            
             else:
                 visibility = {'visibility': 'visible'}
+                
+                #host not found visualisation
                 if event == 'hosts not found':
-                    print("createDictionaryWithHistoricalData site report")
-                    print('from')
-                    print(pd_df.describe())
-                    histData = createDictionaryWithHistoricalData(pd_df)
-                    print('to')
-                    print(histData)
-                    
+                    histData = createDictionaryWithHistoricalData(pd_df)                    
                     site_name, id = button_id['index'].split(', ')
                     fig, test_types, hosts, site = create_heatmap(pd_df, site, fromDay.replace("T", " ").replace(".000Z", ""), toDay.replace("T", " ").replace(".000Z", ""))
                     alarm = qrs.getAlarm(id)['source']
                     return dcc.Graph(figure=fig), event, alarm, visibility
 
-                    
+                #ASN anomalies visualisation
                 if event == 'ASN path anomalies':
                     src, dest, dt = button_id['index'].split('*')
-                    # print(f"src: {src}, dest: {dest}")
-                    # dt = [f"{fromDay.replace(' ', 'T')}.000Z", f"{toDay.replace(' ', 'T')}.000Z"]
-                    print("==========================")
-                    print(dt)
+                    # print("==========================")
+                    # print(dt)
                     data = qrs.query_ASN_anomalies(src, dest, dt)
-                    # print(data)
                     if len(data) > 0:
                             anomalies = data['anomalies'].values[0]
                             title = html.Div([
@@ -1028,14 +943,16 @@ def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, visibility, 
                                     html.Div(children=figures)
                                 ], color='#00245A'),
                             ], className="l-h-3 p-2 boxwithshadow page-cont ml-1 p-1"), event, data.to_dict(), visibility
+                
+                #other alarms visualisations
                 else:
                     print(f"id: {id}, event: {event}")
                     alarm_cont = qrs.getAlarm(id)
                     if event in ["complete packet loss", "high packet loss", "firewall issue"]:
                         
-                        print('URL query:', id)
-                        print()
-                        print('Alarm content:', alarm_cont)
+                        # print('URL query:', id)
+                        # print()
+                        # print('Alarm content:', alarm_cont)
                         alarmsInst = Alarms()
                         alrmContent = alarm_cont['source']
                         event = alarm_cont['event']
@@ -1050,12 +967,11 @@ def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, visibility, 
                         return kibana_row, event, alrmContent, visibility
                         
                     if event in ["bandwidth decreased", "bandwidth increased"]:
-                        print("here I am")
                         print('URL query:', id)
                         sitePairs = getSitePairs(alarm_cont)
                         alarmData = alarm_cont['source']
                         dateFrom, dateTo = hp.getPriorNhPeriod(alarmData['to'])
-                        print('Alarm\'s content:', alarmData)
+                        # print('Alarm\'s content:', alarmData)
                         pivotFrames = alarmsInst.loadData(dateFrom, dateTo)[1]
 
                         data = alarmsInst.getOtherAlarms(
@@ -1080,14 +996,11 @@ def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, visibility, 
                                                     html.B(otherAlarms, className='subtitle')
                                                 ], className="boxwithshadow alarm-header pair-details g-0 p-3", justify="between", align="center"),
                                             ], style={"padding": "0.5% 1.5%"}, className='g-0')
-
-                        print("Trying to build graph for bandwidth decreased/increased")
                         return html.Div(bandwidth_increased_decreased(alarm_cont, alarmData, alarmsInst,alarmsIn48h, sitePairs, expand, '-2')), event, alarmData, visibility
-
-
-                
+        
     return html.Div(), "", {}, visibility
 
+# this callback moves the user to the part of the page with the network measurements
 dash.clientside_callback(
     """
     function(alarmClicks, pathClicks, hostsClicks, measurementsClick) {
@@ -1151,6 +1064,9 @@ dash.clientside_callback(
     [State({'type': 'collapse-p2', 'index': MATCH},  "is_open")],
 )
 def toggle_collapse_2(n, pair, alarm, is_open):
+    """
+    This callback opens details in dynamic content that is generated for paths site.
+    """
     data = ''
     global chdf
     global posDf
@@ -1158,7 +1074,6 @@ def toggle_collapse_2(n, pair, alarm, is_open):
     global altPaths
     if n:
       if is_open==False:
-        # chdf, posDf, baseline, altPaths = pq.readFile(f'{location}chdf.parquet'), pq.readFile(f'{location}posDf.parquet'), pq.readFile(f'{location}baseline.parquet'), pq.readFile(f'{location}altPaths.parquet')
         data = pairDetails(pair, alarm,
                         chdf[chdf['pair']==pair],
                         baseline[baseline['pair']==pair],
@@ -1182,18 +1097,21 @@ def toggle_collapse_2(n, pair, alarm, is_open):
     [State({'type': 'tp-collapse-2', 'index': MATCH},  "is_open")],
 )
 def toggle_collapse_3(n, alarmData, alarm, is_open):
-  data = ''
-  print("HERE")  
-  dateFrom, dateTo = hp.getPriorNhPeriod(alarm['source']['to'])
-  pivotFrames = alarmsInst.loadData(dateFrom, dateTo)[1]
-  if n:
-    if is_open==False:
-      data = buildGraphComponents(alarmData, alarm['source']['from'], alarm['source']['to'], alarm['event'], pivotFrames)
-    return [not is_open, data]
-  if is_open==True:
-    data = buildGraphComponents(alarmData, alarm['source']['from'], alarm['source']['to'], alarm['event'], pivotFrames)
+    """
+    This callback opens details in dynamic content that is generated for throughput alarms
+    (bandwidth increased/decreased).
+    """
+    data = ''
+    dateFrom, dateTo = hp.getPriorNhPeriod(alarm['source']['to'])
+    pivotFrames = alarmsInst.loadData(dateFrom, dateTo)[1]
+    if n:
+        if is_open==False:
+            data = buildGraphComponents(alarmData, alarm['source']['from'], alarm['source']['to'], alarm['event'], pivotFrames)
+        return [not is_open, data]
+    if is_open==True:
+        data = buildGraphComponents(alarmData, alarm['source']['from'], alarm['source']['to'], alarm['event'], pivotFrames)
+        return [is_open, data]
     return [is_open, data]
-  return [is_open, data]
 
 
 
@@ -1209,82 +1127,79 @@ def buildGraphComponents(alarmData, dateFrom, dateTo, event, pivotFrames):
   return throughput_graph_components(alarmData, df, otherAlarms)
 
 
-def create_horizontal_bar_chart(df, fromD, toD):
-    print(f"fromD: {fromD}, toD: {toD}")
-    df = df.groupby(['to', f"{'alarm name'}"]).size().reset_index(name='count')
-    # graphData['percentage'] = graphData['count'].transform(lambda x: x / x.sum() * 100)
-    df.rename(columns={'to':'day'}, inplace=True)
-    df['day'] = pd.to_datetime(df['day'])
+# def create_horizontal_bar_chart(df, fromD, toD):
+#     print(f"fromD: {fromD}, toD: {toD}")
+#     df = df.groupby(['to', f"{'alarm name'}"]).size().reset_index(name='count')
+#     df.rename(columns={'to':'day'}, inplace=True)
+#     df['day'] = pd.to_datetime(df['day'])
     
-    # Create complete date range
-    all_dates = pd.date_range(start=fromD, end= pd.to_datetime(toD)-timedelta(days=1))
+#     all_dates = pd.date_range(start=fromD, end= pd.to_datetime(toD)-timedelta(days=1))
 
-
-    # Get all unique alarm names
-    alarm_names = df['alarm name'].unique()
-    status_colors = {
-        'bandwidth decreased from multiple': ('darkred','critical'),
-        'ASN path anomalies': ('goldenrod', 'significant'),
-        'firewall issue': ('grey', 'moderate'),
-        'source cannot reach any': ('grey', 'moderate'),
-        'complete packet loss': ('grey', 'moderate')
-    }
-    # Create a pivot table with alarm names as rows and dates as columns
-    pivot_df = df.pivot_table(
-        index='alarm name',
-        columns='day',
-        values='count',
-        aggfunc='sum',
-        fill_value=0
-    ).reindex(columns=all_dates, fill_value=0)
+#     # Get all unique alarm names
+#     alarm_names = df['alarm name'].unique()
+#     status_colors = {
+#         'bandwidth decreased from multiple': ('darkred','critical'),
+#         'ASN path anomalies': ('goldenrod', 'significant'),
+#         'firewall issue': ('grey', 'moderate'),
+#         'source cannot reach any': ('grey', 'moderate'),
+#         'complete packet loss': ('grey', 'moderate')
+#     }
+#     # Create a pivot table with alarm names as rows and dates as columns
+#     pivot_df = df.pivot_table(
+#         index='alarm name',
+#         columns='day',
+#         values='count',
+#         aggfunc='sum',
+#         fill_value=0
+#     ).reindex(columns=all_dates, fill_value=0)
     
-    # Create the figure
-    fig = go.Figure()
-    bar_height = max(20, 300 / max(1, len(alarm_names)))  # Ensures min height of 20px
-    # Add a bar segment for each date for each alarm
-    for alarm in alarm_names:
-        for i, date in enumerate(all_dates):
-            count = pivot_df.loc[alarm, date]
-            color, influence = 'green', 'None'
-            if count >= 1:
-                if alarm in status_colors:
-                    color, influence = status_colors[alarm][0], status_colors[alarm][1]
-                else:
-                    color, influence = 'lightgrey', 'insignificant' 
+#     # Create the figure
+#     fig = go.Figure()
+#     bar_height = max(20, 300 / max(1, len(alarm_names)))  # Ensures min height of 20px
+#     # Add a bar segment for each date for each alarm
+#     for alarm in alarm_names:
+#         for i, date in enumerate(all_dates):
+#             count = pivot_df.loc[alarm, date]
+            # color, influence = 'green', 'None'
+            # if count >= 1:
+            #     if alarm in status_colors:
+            #         color, influence = status_colors[alarm][0], status_colors[alarm][1]
+            #     else:
+            #         color, influence = 'lightgrey', 'insignificant' 
             
-            fig.add_trace(go.Bar(
-                y=[alarm],
-                x=[1],  # Each segment has width 1
-                orientation='h',
-                marker=dict(color=color),
-                name=date.strftime('%Y-%m-%d'),
-                hoverinfo='text',
-                hovertext=f"Alarm: {alarm}<br>Date: {date.strftime('%Y-%m-%d')}<br>Count: {count}<br>Impact: {influence}",
-                width=0.8,
-                base=i  # Position along the x-axis
-            ))
+            # fig.add_trace(go.Bar(
+            #     y=[alarm],
+            #     x=[1],  # Each segment has width 1
+            #     orientation='h',
+    #             marker=dict(color=color),
+    #             name=date.strftime('%Y-%m-%d'),
+    #             hoverinfo='text',
+    #             hovertext=f"Alarm: {alarm}<br>Date: {date.strftime('%Y-%m-%d')}<br>Count: {count}<br>Impact: {influence}",
+    #             width=0.8,
+    #             base=i  # Position along the x-axis
+    #         ))
     
-    # Customize layout
-    fig.update_layout(
-        # title=dict(text="Alarms affect on status"),
-        barmode='stack',
-        xaxis=dict(
-            # visible=True,
-            tickvals=list(range(len(all_dates))),
-            ticktext=[date.strftime('%d %b') for date in all_dates],
-            title='Days'
-        ),
-        height=40 + len(alarm_names) * bar_height,  # Dynamic height based on number of alarms
-        margin=dict(l=150, r=20, t=30, b=20),
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        showlegend=False
-    )
+    # # Customize layout
+    # fig.update_layout(
+    #     # title=dict(text="Alarms affect on status"),
+    #     barmode='stack',
+    #     xaxis=dict(
+    #         # visible=True,
+    #         tickvals=list(range(len(all_dates))),
+    #         ticktext=[date.strftime('%d %b') for date in all_dates],
+    #         title='Days'
+    #     ),
+    #     height=40 + len(alarm_names) * bar_height,  # Dynamic height based on number of alarms
+    #     margin=dict(l=150, r=20, t=30, b=20),
+    #     plot_bgcolor='rgba(0,0,0,0)',
+    #     paper_bgcolor='rgba(0,0,0,0)',
+    #     showlegend=False
+    # )
  
         
-    fig.update_yaxes(ticklabelposition="inside", tickvals=list(range(len(alarm_names))), ticktext=alarm_names, automargin=True, fixedrange=True)
-    # fig.show()
-    return fig
+    # fig.update_yaxes(ticklabelposition="inside", tickvals=list(range(len(alarm_names))), ticktext=alarm_names, automargin=True, fixedrange=True)
+    # # fig.show()
+    # return fig
 
 @dash.callback(
     [Output("status-container", "style"),
@@ -1293,11 +1208,18 @@ def create_horizontal_bar_chart(df, fromD, toD):
     [State("status-container", "style")]
 )
 def toggle_container(n_clicks, current_style):
+    """
+    This function expands status container and shows alarms which influenced the status.
+    """
     if n_clicks and n_clicks % 2 == 1:  # Odd click - expand
         return {"height": "400px", "transition": "height 0.3s ease"}, "Hide Details"
     return {"height": "110px", "transition": "height 0.3s ease"}, "Show Details ⬇"
 
+
 def generate_summary(dataFrom, dataTo, alarms):
+    """
+    This function creates the text with the summary
+    """
     def find_frequent_alarm_pairs(alarms_df, top_n=2):
     # Get all alarm combinations per day
         daily_combinations = (
@@ -1318,24 +1240,19 @@ def generate_summary(dataFrom, dataTo, alarms):
         ]
         
         return frequent_pairs
+    
     # print('GENERATE SUMMARY')
-    # print(statuses)
-    # Date range
     df = pd.DataFrame(statuses, columns=['color', 'date', 'status', 'alarms'])
-    # print(df)
     df_exploded = df.explode('alarms')
-    # print(df_exploded)
     date_range = f"{dataFrom.strftime('%b %d')} to {dataTo.strftime('%b %d')}"
     
     category_dist = (alarms.groupby('alarm group')['alarm name']
                      .count()
                      .sort_values(ascending=False))
-    # print(category_dist)
     alarms_pairs = find_frequent_alarm_pairs(alarms)
     if len(alarms_pairs) < 2:
         while len(alarms_pairs) < 2:
             alarms_pairs.append({'pair': None, 'count': 0})
-    # print(alarms_pairs)
     
     summary = html.Div([
         html.H4(f"Site Status Overview ({date_range}):"),
