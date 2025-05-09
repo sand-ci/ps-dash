@@ -1,3 +1,6 @@
+"""
+This file contains functions which generates and returns the components which are reused in different pages.
+"""
 
 from dash import dcc, html
 import dash_bootstrap_components as dbc
@@ -5,9 +8,12 @@ from flask import request
 from utils.utils import extractRelatedOnly, SitesOverviewPlots, descChange, getRawDataFromES, buildPlot, buildDataTable
 from model.Alarms import Alarms
 import plotly.graph_objects as go
+
+
 ###############################################
             #path_changed.py
 ###############################################
+
 def siteBoxPathChanged(site, pairCount, chdf, posDf, baseline, altPaths, alarm, pivotFrames, alarmsInst=Alarms(), button_name=""):
     cnt = pairCount[pairCount['site']==site]['pair'].values[0]
     chdf = chdf[(chdf['src_site']==site) | (chdf['dest_site']==site)]
@@ -102,7 +108,8 @@ def siteBoxPathChanged(site, pairCount, chdf, posDf, baseline, altPaths, alarm, 
                 ]),
               ])
             ])
-      
+
+
 def siteMeasurements(q, pq):
   return dbc.Row(
                     dbc.Card([
