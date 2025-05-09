@@ -1,17 +1,13 @@
-#TODO: set up "firewall issue button"
-#TODO: add country and overview to my summary, add button that switch you to measurement
-#TODO: if len(hosts) > 6 then break into 2 column
-#TODO: finish isolating functions and buttons 
+"""
+This file contains the code for the page "site-report" in ps-dash.
+It summarises all the alarms per site.
+"""
+#TODO: something specific for 0 alarms?
 
-#TODO: debug groupAlarms in Updater.py, number of alarms is counted not correct
-#TODO: for 0 alarms
-
-#TODO: substitute hosts with summary
-#      Percentage of alarms in Infrastracture/Network/Others
-#      
 
 from datetime import datetime, timedelta
 from functools import lru_cache
+from itertools import combinations
 
 import numpy as np
 import dash
@@ -32,7 +28,7 @@ from utils.helpers import timer
 import model.queries as qrs
 from utils.parquet import Parquet
 from utils.utils import defineStatus, explainStatuses, create_heatmap, createDictionaryWithHistoricalData, generate_graphs, extractAlarm, getSitePairs, getRawDataFromES
-from utils.components import siteBoxPathChanged, siteMeasurements, toggleCollapse, pairDetails, loss_delay_kibana, bandwidth_increased_decreased, throughput_graph_components
+from utils.components import siteMeasurements, pairDetails, loss_delay_kibana, bandwidth_increased_decreased, throughput_graph_components
 import functools
 from collections import Counter
 
@@ -57,13 +53,6 @@ dash.register_page(
 
 site = None
 alarmsInst = Alarms()
-# def reformat_time(timestamp):
-#         try:
-#             timestamp_new = pd.to_datetime(timestamp).strftime("%d %b %Y")
-#             return timestamp_new
-#         except Exception as err:
-#             print(err)
-#             return timestamp
 
 def layout(q=None, **other_unknown_query_strings):
     global site
@@ -89,15 +78,10 @@ def layout(q=None, **other_unknown_query_strings):
     toDay_date = (now - timedelta(days=1)).replace(hour=00, minute=00, second=00, microsecond=00000)
     toDay = toDay_date.strftime('%Y-%m-%dT%H:%M:%S.000Z')  # "2024-02-26 23:59:59"
     
-    # toDay = toDay - timedelta(days=2)
     global pivotFrames
     frames, pivotFrames = alarmsInst.loadData(fromDay, toDay)
     
-    # alarmCnt = pq.readFile('parquet/alarmsGrouped.parquet')
-    # alarmCnt = alarmCnt[alarmCnt['site'] == q]
     print(f"fromDay: {fromDay}, toDay: {toDay}")
-    # print(type(frames))
-    # print(type(pivotFrames))
     
     site_alarms = pd.DataFrame(columns=["to", "alarm group", "alarm name", "hosts", "IP version", "Details"])
     site_alarms_num = 0
@@ -106,41 +90,16 @@ def layout(q=None, **other_unknown_query_strings):
         frames.pop("path changed between sites", None)
     if 'path changed' in frames:
         frames.pop("path changed", None)
-    
-    
-    ########TODO: count the most frequent host
-    alarms_with_hosts = {'destination cannot be reached from any':'hosts', 'destination cannot be reached from multiple':'hosts', 
-                         'firewall issue': 'host',
-                         'source cannot reach any':'hosts'}
-    alarms_with_src_dest = ['complete packet loss', 'high packet loss']
-    #check source dest for complete packet loss, high packet loss,
-    all_hosts = []
+
+    # prepare table with alarms
     for frame in frames:
         df = frames[frame]
-        # pivotFrames = pivotFrames[pivotFrames['to'] >= fromDay_date]
         df = df[pd.to_datetime(df['to']).dt.date >= fromDay_date.date()]
         site_df = df[df['tag'].apply(lambda x: q in x)]
         
         if not site_df.empty:
-            if frame in alarms_with_hosts:
-                print(frame)
-                print("----------------")
-                print(frames[frame].columns)
-                for item in site_df[alarms_with_hosts[frame]]:
-                    all_hosts.extend(
-                        item.tolist() if isinstance(item, np.ndarray) 
-                        else item if isinstance(item, list) 
-                        else [str(item)]
-                    )
-            if frame in alarms_with_src_dest:
-                print(frame)
-                print("----------------")
-                print(site_df[site_df['src_site'] == q])
-                print(site_df[site_df['dest_site'] == q])
-                for item in site_df[site_df['src_site'] == q]['src_host']:
-                    all_hosts.extend([item])
-                for item in site_df[site_df['dest_site'] == q]['dest_host']:
-                    all_hosts.extend([item])
+            print(frame)
+            print("----------------")
             # print(site_df.head(5))
             site_df['to'] = pd.to_datetime(site_df['to'], errors='coerce')
             
@@ -164,13 +123,11 @@ def layout(q=None, **other_unknown_query_strings):
                     hosts_list = s
                     print("HOSTS LIST")
                     print(hosts_list)
-                    all_hosts.extend(hosts_list)
                     site_df.at[i, 'hosts list'] = hosts_list
                     site_df.at[i, 'hosts'] = hosts_list
             site_df = alarmsInst.formatDfValues(site_df, frame, False, True)
-            # TODO: put it in the formating to the Alarms.py to def formatDfValues()
+            # TODO: put it in the formating to the Alarms.py to def formatDfValues()?
             if 'hosts' in site_df.columns:
-                print(site_df['hosts'].head(5))
                 site_df['hosts'] = site_df['hosts'].apply(lambda x: html.Div([html.Div(item) for item in x.split('\n')]) if isinstance(x, str) else x)
             site_alarms_num += len(site_df)
             site_df.reset_index(drop=True, inplace=True)
@@ -178,7 +135,6 @@ def layout(q=None, **other_unknown_query_strings):
                 add_hosts = 'hosts'
                 if 'host' in alarm:
                     add_hosts = 'host'
-                # Create a new row dictionary
                 new_row = {
                     # 'from': alarm.get('from', '"from" field not found'),
                     'to': alarm.get('to', '"to" field not found'),
@@ -198,19 +154,11 @@ def layout(q=None, **other_unknown_query_strings):
 
                 new_row['Destination Site(s)'] = destination_sites
                 site_alarms = pd.concat([site_alarms, pd.DataFrame([new_row])], ignore_index=True)
-    # print("-----------HOST COUNT------------")
-    # host_counts = Counter(all_hosts)
-    # most_common_host = host_counts.most_common(1)[0] if host_counts else (None, 0)
 
-    # print(f"Most frequent host: {most_common_host[0]} (appears {most_common_host[1]} times)")
-    # flat_list = np.concatenate(hosts_count).tolist()
-    # print(flat_list)
     print(f"Total alarms collected: {site_alarms_num}")
-    # print(site_alarms)
-    # get meta data for summary
-    # create_horizontal_bar_chart(site_alarms, fromDay, toDay)
-    # f = create_status_chart_explained(site_alarms, fromDay, toDay)
-    # f.show()
+
+    
+    # extract meta data like CPU, country and hosts
     meta_df = qrs.getMetaData()
     meta_df['host_ip'] = meta_df.apply(
         lambda row: (row['host'], 'ipv6' if row['ipv6'] else 'ipv4'),
@@ -227,11 +175,14 @@ def layout(q=None, **other_unknown_query_strings):
         cpus, cpu_cores = site_meta_data.iloc[0]['cpus'], site_meta_data.iloc[0]['cpu_cores']
     else:
         cpus, cpu_cores = None, None
+        
+    
     return html.Div(children = [
         html.Div(id='scroll-trigger', style={'display': 'none'}),
         dcc.Store(id='fromDay', data=fromDay),
         dcc.Store(id='toDay', data=toDay),
         dcc.Store(id='alarm-storage', data={}),
+        
         dbc.Row([
             dbc.Row(
                 dbc.Col([
@@ -240,7 +191,8 @@ def layout(q=None, **other_unknown_query_strings):
                         # header line with site name
                         html.H3(f"\t{q}", className="header-line p-2",  
                                 style={"background-color": "#00245a", "color": "white", "font-size": "25px"}),
-                        # first row
+                        
+                        # first row: status of the site throughout the week
                         dbc.Row(children=[
                             dbc.Col([
                                 html.Div(
@@ -248,7 +200,7 @@ def layout(q=None, **other_unknown_query_strings):
                                     id="status-container",
                                     
                                     children=[
-                                        # Header with toggle button
+                                        # header with toggle button
                                         html.Div(
                                                 html.I(
                                                     className="fas fa-question-circle",
@@ -280,8 +232,8 @@ def layout(q=None, **other_unknown_query_strings):
                                                     ),
                                                 )
                                                  ], style={'margin-bottom': '0px'}),
-                                        # Status graph (always visible)
-                                            
+                                        
+                                        # Status graph
                                         html.Div(
                                             dcc.Graph(
                                                 id="site-status-alarms",
@@ -293,7 +245,7 @@ def layout(q=None, **other_unknown_query_strings):
                                                 }
                                             ), style={'margin-top': '0px'}
                                         ),
-                                        
+                                        dcc.Store(id='site-statuses', data={}),
                                         dbc.Modal(
                                             [
                                                 dbc.ModalHeader(dbc.ModalTitle("How was the status determined?")),
@@ -310,7 +262,7 @@ def layout(q=None, **other_unknown_query_strings):
                                 )
                         ])], className="mb-1 pr-1 pl-1"),
                         
-                        # second row of stats: number of alarms, graph with alarms types and general site information
+                        # second row of stats: number of alarms, alarms types and categories distribution, metadata
                         dbc.Row([
                             dbc.Col(
                                 html.Div(
@@ -340,7 +292,10 @@ def layout(q=None, **other_unknown_query_strings):
                                 ),
                                 width=3
                             ),
+                            
                             dcc.Store(id='alarms-data-compressed', data=site_alarms.to_dict('records')), 
+                            
+                            # bar chart: alarms name and categories distrubion
                             dbc.Col(html.Div(className="boxwithshadowhidden p-2 h-100", style={"background-color": "#ffffff"}, 
                                                 children=[
                                                     html.Div([
@@ -364,7 +319,7 @@ def layout(q=None, **other_unknown_query_strings):
                                                     )
                                                 ]
                                                 ), width=5, style={"background-color": "#ffffff", "height": "100%"}),
-                            
+                            # metadata card
                             dbc.Col(
                                 html.Div(className="boxwithshadow page-cont p-2 h-100", style={"background-color": "#ffffff", "align-content":"center"}, children=[
                                     # html.H3("Summary", style={"padding-top": "5%", "padding-left": "5%"}),
@@ -382,11 +337,13 @@ def layout(q=None, **other_unknown_query_strings):
                                                     width=6,
                                                     style={
                                                         "border-right": "1px solid #ddd",  # Thin vertical line
-                                                        "padding-right": "20px"
+                                                        "padding-right": "20px",
+                                                        "padding-top": "20px"
+                                                        
                                                     }
                                         ),
                                         dbc.Col([
-                                            html.H4(f"{site} hosts:"),
+                                            html.H4(f"{site} hosts:", style={"padding-top": "20px"}),
                                             html.Div([
                                                 
                                                 html.Ul(
@@ -409,13 +366,8 @@ def layout(q=None, **other_unknown_query_strings):
                                             ], style={
                                                             'height': '200px', 
                                                             'overflow-y': 'auto',  # Enable vertical scrolling
-                                                            'width': '100%',
-                                                            # 'mask-image': 'linear-gradient(to top, transparent, black)',
-                                                            # 'mask-size': '100% 190px',
-                                                            # 'mask-position': 'bottom',
-                                                            # 'mask-repeat': 'no-repeat',
-                                                            # 'padding-bottom': '70px',
-                                                            # 'mask-composite': 'exclude'
+                                                            'width': '100%', # Thin vertical line
+                                                            "padding-right": "20px"
                                                         }
                                             )
                                     ], width=6
@@ -429,7 +381,7 @@ def layout(q=None, **other_unknown_query_strings):
                                         color="link",
                                         style={
                                             "margin-left": "80px",
-                                            "margin-top": "15px",
+                                            "margin-top": "8px",
                                             "width": "60%",
                                             # "border-radius": "5px"
                                         }
@@ -442,7 +394,8 @@ def layout(q=None, **other_unknown_query_strings):
                         
                         # third row with alarms list and summary
                         dbc.Row([
-                            # Left Column (Site status + Problematic host)
+                            
+                            # Left Column (Summary)
                             dbc.Col([
                                 
                                 html.Div(
@@ -453,12 +406,21 @@ def layout(q=None, **other_unknown_query_strings):
                                                     "padding-left": "5%", 
                                                     "padding-top": "5%"
                                                 }),
+                                        html.H4(generate_summary(fromDay_date, toDay_date, site_alarms), style={
+                                                    "display": "flex",
+                                                    "justify-content": "center",
+                                                    "margin-top": "20px",
+                                                    "height": "90%",
+                                                    "padding-left": "5%",
+                                                    "padding-right": "5%"
+                                                    
+                                                })
                                     ], style={"height": "100%"}
                                 )
                             ], width=3, style={
                                 "display": "flex",
                                 "flex-direction": "column",
-                                "height": "600px"  # Fixed height for left column
+                                "height": "600px"  
                             }),
                             
                             # Right Column (Filters + Table)
@@ -466,7 +428,7 @@ def layout(q=None, **other_unknown_query_strings):
                                 html.Div(
                                     className="boxwithshadowhidden page-cont h-100",
                                     style={
-                                            "height": "100%",  # Adjust based on filters height
+                                            "height": "100%",
                                             "display": "flex",
                                             "flex-direction": "column"
                                         },
@@ -510,24 +472,20 @@ def layout(q=None, **other_unknown_query_strings):
                                         ], className="p-1 mb-2"),
                                         dbc.Col([
                                                 dcc.Loading(
-                                                    html.Div(  # Changed from html.Div to DataTable
+                                                    html.Div(
                                                         id='alarms-table',
-                                                    # columns=[{"name": col, "id": col} for col in site_alarms.columns],
                                                         style={
-                                                            'height': '400px',  # Fixed height of full column lenght for the scrollable container
+                                                            'height': '400px',
                                                             'overflow-y': 'scroll',  # Enable vertical scrolling
-                                                            'border': '1px solid #ddd',  # Optional: Add a border for better visibility
-                                                            'padding': '10px',  # Optional: Add padding inside the container
+                                                            'border': '1px solid #ddd',  # Add a border for better visibility
+                                                            'padding': '10px',  # Add padding inside the container
                                                             'width': '100%'
                                                         }
                                                     ),
                                                     style={"height": "100%"},
                                                     color='#00245A'
-                                                # color='#00245A'
                                                 )
-                                            # ]
                                         ], style={"padding-left": "1%", "padding-right": "1%"})
-                                        # ]),
                                     ]
                                 )
                             ], width=9, style={"height": "600px"})
@@ -536,9 +494,8 @@ def layout(q=None, **other_unknown_query_strings):
                     ])                 
                 )
         ], className="ml-1 mt-1 mr-0 mb-1"),
-        # Hidden component to track URL changes
     
-        
+        # section with alarm visualisation that is shown the the button near an alarm was pressed
        dbc.Row([
             dbc.Row(
                 dbc.Col([
@@ -577,6 +534,8 @@ def layout(q=None, **other_unknown_query_strings):
                 ])
             )
        ], className="ml-1 mt-1 mr-0 mb-1"),
+       
+       # general websites' measurements
         html.Div(id='site-measurements',
                 children=siteMeasurements(q, pq),
                 style={'margin-top': "20px"},
@@ -586,34 +545,29 @@ def layout(q=None, **other_unknown_query_strings):
                 id="site-status-explanation",
                 className="boxwithshadow p-0 mt-3",
                 children=[
-                    # Your explanation content here
+                    # 
                 ]
             )
     ], className="scroll-container ml-2")
     
 
 def create_bar_chart(graphData, column_name='alarm group'):
-    # Calculate the total counts for each event type
-    # event_totals = graphData.groupby('event')['cnt'].transform('sum')
-    # Calculate percentage for each site relative to the event total
-    # graphData['percentage'] = (graphData['cnt'] / event_totals) * 100
+    """
+    This function creates the bar chart to depict the alarms' or alarm categories' 
+    distribution based on the given parameter 'column_name'.
+    
+    """
     graphData= graphData.groupby(['to', f"{column_name}"]).size().reset_index(name='count')
-    # graphData['percentage'] = graphData['count'].transform(lambda x: x / x.sum() * 100)
     graphData.rename(columns={'to':'day'}, inplace=True)
-    # print(graphData.head(5))
-    # print(graphData.columns)
-    # Create the bar chart using percentage as the y-axis
     fig = px.bar(
         graphData, 
         x='day', 
         y='count', 
-        color=f'{column_name}', 
-        # labels={'count': 'Count', 't': '', f'{column_name}': 'Event Type'},
+        color=f'{column_name}',
         barmode='stack',
         color_discrete_sequence=px.colors.qualitative.Prism
     )
 
-    # Update layout parameters
     fig.update_layout(
         margin=dict(t=20, b=20, l=0, r=0),
         showlegend=True,
@@ -651,9 +605,14 @@ def create_bar_chart(graphData, column_name='alarm group'):
 
     return fig
 
+
 def create_status_chart_explained(graphData, fromDay, toDay):
-    # Convert input dates to datetime
-    # print("====================================")
+    """
+    This function creates the statur horizontal bar chart where 
+    the status of the site throughout the week is shown and the
+    alarms which explain it are highlighted.
+    """
+    global statuses
     fromDay = pd.to_datetime(fromDay)
     toDay = pd.to_datetime(toDay)
     # print(fromDay)
@@ -671,30 +630,33 @@ def create_status_chart_explained(graphData, fromDay, toDay):
     # graphData['to'] = pd.to_datetime(graphData['to'])
     graphData = graphData[(pd.to_datetime(graphData['to']).dt.date >= fromDay.date()) & (pd.to_datetime(graphData['to']).dt.date <= toDay.date())]
     graphData = graphData.groupby(['to', "alarm name"]).size().reset_index(name='cnt')
-    red_status_days, yellow_status_days, grey_status_days = defineStatus(graphData, "alarm name", 'to')
+    red_status, yellow_status, grey_status = defineStatus(graphData, "alarm name", ['to', 'alarm name'])
+    red_status_days, yellow_status_days, grey_status_days = red_status['to'].unique().tolist(), yellow_status['to'].unique().tolist(), grey_status['to'].unique().tolist()
+    print("STATUSES")
+    print(red_status)
+    print(yellow_status)
+    print(grey_status)
     days = sorted(pd.to_datetime(graphData['to'].unique()))
     graphData = graphData.rename(columns={'to': 'day'})
     graphData['day'] = pd.to_datetime(graphData['day'])
-    
-    all_days = []
-    print(yellow_status_days)
+
     # --- TOP PLOT (STATUS BAR) ---
     status_colors = []
     for day in days:
         day_str = day.strftime('%Y-%m-%d')
         day_formated = day.strftime('%d %b')
         if day_str in red_status_days:
-            status_colors.append(('darkred', day_formated, 'critical'))
+            status_colors.append(('darkred', day_formated, 'critical', red_status[red_status['to'] == day_str]['alarm name'].unique().tolist()))
         elif day_str in yellow_status_days:
-            status_colors.append(('goldenrod', day_formated, 'warning'))
+            status_colors.append(('goldenrod', day_formated, 'warning', yellow_status[yellow_status['to'] == day_str]['alarm name'].unique().tolist()))
         elif day_str in grey_status_days:
-            status_colors.append(('grey', day_formated, 'unknown'))
+            status_colors.append(('grey', day_formated, 'unknown', grey_status[grey_status['to'] == day_str]['alarm name'].unique().tolist()))
         else:
-            status_colors.append(('green', day_formated, 'ok'))
-    print(status_colors)
+            status_colors.append(('green', day_formated, 'ok', []))
+    statuses = status_colors
     print(days)
     # Add single stacked bar for status
-    for color, d, status in status_colors:
+    for color, d, status, alarms in status_colors:
         fig.add_trace(go.Bar(
             y=['Status'],
             x=[1],  # Equal segments
@@ -1334,3 +1296,82 @@ def toggle_container(n_clicks, current_style):
     if n_clicks and n_clicks % 2 == 1:  # Odd click - expand
         return {"height": "400px", "transition": "height 0.3s ease"}, "Hide Details"
     return {"height": "110px", "transition": "height 0.3s ease"}, "Show Details ⬇"
+
+def generate_summary(dataFrom, dataTo, alarms):
+    def find_frequent_alarm_pairs(alarms_df, top_n=2):
+    # Get all alarm combinations per day
+        daily_combinations = (
+            alarms_df.sort_values('to')
+            .groupby('to')['alarm name']
+            .apply(lambda x: list(combinations(sorted(set(x)), 2)))  # Get all possible 2-alarm combinations
+            .explode()  # Flatten the list of combinations
+            .dropna()  # Remove days with only 1 alarm
+        )
+        
+        # Count occurrences of each pair
+        pair_counts = Counter(daily_combinations).most_common(top_n)
+        
+        # Format the results
+        frequent_pairs = [
+            {'pair': ' & '.join(pair), 'count': count} 
+            for pair, count in pair_counts
+        ]
+        
+        return frequent_pairs
+    # print('GENERATE SUMMARY')
+    # print(statuses)
+    # Date range
+    df = pd.DataFrame(statuses, columns=['color', 'date', 'status', 'alarms'])
+    # print(df)
+    df_exploded = df.explode('alarms')
+    # print(df_exploded)
+    date_range = f"{dataFrom.strftime('%b %d')} to {dataTo.strftime('%b %d')}"
+    
+    category_dist = (alarms.groupby('alarm group')['alarm name']
+                     .count()
+                     .sort_values(ascending=False))
+    # print(category_dist)
+    alarms_pairs = find_frequent_alarm_pairs(alarms)
+    if len(alarms_pairs) < 2:
+        while len(alarms_pairs) < 2:
+            alarms_pairs.append({'pair': None, 'count': 0})
+    # print(alarms_pairs)
+    
+    summary = html.Div([
+        html.H4(f"Site Status Overview ({date_range}):"),
+        html.Ul([
+            html.Li([
+                html.Strong("Critical (Red) days: "), 
+                f"{len(df[df['status']=='critical'])} out of 7",
+                html.Br(),
+                html.Span(f"Triggered by: {set(df_exploded[df_exploded['status']=='critical']['alarms'].tolist())}")
+            ]),
+            html.Li([
+                html.Strong("Warning (Yellow) days: "),
+                f"{len(df[df['status']=='warning'])} out of 7",
+                html.Br(),
+                html.Span(f"Triggered by: {set(df_exploded[df_exploded['status']=='warning']['alarms'].tolist())}")
+            ]),
+            html.Li([
+                html.Strong("Unknown (Grey) days: "),
+                f"{len(df[df['status']=='unknown'])} out of 7",
+                html.Br(),
+                html.Span(f"Triggered by: {set(df_exploded[df_exploded['status']=='unknown']['alarms'].tolist())}")
+            ])
+        ]),
+        html.Br(),
+        html.H4("Weekly Alarm Distribution:"),
+        html.Pre(category_dist.to_string()),  
+        html.Br(),
+        html.H4("Most Frequent Alarm Combinations:"),
+        html.Ul([
+            html.Li([
+                html.Span(f"Pair 1: {alarms_pairs[0]['pair']} ({alarms_pairs[0]['count']} occurrences)"),
+                html.Br()
+            ]),
+            html.Li([
+                html.Span(f"Pair 2: {alarms_pairs[1]['pair']} ({alarms_pairs[1]['count']} occurrences)"),
+                html.Br()])
+        ])
+    ])
+    return summary

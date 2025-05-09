@@ -91,24 +91,65 @@ def defineStatus(data, key_value, count_value):
     # and it dominates the table. Use the summary event "path changed" instead
     data = data[data[key_value] != 'path changed between sites']
 
-    red_status = data[(data[key_value]=='bandwidth decreased from/to multiple sites')
-            & (data['cnt']>0)][count_value].unique().tolist()
+    red_status = data[(data[key_value].isin(['bandwidth decreased from/to multiple sites']))
+            & (data['cnt']>0)][count_value]
 
-    yellow_status = data[(data[key_value].isin(['path changed', 'ASN path anomalies']))
-                    & (data['cnt']>0)][count_value].unique().tolist()
+    yellow_status = data[(data[key_value].isin(['ASN path anomalies']))
+                    & (data['cnt']>0)][count_value]
 
     grey_status = data[(data[key_value].isin(['firewall issue', 'source cannot reach any', 'complete packet loss']))
-                    & (data['cnt']>0)][count_value].unique().tolist()
+                    & (data['cnt']>0)][count_value]
     return red_status, yellow_status, grey_status
 
+#    def defineStatus(data, key_value, count_value):
+#     # Filter for days with at least one alarm
+#     filtered = data[data['cnt'] > 0].copy()
+    
+#     # Create status mapping
+#     conditions = [
+#         filtered[key_value].isin(['bandwidth decreased from multiple']),
+#         filtered[key_value].isin(['ASN path anomalies']),
+#         filtered[key_value].isin(['firewall issue', 'source cannot reach any', 'complete packet loss'])
+#     ]
+#     choices = ['red', 'yellow', 'grey']
+#     filtered['status'] = np.select(conditions, choices, default='green')
+    
+#     # Create the original tuple outputs
+#     red_tuples = filtered[filtered['status'] == 'red'][[count_value, key_value]].apply(tuple, axis=1).unique().tolist()
+#     yellow_tuples = filtered[filtered['status'] == 'yellow'][[count_value, key_value]].apply(tuple, axis=1).unique().tolist()
+#     grey_tuples = filtered[filtered['status'] == 'grey'][[count_value, key_value]].apply(tuple, axis=1).unique().tolist()
+    
+#     # Create summary DataFrame
+#     summary_df = (
+#         filtered[filtered['status'] != 'green']
+#         .groupby([count_value, 'status'])[key_value]
+#         .agg(list)
+#         .reset_index()
+    #     .rename(columns={count_value: 'date', key_value: 'influencing_alarms'})
+    # )
+    
+    # # Ensure one row per date with its determined status
+    # status_df = (
+    #     summary_df
+    #     .groupby('date')
+    #     .agg({
+    #         'status': 'first',  # Takes the most severe status if multiple exist
+    #         'influencing_alarms': lambda x: list(set([item for sublist in x for item in sublist]))
+    #     })
+    #     .reset_index()
+    # )
+    
+    # return (red_tuples, yellow_tuples, grey_tuples, status_df)
+
+
 def createDictionaryWithHistoricalData(dframe):
-            site_dict = dframe.groupby('site').apply(
-                lambda group: [
-                    (row['from'], row['to'], row['hosts_not_found'])
-                    for _, row in group.iterrows()
-                ]
-            ).to_dict()
-            return site_dict
+    site_dict = dframe.groupby('site').apply(
+        lambda group: [
+            (row['from'], row['to'], row['hosts_not_found'])
+            for _, row in group.iterrows()
+        ]
+    ).to_dict()
+    return site_dict
 def generateStatusTable(alarmCnt):
     red_sites, yellow_sites, grey_sites = defineStatus(alarmCnt, 'event', 'site')
     
