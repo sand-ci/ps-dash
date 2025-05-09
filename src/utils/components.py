@@ -4,111 +4,17 @@ This file contains functions which generates and returns the components which ar
 
 from dash import dcc, html
 import dash_bootstrap_components as dbc
-from flask import request
-from utils.utils import extractRelatedOnly, SitesOverviewPlots, descChange, getRawDataFromES, buildPlot, buildDataTable
+from utils.utils import SitesOverviewPlots, descChange, buildPlot, buildDataTable
 from model.Alarms import Alarms
 import plotly.graph_objects as go
-
+from datetime import datetime
+import utils.helpers as hp
+from utils.helpers import DATE_FORMAT
+from utils.parquet import Parquet
 
 ###############################################
-            #path_changed.py
+            #site.py
 ###############################################
-
-def siteBoxPathChanged(site, pairCount, chdf, posDf, baseline, altPaths, alarm, pivotFrames, alarmsInst=Alarms(), button_name=""):
-    cnt = pairCount[pairCount['site']==site]['pair'].values[0]
-    chdf = chdf[(chdf['src_site']==site) | (chdf['dest_site']==site)]
-    posDf = posDf[(posDf['src_site']==site) | (posDf['dest_site']==site)]
-    baseline = baseline[(baseline['src_site']==site) | (baseline['dest_site']==site)]
-    altPaths = altPaths[(altPaths['src_site']==site) | (altPaths['dest_site']==site)]
-    if site:
-      baseline['spair'] = baseline['src_site']+' -> '+baseline['dest_site']
-
-      showSample = ''
-      related2FlaggedASN = extractRelatedOnly(chdf, alarm['asn'])
-      cntRelated = len(related2FlaggedASN)
-      if len(related2FlaggedASN)>10:
-        showSample = "Bellow is a subset of 5."
-        related2FlaggedASN = related2FlaggedASN.sample(5)
-      sitePairs = related2FlaggedASN['spair'].values
-      nodePairs = related2FlaggedASN['pair'].values
-      
-      
-      diffs = sorted(list(set([str(el) for v in chdf['diff'].values.tolist() for el in v])))
-      diffs_str = '  |  '.join(diffs)
-      
-      data = alarmsInst.getOtherAlarms(currEvent='path changed', alarmEnd=alarm["to"], pivotFrames=pivotFrames, site=site)
-      otherAlarms = alarmsInst.formatOtherAlarms(data)
-
-      url = f'{request.host_url}paths-site/{site}?dateFrom={alarm["from"]}&dateTo={alarm["to"]}'
-
-      return html.Div([
-              dbc.Row([
-                dbc.Row([
-                  dbc.Col([
-                    dbc.Row([
-                       dbc.Col([
-                            dbc.Card([
-                                dbc.CardBody([
-                                    html.P(f"{cnt} is the total number of traceroute alarms which involve site {site}", className='card-text'),
-                                    html.P(f"{cntRelated} (out of {cnt}) concern a path change to ASN {alarm['asn']}. {showSample}", className='card-text'),
-                                    html.P(f"Other flagged AS numbers:  {diffs_str}", className='card-text')
-                                ])
-                            ], className='mb-3 h-100'),
-                       ], lg=6, md=12),
-                        dbc.Col([
-                            dbc.Card([
-                                dbc.CardBody([
-                                    html.P(f'Site {site} takes part in the following alarms in the period 24h prior and up to 24h after the current alarm end ({alarm["to"]})', className='card-text'),
-                                    html.B(otherAlarms, className='card-text')
-                                ])
-                            ], className='mb-3 h-100')
-                        ], lg=6, md=12)
-                      ], 
-                      className='site-header-line p-2 d-flex',
-                      justify="center", align="stretch"),
-
-                    dbc.Row(
-                    [
-                      html.Div(id=f'pair-section{site+str(i)}',
-                        children=[
-                          dbc.Button(
-                              sitePairs[i],
-                              value=pair,
-                              id={
-                                  'type': 'collapse-button'+button_name,
-                                  'index': site+str(i)+button_name
-                              },
-                              className="collapse-button",
-                              color="white",
-                              n_clicks=0,
-                          ),
-                          dcc.Loading(
-                            dbc.Collapse(
-                                id={
-                                    'type': 'collapse'+button_name,
-                                    'index': site+str(i)+button_name
-                                },
-                                is_open=False, className="collaps-container rounded-border-1"
-                          ), style={'height':'0.5rem'}, color='#e9e9e9'),
-                        ]
-                      ) for i, pair in enumerate(nodePairs)
-                    ],),
-                    dbc.Row(
-                        html.Div(
-                              html.A('Show all "Path changed" alarms for that site in a new page', href=url, target='_blank',
-                                   className='btn btn-secondary site-btn mb-2',
-                                   id={
-                                       'type': 'site-new-page-btn',
-                                       'index': site
-                                   }
-                              ),
-                        ), align='center'
-                      )
-                  ]),
-                ]),
-              ])
-            ])
-
 
 def siteMeasurements(q, pq):
   return dbc.Row(
@@ -271,32 +177,9 @@ def pairDetails(pair, alarm, chdf, baseline, altpaths, hopPositions, pivotFrames
             ], justify="start", align="start"),
           ])
 
-  
-def toggleCollapse(chdf, posDf, baseline, altPaths, n, pair, alarm, is_open, pivotFrames, alarmsInst=Alarms()):
-    data = ''
-    if n:
-      if is_open==False:
-        # chdf, posDf, baseline, altPaths = pq.readFile(f'{location}chdf.parquet'), pq.readFile(f'{location}posDf.parquet'), pq.readFile(f'{location}baseline.parquet'), pq.readFile(f'{location}altPaths.parquet')
-        data = pairDetails(pair, alarm,
-                        chdf[(chdf['pair']==pair) & (chdf['from_date']==alarm['from']) & (chdf['to_date']==alarm['to'])],
-                        baseline[(baseline['pair']==pair) & (baseline['from_date']==alarm['from']) & (baseline['to_date']==alarm['to'])],
-                        altPaths[(altPaths['pair']==pair) & (altPaths['from_date']==alarm['from']) & (altPaths['to_date']==alarm['to'])],
-                        posDf[(posDf['pair']==pair) & (posDf['from_date']==alarm['from']) & (posDf['to_date']==alarm['to'])],
-                        pivotFrames,
-                        alarmsInst)
-      return [not is_open, data]
-    return [is_open, data]
-  
-
 ###############################################
             #loss_delay.py
 ###############################################
-
-from datetime import datetime
-import utils.helpers as hp
-from utils.helpers import DATE_FORMAT
-from model.Alarms import Alarms
-from utils.parquet import Parquet
 
 def obtainFieldNames(dateFrom):
   # Date when all latency alarms started netsites instead of sites
