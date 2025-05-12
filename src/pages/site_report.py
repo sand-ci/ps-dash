@@ -75,12 +75,13 @@ def layout(q=None, **other_unknown_query_strings):
     fromDay = fromDay_date.strftime('%Y-%m-%dT%H:%M:%S.000Z')  # "2024-02-20 00:00:00"
 
     # Calculate toDay (2 days ago at 23:59:59)
-    toDay_date = (now - timedelta(days=1)).replace(hour=00, minute=00, second=00, microsecond=00000)
+    toDay_date = now.replace(hour=23, minute=59, second=59, microsecond=00000) #as in queries we extract based on created_at, to get all the alarms we need to get up to now and after that filter the data by 'to' to get a week of data and end report with date 48hours earlier
     toDay = toDay_date.strftime('%Y-%m-%dT%H:%M:%S.000Z')  # "2024-02-26 23:59:59"
     
     global pivotFrames
     frames, pivotFrames = alarmsInst.loadData(fromDay, toDay)
-    
+    toDay_date = toDay_date-timedelta(days=2)
+    toDay = toDay_date.strftime('%Y-%m-%dT%H:%M:%S.000Z')
     print(f"fromDay: {fromDay}, toDay: {toDay}")
     
     site_alarms = pd.DataFrame(columns=["to", "alarm group", "alarm name", "hosts", "IP version", "Details"])
@@ -94,7 +95,7 @@ def layout(q=None, **other_unknown_query_strings):
     # prepare table with alarms
     for frame in frames:
         df = frames[frame]
-        df = df[pd.to_datetime(df['to']).dt.date >= fromDay_date.date()]
+        df = df[(pd.to_datetime(df['to']).dt.date >= fromDay_date.date()) & (pd.to_datetime(df['to']).dt.date <= toDay_date.date())]
         site_df = df[df['tag'].apply(lambda x: q in x)]
         
         if not site_df.empty:
@@ -107,6 +108,7 @@ def layout(q=None, **other_unknown_query_strings):
             site_df['to'] = site_df['to'].dt.normalize()  # or .dt.floor('D')
             site_df['to'] = site_df['to'].dt.strftime('%Y-%m-%d')
             if frame == "hosts not found":
+                print(site_df['to'].max())
                 site_df['hosts'] = None
                 site_df['hosts list'] = None
                 for i, row in site_df.iterrows():
@@ -180,17 +182,18 @@ def layout(q=None, **other_unknown_query_strings):
     return html.Div(children = [
         html.Div(id='scroll-trigger', style={'display': 'none'}),
         dcc.Store(id='fromDay', data=fromDay),
-        dcc.Store(id='toDay', data=toDay),
+        dcc.Store(id='toDay', data=now.strftime('%Y-%m-%dT%H:%M:%S.000Z')),
+        dcc.Store(id='now', data=now.strftime('%Y-%m-%dT%H:%M:%S.000Z')),
         dcc.Store(id='alarm-storage', data={}),
         
         dbc.Row([
             dbc.Row(
                 dbc.Col([
                     # dashboard card begins
-                    html.Div(className="boxwithshadowhidden", style={"background-color": "white"}, children=[
+                    # html.Div(className="boxwithshadowhidden", style={"background-color": "white"}, children=[
                         # header line with site name
-                        html.H3(f"\t{q}", className="header-line p-2",  
-                                style={"background-color": "#00245a", "color": "white", "font-size": "25px"}),
+                        # html.H3(f"\t{q}", className="header-line p-2",  
+                        #         style={"background-color": "#00245a", "color": "white", "font-size": "25px"}),
                         
                         # first row: status of the site throughout the week
                         dbc.Row(children=[
@@ -222,7 +225,7 @@ def layout(q=None, **other_unknown_query_strings):
                                                 }
                                             ),
                                         dbc.Row([
-                                            dbc.Col(html.H3("Daily Site Status", style={"padding-left": "3%", "padding-top": "3%", 'margin-bottom': '0px'})),
+                                            dbc.Col(html.H3(f"{q} Daily Status", style={"padding-left": "3%", "padding-top": "3%", 'margin-bottom': '0px'})),
                                             dbc.Col(
                                                 dbc.Button(
                                                         "Show Details ⬇",
@@ -268,7 +271,7 @@ def layout(q=None, **other_unknown_query_strings):
                                 html.Div(
                                     className="boxwithshadow page-cont p-2 h-100",
                                     children=[
-                                        html.H3("Number of Alarms", style={"color": "white", "padding-left": "5%", "padding-top": "5%"}),
+                                        html.H3(f"Number of Alarms from {q}", style={"color": "white", "padding-left": "5%", "padding-top": "5%"}),
                                         html.H1(
                                             # f"{site_alarms_num if site_alarms_num > 0 else 0}", 
                                             id="num-alarms",
@@ -491,7 +494,7 @@ def layout(q=None, **other_unknown_query_strings):
                             ], width=9, style={"height": "600px"})
                         ], className="my-3 pr-1 pl-1", style={"height": "600px"})
                         ]),
-                    ])                 
+                    # ])                 
                 )
         ], className="ml-1 mt-1 mr-0 mb-1"),
     
@@ -690,7 +693,7 @@ def create_status_chart_explained(graphData, fromDay, toDay):
                 if alarm in alarm_colors:
                     color, influence = alarm_colors[alarm][0], alarm_colors[alarm][1]
                 else:
-                    color, influence = 'lightgrey', 'insignificant' 
+                    color, influence = '#5c7a51', 'insignificant' 
             
             fig.add_trace(go.Bar(
                 y=[alarm],
@@ -867,11 +870,12 @@ def toggle_modal(n1, n2, is_open):
     [
         State('dynamic-content-container', 'children'),
         State('fromDay', 'data'),
-        State('toDay', 'data')
+        State('toDay', 'data'),
+        State('now', 'data')
     ],
     prevent_initial_call=True
 )
-def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, visibility, current_children, fromDay, toDay):
+def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, visibility, current_children, fromDay, toDay, now):
     """
     This function extracts the visualisation of the chosen alarm and shows it under the table with alarms.
     """
@@ -883,7 +887,8 @@ def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, visibility, 
     global site
     print("Debugging update_dynamic_content")
     alarmsInst = Alarms()
-    frames, pivotFrames = alarmsInst.loadData(fromDay, toDay)
+    
+    
     button_content_mapping = {'hosts-not-found-btn': "hosts not found",
                               'path-anomaly-btn': "ASN path anomalies"
                               }
@@ -897,8 +902,15 @@ def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, visibility, 
                 event = button_content_mapping[button_id['type']]
             else:
                 id, event = button_id['index'].split(', ')
+            if event == 'hosts not found':
+                toDay = now
+            # else:
+            #     date = toDay 
                 
+            frames, pivotFrames = alarmsInst.loadData(fromDay, toDay)
             pd_df = pivotFrames[event]
+            print('pd_df')
+            print(pd_df)
             if pd_df.empty:
                 return dash.no_update, dash.no_update, {}, visibility
             
@@ -907,7 +919,7 @@ def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, visibility, 
                 
                 #host not found visualisation
                 if event == 'hosts not found':
-                    histData = createDictionaryWithHistoricalData(pd_df)                    
+                    histData = createDictionaryWithHistoricalData(pd_df)
                     site_name, id = button_id['index'].split(', ')
                     fig, test_types, hosts, site = create_heatmap(pd_df, site, fromDay.replace("T", " ").replace(".000Z", ""), toDay.replace("T", " ").replace(".000Z", ""))
                     alarm = qrs.getAlarm(id)['source']

@@ -199,7 +199,7 @@ def query_ASN_paths_pos_probs(src, dest, dt, ipv):
 
 def queryAlarms(dateFrom, dateTo):
   period = hp.GetTimeRanges(dateFrom, dateTo)
-
+  print(period)
   # this is the list of events currently tracked in pSDash interface
   allowed_events = ['bad owd measurements',
                     'large clock correction',

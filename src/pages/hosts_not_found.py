@@ -452,6 +452,7 @@ def update_output(n_clicks, start_date, end_date, sites, all, sitesState):
     if not ctx.triggered or ctx.triggered[0]['prop_id'].split('.')[0] == 'search-button-2':
         if start_date and end_date:
             print("Start and end dates are specified")
+            rn = pd.to_datetime(end_date) + timedelta(days=2)
             start_date, end_date = [f'{start_date}T00:01:00.000Z', f'{end_date}T23:59:59.000Z']
         else: 
             print("Start and end dates are not specified")
@@ -459,7 +460,7 @@ def update_output(n_clicks, start_date, end_date, sites, all, sitesState):
         alarmsInst = Alarms()
         print(f"start_date: {start_date}")
         print(f"end_date: {end_date}")
-        framesAllAlarms, pivotFramesAllAlarms = alarmsInst.loadData(start_date, end_date)
+        framesAllAlarms, pivotFramesAllAlarms = alarmsInst.loadData(start_date, f'{rn.date().strftime("%Y-%m-%d")}T23:59:59.000Z')
         
         # print(f"pivotFramesAllAlarms: {pivotFramesAllAlarms}")
         df, pivotFrame = framesAllAlarms['hosts not found'], pivotFramesAllAlarms['hosts not found']

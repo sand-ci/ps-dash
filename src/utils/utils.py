@@ -370,7 +370,7 @@ def create_heatmap(site_dict, site, date_from, date_to, test_types=None, hostnam
     date_to = datetime.strptime(date_to, '%Y-%m-%d %H:%M:%S')
     print(f"Building graph for date range {date_from} to {date_to}...")
     # Generate all dates in the range
-    date_range = [date_from + timedelta(days=i) for i in range((date_to - date_from).days)]
+    date_range = [date_from + timedelta(days=i) for i in range((date_to - date_from).days - 1)]
     date_range_str = [date.strftime('%Y-%m-%d') for date in date_range]
     print(f"Date range: {date_range_str}")
     print("Extracting all hosts...")
