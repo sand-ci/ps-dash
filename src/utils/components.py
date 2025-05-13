@@ -339,3 +339,4 @@ def throughput_graph_components(alrmData, df, otherAlarms):
           justify="evenly")
 
         ], className='boxwithshadow')
+    

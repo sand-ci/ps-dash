@@ -1,11 +1,6 @@
 """
-Module with the extracted functions from different pages that can be reused.
+Module with the extracted functions from different pages that can be reused and are reused in different modules/pages.
 """
-
-####################################################
-                #pages/home.py
-####################################################
-
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
@@ -24,6 +19,10 @@ from plotly.subplots import make_subplots
 from utils.parquet import Parquet
 from elasticsearch.helpers import scan
 import dash_bootstrap_components as dbc
+
+####################################################
+                #pages/home.py
+####################################################
 
 def buildMap(mapDf):
     # usually test and production sites are at the same location,
@@ -101,46 +100,6 @@ def defineStatus(data, key_value, count_value):
                     & (data['cnt']>0)][count_value]
     return red_status, yellow_status, grey_status
 
-#    def defineStatus(data, key_value, count_value):
-#     # Filter for days with at least one alarm
-#     filtered = data[data['cnt'] > 0].copy()
-    
-#     # Create status mapping
-#     conditions = [
-#         filtered[key_value].isin(['bandwidth decreased from multiple']),
-#         filtered[key_value].isin(['ASN path anomalies']),
-#         filtered[key_value].isin(['firewall issue', 'source cannot reach any', 'complete packet loss'])
-#     ]
-#     choices = ['red', 'yellow', 'grey']
-#     filtered['status'] = np.select(conditions, choices, default='green')
-    
-#     # Create the original tuple outputs
-#     red_tuples = filtered[filtered['status'] == 'red'][[count_value, key_value]].apply(tuple, axis=1).unique().tolist()
-#     yellow_tuples = filtered[filtered['status'] == 'yellow'][[count_value, key_value]].apply(tuple, axis=1).unique().tolist()
-#     grey_tuples = filtered[filtered['status'] == 'grey'][[count_value, key_value]].apply(tuple, axis=1).unique().tolist()
-    
-#     # Create summary DataFrame
-#     summary_df = (
-#         filtered[filtered['status'] != 'green']
-#         .groupby([count_value, 'status'])[key_value]
-#         .agg(list)
-#         .reset_index()
-    #     .rename(columns={count_value: 'date', key_value: 'influencing_alarms'})
-    # )
-    
-    # # Ensure one row per date with its determined status
-    # status_df = (
-    #     summary_df
-    #     .groupby('date')
-    #     .agg({
-    #         'status': 'first',  # Takes the most severe status if multiple exist
-    #         'influencing_alarms': lambda x: list(set([item for sublist in x for item in sublist]))
-    #     })
-    #     .reset_index()
-    # )
-    
-    # return (red_tuples, yellow_tuples, grey_tuples, status_df)
-
 
 def createDictionaryWithHistoricalData(dframe):
     site_dict = dframe.groupby('site').apply(
@@ -150,6 +109,8 @@ def createDictionaryWithHistoricalData(dframe):
         ]
     ).to_dict()
     return site_dict
+
+
 def generateStatusTable(alarmCnt):
     red_sites, yellow_sites, grey_sites = defineStatus(alarmCnt, 'event', 'site')
     
@@ -267,7 +228,6 @@ def createTable(df, id):
             id=id)
     
 def explainStatuses():
-
   categoryDf = qrs.getSubcategories()
 
   red_infrastructure = ['firewall issue', 'source cannot reach any', 'complete packet loss']
@@ -356,24 +316,22 @@ def create_heatmap(site_dict, site, date_from, date_to, test_types=None, hostnam
         plotly.graph_objects.Figure: The heatmap figure.
     """
     print("In create_heatmap function site_report...")
-    print(site)
-    print(site_dict)
+    # print(site)
+    # print(site_dict)
     site_dict = site_dict[site_dict['site']==site]
-    print(site_dict)
-    # Get the records for the specified site
+    # print(site_dict)
     
     records = site_dict.to_dict('records')
-    print(records)
     # print(f"Data records: {records}")
-    # # Parse date_from and date_to
+
     date_from = datetime.strptime(date_from, '%Y-%m-%d %H:%M:%S')
     date_to = datetime.strptime(date_to, '%Y-%m-%d %H:%M:%S')
-    print(f"Building graph for date range {date_from} to {date_to}...")
     # Generate all dates in the range
     date_range = [date_from + timedelta(days=i) for i in range((date_to - date_from).days - 1)]
     date_range_str = [date.strftime('%Y-%m-%d') for date in date_range]
-    print(f"Date range: {date_range_str}")
-    print("Extracting all hosts...")
+    # print(f"Date range: {date_range_str}")
+    
+    # print("Extracting all hosts...")
     # Extract all unique hostnames and test types
     all_hostnames = set()
     all_test_types = set()
@@ -383,33 +341,31 @@ def create_heatmap(site_dict, site, date_from, date_to, test_types=None, hostnam
             if hosts is not None:  # Check if hosts list is not empty
                 all_hostnames.update(hosts)
                 all_test_types.add(test_type)
-    print("Applying filter....")
-    # Apply filters if provided
+                
+    # print("Applying filter....")
     if test_types:
         all_test_types = set(test_types)
     if hostnames:
         all_hostnames = set(hostnames)
 
-    # Create a list of all combinations (hostname + test type)
+    # all combinations (hostname + test type)
     combinations = [f"({test}) {host}" for host in all_hostnames for test in all_test_types]
 
-    # Initialize a DataFrame to store the heatmap data
+    # store the heatmap data
     heatmap_data = pd.DataFrame(index=date_range_str, columns=combinations, dtype=int)
 
-    # Fill the DataFrame with 0 (absence) by default
+    # 0 (absence) by default
     heatmap_data.fillna(0, inplace=True)
 
     # Mark presence of alarms with 1
     print(f"Records: {records}")
     for record in records:
         try:
-            # Parse the dates using the regex-based function
             record_from = parse_date(record['from'])
             record_to = parse_date(record["to"])
         except ValueError as err:
             print(f"Error parsing date: {err}")
 
-        # Iterate over each day in the record's date range
         current_date = record_from
         while current_date <= record_to:
             current_date_str = current_date.strftime('%Y-%m-%d')
@@ -422,17 +378,11 @@ def create_heatmap(site_dict, site, date_from, date_to, test_types=None, hostnam
                                 if combination in heatmap_data.columns:
                                     heatmap_data.at[current_date_str, combination] = 1
             current_date += timedelta(days=1)
-    # print(f"Heatmap data: {heatmap_data}")
     case = 0
-            # print(f"Heatmap data unique values: {len(np.unique(heatmap_data.values))}")
     if heatmap_data.shape[1] == 1 or len(np.unique(heatmap_data.values)) == 1:
         heatmap_data[' '] = 0 # turning 1D data in 2D
         case = 1 # corner cases for cases when there is only one value meaning all the test for the period failed to be found in Elasticsearch
-    #     print(f"Heatmap data: {heatmap_data}")
-    # print(f"Heatmap data values: {heatmap_data.T.values}")
-    # print(f"Heatmap data index: {heatmap_data.index}")
-    # print(f"Heatmap data columns: {heatmap_data.columns}")
-    # print("Heatmap data shape:", heatmap_data.shape)
+
     colorscales = {0:[[0, '#69c4c4'], [1, 'grey']], 1:[[0, '#ffffff'], [1, 'grey']]}
     colorbars = {1:dict(title="Data Availability", tickvals=[0, 1], ticktext=[' ', "Missed"]),
                     0:dict(title="Data Availability", tickvals=[0, 1], ticktext=["Available", "Missed"])}
@@ -440,7 +390,7 @@ def create_heatmap(site_dict, site, date_from, date_to, test_types=None, hostnam
         z=heatmap_data.T.values,  # Transpose to have dates on the y-axis
         x=heatmap_data.index,  # Dates
         y=heatmap_data.columns,  # Host + Test Type combinations
-        colorscale=colorscales[case],  # Custom colorscale
+        colorscale=colorscales[case],
         colorbar=colorbars[case],
         hoverongaps=False,
         xgap=1,  # Add white borders between cells
@@ -448,15 +398,13 @@ def create_heatmap(site_dict, site, date_from, date_to, test_types=None, hostnam
         showscale=True
     )
 
-    # Create the figure
     fig = go.Figure(data=[heatmap])
 
-    # Update layout
     fig.update_layout(
         title=f"Missing tests for {site} ({date_from.strftime('%Y-%m-%d')} to {date_to.strftime('%Y-%m-%d')})",
         xaxis_title="Date",
         yaxis_title="Host + Test Type",
-        font=dict(size=12)  # Set default font size
+        font=dict(size=12)
     )
 
     return fig, list(all_test_types), list(all_hostnames), site
@@ -467,6 +415,9 @@ def create_heatmap(site_dict, site, date_from, date_to, test_types=None, hostnam
                 #pages/asn_anomalies.py
 ####################################################
 def build_anomaly_heatmap(subset_sample):
+    """
+    This function creates the heatmap for the alarm 'ASN anomalies'
+    """
     columns = ['src_netsite', 'dest_netsite', 'anomalies', 'ipv6']
     src_site, dest_site, anomaly, ipv = subset_sample[columns].values[0]
     ipv = 'IPv6' if ipv else 'IPv4'
@@ -580,7 +531,6 @@ def addNetworkOwners(asn_list):
     owners = qrs.getASNInfo(asn_list)
     asn_data = [{"asn": str(asn), "owner": owners.get(str(asn), "Unknown")} for asn in asn_list]
     return asn_data
-
 
 def generate_asn_cards(asn_data):
     # Create a card for each ASN
@@ -897,8 +847,6 @@ def SitesOverviewPlots(site_name, pq):
 
     return fig
 
-
-
 #######################################
          #pages/throughput.py
 #######################################
@@ -964,6 +912,7 @@ def buildDataTable(df):
             filter_options={"case": "insensitive"},
             sort_action="native",
         ))
+
 def getSitePairs(alarm):
   sitePairs = []
   event = alarm['event']

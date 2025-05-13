@@ -39,11 +39,7 @@ class ParquetUpdater(object):
                 self.storeMetaData()
                 self.cacheIndexData()
                 self.storeAlarms()
-                self.storePathChangeDescDf()
                 self.psConfigData()
-
-                # self.storeThroughputDataAndModel()
-                # self.storePacketLossDataAndModel()
 
             # Set the schedulers
             Scheduler(60*60*12, self.storeMetaData)
