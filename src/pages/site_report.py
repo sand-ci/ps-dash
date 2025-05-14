@@ -201,7 +201,7 @@ def layout(q=None, **other_unknown_query_strings):
                                 html.Div(
                                     className="boxwithshadowhidden",
                                     id="status-container",
-                                    
+                                    style={"background-color": "#ffffff"},
                                     children=[
                                         # header with toggle button
                                         html.Div(
@@ -225,16 +225,16 @@ def layout(q=None, **other_unknown_query_strings):
                                                 }
                                             ),
                                         dbc.Row([
-                                            dbc.Col(html.H3(f"{q} Daily Status", style={"padding-left": "3%", "padding-top": "3%", 'margin-bottom': '0px'})),
+                                            dbc.Col(html.H3(f"{q} Daily Status", style={"padding-left": "3%", "padding-top": "3%", 'margin-bottom': '0px',"background-color": "#ffffff"})),
                                             dbc.Col(
                                                 dbc.Button(
                                                         "Show Details ⬇",
                                                         id="toggle-alarms-button",
                                                         color="link",
-                                                        style={"font-size": "0.8rem", "padding-top": "3%",}
+                                                        style={"font-size": "0.8rem", "padding-top": "3%","background-color": "#ffffff"}
                                                     ),
                                                 )
-                                                 ], style={'margin-bottom': '0px'}),
+                                                 ], style={'margin-bottom': '0px', "background-color": "#ffffff"}),
                                         
                                         # Status graph
                                         html.Div(
@@ -246,7 +246,7 @@ def layout(q=None, **other_unknown_query_strings):
                                                     'width': '100%',
                                                     'height': '350px'
                                                 }
-                                            ), style={'margin-top': '0px'}
+                                            ), style={'margin-top': '0px',"background-color": "#ffffff"}
                                         ),
                                         dcc.Store(id='site-statuses', data={}),
                                         dbc.Modal(
@@ -263,7 +263,9 @@ def layout(q=None, **other_unknown_query_strings):
                                         )
                                     ]
                                 )
-                        ])], className="mb-1 pr-1 pl-1"),
+                        ]
+                                    )
+                            ], className="mb-1 pr-1 pl-1"),
                         
                         # second row of stats: number of alarms, alarms types and categories distribution, metadata
                         dbc.Row([
@@ -321,7 +323,7 @@ def layout(q=None, **other_unknown_query_strings):
                                                         color='#ffffff'
                                                     )
                                                 ]
-                                                ), width=5, style={"background-color": "#ffffff", "height": "100%"}),
+                                                ), width=5, style={"height": "100%"}),
                             # metadata card
                             dbc.Col(
                                 html.Div(className="boxwithshadow page-cont p-2 h-100", style={"background-color": "#ffffff", "align-content":"center"}, children=[
@@ -433,10 +435,11 @@ def layout(q=None, **other_unknown_query_strings):
                                     style={
                                             "height": "100%",
                                             "display": "flex",
-                                            "flex-direction": "column"
+                                            "flex-direction": "column",
+                                            "background-color": "#ffffff"
                                         },
                                     children=[
-                                        html.H1(f"List of alarms", className="text-center pt-2"),
+                                        html.H1(f"List of alarms", className="text-center pt-2", style={"background-color": "#ffffff"}),
                                         html.H5("Filters", style={"padding-top": "1%"}, className="pl-1"),
                                         dbc.Row([
                                             dbc.Col(
