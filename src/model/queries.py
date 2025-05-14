@@ -1,6 +1,6 @@
 import traceback
 from elasticsearch.helpers import scan
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
 from dateutil.parser import parse
 
@@ -177,7 +177,7 @@ def query_ASN_paths_pos_probs(src, dest, dt, ipv):
       if ipv != -1:
           ipv_q = {
             "term": {
-              "ipv6": ipv
+              "ipv6": True if ipv == 1 else False
             }
           }
           must_conditions.append(ipv_q)
@@ -197,10 +197,36 @@ def query_ASN_paths_pos_probs(src, dest, dt, ipv):
   return doc
 
 
+def queryPathAnomaliesDetails(dateFrom, dateTo, idx='ps_traces_changes'):
+    query = {
+        "bool": {
+            "must": [
+                {"exists": {"field": "transitions"}},
+                  {
+                  "range": {
+                    "to_date": {
+                      "format": "strict_date_optional_time",
+                      "gte": dateFrom,
+                      # "lte": dateTo,
+                    }
+                  }
+                }
+            ]
+        }
+    }
+    res = hp.es.search(index=idx, query=query, size=10000)
+    # collect every transition record from every hit
+    records = []
+    for hit in res["hits"]["hits"]:
+        for t in hit["_source"].get("transitions", []):
+            records.append(t)
+    df = pd.DataFrame(records)
+    return df
+
 
 def queryAlarms(dateFrom, dateTo):
   period = hp.GetTimeRanges(dateFrom, dateTo)
-
+  print(period)
   # this is the list of events currently tracked in pSDash interface
   allowed_events = ['bad owd measurements',
                     'large clock correction',
@@ -231,7 +257,7 @@ def queryAlarms(dateFrom, dateTo):
                             }
                         }
                     },
-                    {
+{
                         "term": {
                             "category": {
                                 "value": "Networking",
@@ -404,8 +430,9 @@ def getSubcategories():
   return catdf
 
 
-def query_ASN_anomalies(src, dest):
-  dateFrom, dateTo = hp.defaultTimeRange(days=2)
+def query_ASN_anomalies(src, dest, dt):
+  dateFrom = f"{dt}T00:00:00"
+  dateTo = f"{dt}T23:59:59"
   q = {
     "query": {
       "bool": {
@@ -455,33 +482,6 @@ def query_ASN_anomalies(src, dest):
 
   ddf = pd.DataFrame(data)
   return ddf
-
-
-def queryPathAnomaliesDetails(dateFrom, dateTo, idx='ps_traces_changes'):
-    query = {
-        "bool": {
-            "must": [
-                {"exists": {"field": "transitions"}},
-                  {
-                  "range": {
-                    "to_date": {
-                      "format": "strict_date_optional_time",
-                      "gte": dateFrom,
-                      # "lte": dateTo,
-                    }
-                  }
-                }
-            ]
-        }
-    }
-    res = hp.es.search(index=idx, query=query, size=10000)
-    # collect every transition record from every hit
-    records = []
-    for hit in res["hits"]["hits"]:
-        for t in hit["_source"].get("transitions", []):
-            records.append(t)
-    df = pd.DataFrame(records).drop_duplicates()
-    return df
 
 
 def query4Avg(idx, dateFrom, dateTo):
@@ -591,3 +591,120 @@ def query4Avg(idx, dateFrom, dateTo):
                     })
 
   return aggrs
+
+
+def queryBandwidthIncreasedDecreased(dateFrom, dateTo, sips, dips, ipv6):
+    q = {
+          "query" : {  
+              "bool" : {
+              "must" : [
+                    {
+                      "range": {
+                          "timestamp": {
+                          "gte": dateFrom,
+                          "lte": dateTo,
+                          "format": "strict_date_optional_time"
+                          }
+                        }
+                    },
+                    {
+                      "terms" : {
+                        "src": sips
+                      }
+                    },
+                    {
+                      "terms" : {
+                        "dest": dips
+                      }
+                    },
+                    {
+                      "term": {
+                          "ipv6": {
+                            "value": ipv6
+                          }
+                      }
+                    }
+                ]
+              }
+            }
+          }
+      # print(str(q).replace("\'", "\""))
+
+    result = scan(client=hp.es,index='ps_throughput',query=q)
+    data = []
+
+    for item in result:
+        data.append(item['_source'])
+
+    df = pd.DataFrame(data)
+
+    df['pair'] = df['src']+'->'+df['dest']
+    df['dt'] = df['timestamp']
+    return df
+
+def getSiteMetadata(site, date_from=None, date_to=None, index='ps_meta'):
+    """
+    Fetch metadata using Elasticsearch scan with date range filtering,
+    including cpu_cores, cpus
+    """
+    # Set default dates if not provided
+    if date_to is None:
+        date_to = datetime.utcnow()
+    else:
+        date_to = datetime.strptime(date_to, '%Y-%m-%d') if isinstance(date_to, str) else date_to
+    
+    if date_from is None:
+        date_from = date_to - timedelta(days=365)
+    else:
+        date_from = datetime.strptime(date_from, '%Y-%m-%d') if isinstance(date_from, str) else date_from
+    
+    date_format = 'strict_date_optional_time'
+    date_from_str = date_from.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+    date_to_str = date_to.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+    query = {
+        "query": {
+            "bool": {
+                "filter": [
+                    {"match_phrase": {"netsite": site}},
+                    {"range": {
+                        "timestamp": {
+                            "format": date_format,
+                            "gte": date_from_str,
+                            "lte": date_to_str
+                        }
+                    }}
+                ]
+            }
+        },
+        "sort": [{"timestamp": {"order": "desc", "format": date_format}}],
+        "_source": {
+            "includes": ["*", "cpu_cores", "cpus", "wlcg-role"],  # Include all fields plus our specific ones
+            "excludes": []  # No exclusions
+        }
+    }
+    
+    try:
+        results = scan(
+            hp.es,
+            index=index,
+            query=query,
+            preserve_order=True
+        )
+        
+        meta = []
+        for hit in results:
+            doc = hit['_source']
+            # Ensure the fields exist in the document
+            doc.setdefault('cpu_cores', None)
+            doc.setdefault('cpus', None)
+            meta.append(doc)
+        
+        if meta:
+            return pd.DataFrame(meta)
+        else:
+            print(f"No metadata found for site '{site}' between {date_from_str} and {date_to_str}")
+            return None
+            
+    except Exception as e:
+        print(f"Error fetching metadata: {str(e)}")
+        return None

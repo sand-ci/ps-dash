@@ -11,10 +11,10 @@ import utils.helpers as hp
 from utils.helpers import timer
 import model.queries as qrs
 from utils.parquet import Parquet
+import dash_bootstrap_components as dbc
 
 import urllib3
 urllib3.disable_warnings()
-
 
 class Alarms(object):
 
@@ -201,8 +201,8 @@ class Alarms(object):
       
       if len(folder)==0 or isTooOld == True:
           print('Query ES')
-          print('+++++++++++++++++++++')
           frames, pivotFrames = self.getAllAlarms(dateFrom, dateTo)
+
 
     except Exception as e:
       print(e, traceback.format_exc())
@@ -228,9 +228,9 @@ class Alarms(object):
     dateFrom, dateTo = hp.getPriorNhPeriod(alarmEnd)
     # frames, pivotFrames = self.loadData(dateFrom, dateTo)
     print('getOtherAlarms')
-    print('+++++++++++++++++++++')
+    
     # print(dateFrom, dateTo, currEvent, alarmEnd, '# alarms:', [len(d) for d in pivotFrames], site, src_site, dest_site)
-    print()
+
 
     alarmsListed = {}
 
@@ -279,8 +279,9 @@ class Alarms(object):
 
 
   @staticmethod
-  def convertListOfDict(column_name, df):
+  def convertListOfDict(column_name, df, event=False):
     def convert_to_string(value):
+# I could have broken smth here
             if isinstance(value, dict):
                 result = []
                 for key, val in value.items():
@@ -291,9 +292,17 @@ class Alarms(object):
                             val_str = str(val)
                         result.append(f"<b>{key}</b>: {val_str}")
                 return '\n'.join(result)
+            if isinstance(value, list):
+                val_str = ' || '.join(value)
+                return val_str
+            if column_name == "hosts_not_found":
+                print(type(value))
             return str(value)
-        
-    df[column_name] = df[column_name].apply(convert_to_string)
+    if event:
+      df['hosts_failed'] = df['hosts_failed'].apply(convert_to_string)
+      df['tests_types_failed'] = df['tests_types_failed'].apply(convert_to_string)
+    else:
+      df[column_name] = df[column_name].apply(convert_to_string)
     return df
 
 
@@ -305,7 +314,7 @@ class Alarms(object):
 
 
   # Format, hide or edit anything displayed in the datatables
-  def formatDfValues(self, df, event):
+  def formatDfValues(self, df, event, generate_button=False, site_report=False):
     try:
         sign = {'bandwidth increased from/to multiple sites': '+',
                 'bandwidth decreased from/to multiple sites': ''}
@@ -347,14 +356,17 @@ class Alarms(object):
             df['anomalies'] = df['anomalies'].apply(lambda x: ', '.join(map(str, x)))
             df.rename(columns={'anomalies': 'new ASN(s)'}, inplace=True)
         if 'to_date' in df.columns:
-            df['to'] = pd.to_datetime(df['to_date'], utc=True)
+            df['to'] = pd.to_datetime(df['to_date'], format='mixed', utc=True)
             df['to'] = df['to'].dt.strftime('%Y-%m-%d')
             df.drop('to_date', axis=1, inplace=True)
+        if 'asn_list' in df.columns:
+            df.drop('asn_list', axis=1, inplace=True)
         if 'ipv' in df.columns:
+            df['ipv'] = df['ipv'].apply(lambda x: x.lower() if x is not None else x)
             df.rename(columns={'ipv': 'IP version'}, inplace=True)
 
-        if 'alarms_id' in df.columns:
-            df.drop('alarms_id', axis=1, inplace=True)
+        # if 'alarms_id' in df.columns:
+        #     df.drop('alarms_id', axis=1, inplace=True)
         if 'tag' in df.columns:
             df.drop('tag', axis=1, inplace=True)
         if '%change' in df.columns:
@@ -365,12 +377,21 @@ class Alarms(object):
             df['avg_value'] = df['avg_value'].apply(lambda x: f'{x}%')
         if 'alarm_id' in df.columns:
           df['alarm_link'] = df['alarm_id']
-          df.drop('alarm_id', axis=1, inplace=True)
 
         if 'configurations' in df.columns:
             df = self.replaceCol('configurations', df, '\n')
-        if 'hosts_not_found' in df.columns:
-            df = self.convertListOfDict('hosts_not_found', df)
+        if 'hosts_not_found' in df.columns or event == 'hosts not found':
+            additionalTable = False
+            if 'hosts_not_found' not in df.columns:
+              additionalTable = True
+            df = self.convertListOfDict('hosts_not_found', df, additionalTable)
+            
+            # import re
+            # def extract_hosts(text):
+            #     return re.findall(r'(?:^|\n)\s*[^:]*:\s*([^\s]+)', text)
+            # df['hosts'] = df['hosts_not_found'].apply(lambda x: extract_hosts(x))
+            # print(df.iloc[0])
+            
 
         if event == 'complete packet loss':
           df.drop(columns=['avg_value'], inplace=True)
@@ -378,17 +399,19 @@ class Alarms(object):
           df.drop(columns=['asn_count'], inplace=True)
 
         # TODO: create pages/visualizatios for the following events then remove the df.drop('alarm_link') below
-        if event not in ['unresolvable host', 'hosts not found']:
-          df = self.createAlarmURL(df, event)
-        else:
-          df.drop('alarm_link', axis=1, inplace=True)
-
-          if 'site' in df.columns:
-              df['site'] = df['site'].fillna("Unknown site")
+        if event not in ['unresolvable host']:
+          df = self.createAlarmURL(df, event, site_report)
+          
+        if generate_button:
+            self.createGraphButton(df)
+        # df.drop('alarm_link', axis=1, inplace=True)
+        if 'site' in df.columns:
+            df['site'] = df['site'].fillna("Unknown site")
 
         # Reorder 'from' and 'to' columns to be the first two columns if they exist
         df = self.reorder_columns(df, ['from', 'to'])
-
+        if 'alarm_id' in df.columns:
+            df.drop('alarm_id', axis=1, inplace=True)
         return df
     except Exception as e:
         print('Exception ------- ', event)
@@ -398,26 +421,83 @@ class Alarms(object):
 
   @staticmethod
   # Create dynamically the URLs leading to a page for a specific alarm
-  def createAlarmURL(df, event):
+  def createAlarmURL(df, event, site_report=False):
+    event_page_map = {
+        'ASN path anomalies': 'anomalous_paths/',
+        'firewall issue': 'loss-delay/',
+        'complete packet loss': 'loss-delay/',
+        'bandwidth decreased from/to multiple sites': 'loss-delay/',
+        'high packet loss on multiple links': 'loss-delay/',
+        'high packet loss': 'loss-delay/',
+        'hosts not found': 'hosts_not_found/'
+    }
     if event.startswith('bandwidth'):
-          page = 'throughput/'
-    elif event == 'ASN path anomalies':
-        page = 'anomalous_paths/'
-    elif event in ['firewall issue', 'complete packet loss', 'bandwidth decreased from/to multiple sites',
-                    'high packet loss on multiple links', 'high packet loss']:
-        page = 'loss-delay/'
+        page = 'throughput/'
+    elif event in event_page_map:
+        page = event_page_map.get(event, '')
     # else:
-    #     page = 'alarms/'
-
+    #     print("Event page in ps-dash was not found.")
+    #     return KeyError
+    if not site_report:
     # create clickable cells leading to alarm pages
-    if 'alarm_link' in df.columns:
-        url = f'{request.host_url}{page}'
-        df['alarm_link'] = df['alarm_link'].apply(
+      if 'alarm_link' in df.columns:
+          url = f'{request.host_url}{page}'
+          df['alarm_link'] = df['alarm_link'].apply(
             lambda id: f"<a class='btn btn-secondary' role='button' href='{url}{id}' target='_blank'>VIEW IN A NEW TAB</a>" if id else '-')
-    
-    if event == 'ASN path anomalies':
-      df['alarm_link'] = df.apply(
-        lambda row: f"<a class='btn btn-secondary' role='button' href='{request.host_url}anomalous_paths/src_netsite={row['src_netsite']}&dest_netsite={row['dest_netsite']}&dt={row['to']}' target='_blank'>VIEW IN A NEW TAB</a>" if row['src_netsite'] and row['dest_netsite'] else '-', axis=1)
+      
+      if event == 'ASN path anomalies':
+            df['alarm_link'] = df.apply(
+              lambda row: f"<a class='btn btn-secondary' role='button' href='{request.host_url}anomalous_paths/src_netsite={row['src_netsite']}&dest_netsite={row['dest_netsite']}&dt={row['to']}' target='_blank'>VIEW IN A NEW TAB</a>" if row['src_netsite'] and row['dest_netsite'] else '-', axis=1)
+        
+      if event == "hosts not found":
+            df['alarm_link'] = df.apply(
+              lambda row: f"<a class='btn btn-secondary' role='button' href='{request.host_url}hosts_not_found/{row['site']}' target='_blank'>VIEW IN A NEW TAB</a>" if row['site'] else '-', axis=1)
+    else:
+        
+        if event == 'ASN path anomalies':
+            df['alarm_link'] = df.apply(
+                lambda row: dbc.Button(
+                    "VIEW DETAILS",
+                    id={'type': 'path-anomaly-btn', 'index': f"{row['src_netsite']}*{row['dest_netsite']}*{row['to']}"},
+                    className="btn btn-secondary",
+                    n_clicks=0
+                ) if row['src_netsite'] and row['dest_netsite'] else '-',
+                axis=1
+            )
+
+        elif event == "hosts not found":
+            df['alarm_link'] = df.apply(
+                lambda row: dbc.Button(
+                    "VIEW DETAILS",
+                    id={'type': 'hosts-not-found-btn', 'index': f"{row['site']}, {row['alarm_id']}"},
+                    className="btn btn-secondary",
+                    n_clicks=0
+                ) if row['site'] else '-',
+                axis=1
+            )  
+        else:
+          if 'alarm_link' in df.columns:
+              df['alarm_link'] = df['alarm_link'].apply(
+                  lambda id: dbc.Button(
+                      "VIEW DETAILS",
+                      id={'type': 'alarm-link-btn', 'index': f"{id}, {event}"},
+                      className="btn btn-secondary",
+                      n_clicks=0
+                  ) if id else '-'
+              )
+    return df
+  
+  @staticmethod
+  def createGraphButton(df):
+    df['alarm_button'] = df['site'].apply(
+        lambda site: dbc.Button(
+            "GENERATE GRAPH",
+            id={'type': 'generate-graph-button', 'index': site},  # Unique ID for each button
+            color="primary",
+            className="me-1",
+            style={"width": "100%", "font-size": "1.0em"}
+        )
+    )
     return df
 
 

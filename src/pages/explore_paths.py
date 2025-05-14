@@ -3,7 +3,6 @@ from dash import Dash, html, dcc, Input, Output, Patch, callback, State, ctx, da
 import dash_bootstrap_components as dbc
 import pandas as pd
 
-from elasticsearch import Elasticsearch
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
@@ -12,11 +11,7 @@ import utils.helpers as hp
 import model.queries as qrs
 from model.Alarms import Alarms
 from utils.parquet import Parquet
-from flask_caching import Cache
-
-# Initialize Flask-Caching
-cache = Cache()
-cache.init_app(dash.get_app().server, config={"CACHE_TYPE": "SimpleCache"})
+from utils.helpers import timer
 
 
 def title():
@@ -40,6 +35,25 @@ dash.register_page(
     description=description,
 )
 
+# Utility: robust parquet reader with error handling
+def read_parquet_safe(path):
+    try:
+        df = pd.read_parquet(path)
+        if df.empty:
+            print(f"Warning: {path} is empty.")
+        return df
+    except Exception as e:
+        print(f"Error reading {path}: {e}")
+        return pd.DataFrame()
+
+# Utility: common filter for DataFrames
+def apply_common_filters(df, selected_asns=None, selected_sites=None, anomalies_col='anomalies', src_col='src_netsite', dest_col='dest_netsite'):
+    if selected_asns:
+        df = df[df[anomalies_col].apply(lambda asn_list: any(str(a) in [str(x) for x in asn_list] for a in selected_asns))]
+    if selected_sites:
+        df = df[(df[src_col].isin(selected_sites)) | (df[dest_col].isin(selected_sites))]
+    return df
+
 def get_dropdown_data(asn_anomalies, pivotFrames):
     # sites
     unique_sites = pd.unique(asn_anomalies[['src_netsite', 'dest_netsite']].values.ravel()).tolist()
@@ -56,8 +70,9 @@ def get_dropdown_data(asn_anomalies, pivotFrames):
     return sitesDropdownData, asnsDropdownData
 
 
+@timer
 def layout(**other_unknown_query_strings):
-    asn_anomalies = pq.readFile('parquet/frames/ASN_path_anomalies.parquet')
+    asn_anomalies = read_parquet_safe('parquet/frames/ASN_path_anomalies.parquet')
 
     if asn_anomalies.empty:
         return dbc.Row([
@@ -69,7 +84,7 @@ def layout(**other_unknown_query_strings):
             ], xl=12, lg=12, md=12, sm=12, className="mb-1 flex-grow-1")
         ])
 
-    dateFrom, dateTo = hp.defaultTimeRange(2)
+    dateFrom, dateTo = hp.defaultTimeRange(days=2)
     frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
     period_to_display = hp.defaultTimeRange(days=2, datesOnly=True)
 
@@ -150,7 +165,8 @@ def layout(**other_unknown_query_strings):
                 dbc.Row([
                     dbc.Col([
                         dbc.Button("Search", id="search-button", color="secondary", 
-                                   className="mlr-2", style={"width": "100%", "font-size": "1.5em"})
+                                   className="mlr-2", style={"width": "100%", "font-size": "1.5em"},
+                                   title="Click to apply the selected filters to the plots and tables.")
                     ])
                 ]),
             ], lg=12, md=12),
@@ -174,22 +190,9 @@ def layout(**other_unknown_query_strings):
     ], className=' main-cont', align="center", style={"padding": "0.5% 1.5%"})
 
 
-def colorMap(eventTypes):
-  colors = ['#75cbe6', '#3b6d8f', '#75E6DA', '#189AB4', '#2E8BC0', '#145DA0', '#05445E', '#0C2D48',
-            '#5EACE0', '#d6ebff', '#498bcc', '#82cbf9',
-            '#2894f8', '#fee838', '#3e6595', '#4adfe1', '#b14ae1'
-            '#1f77b4', '#ff7f0e', '#2ca02c', '#00224e', '#123570', '#3b496c', '#575d6d', '#707173', '#8a8678', '#a59c74',
-            ]
-
-  paletteDict = {}
-  for i, e in enumerate(eventTypes):
-      paletteDict[e] = colors[i]
-
-  return paletteDict
-
-
+@timer
 def load_initial_data(selected_keys, asn_anomalies):
-    dateFrom, dateTo = hp.defaultTimeRange(2)
+    dateFrom, dateTo = hp.defaultTimeRange(days=2)
     frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
     dataTables = []
 
@@ -217,14 +220,14 @@ def load_initial_data(selected_keys, asn_anomalies):
 )
 def update_figures(n_clicks, asnStateValue, sitesStateValue):
     if n_clicks is not None:
-        asn_anomalies = pq.readFile('parquet/frames/ASN_path_anomalies.parquet')
-        dateFrom, dateTo = hp.defaultTimeRange(2)
+        asn_anomalies = read_parquet_safe('parquet/frames/ASN_path_anomalies.parquet')
+        dateFrom, dateTo = hp.defaultTimeRange(days=2)
 
         sitesState = sitesStateValue if sitesStateValue else []
         asnState = asnStateValue if asnStateValue else []
 
         parallel_cat_fig = get_parallel_cat_fig(sitesState, asnState)
-        heatmap_fig = get_heatmap_fig(asn_anomalies, dateFrom, dateTo)
+        heatmap_fig = get_heatmap_fig(asn_anomalies, dateFrom, dateTo, selected_asns=asnState, selected_sites=sitesState)
         datatables = create_data_tables(sitesState, asnState, selected_keys)
         return parallel_cat_fig, heatmap_fig, datatables
 
@@ -232,21 +235,13 @@ def update_figures(n_clicks, asnStateValue, sitesStateValue):
 
 
 def filterASN(df, selected_asns=[], selected_sites=[]):
-
-  if selected_asns:
-      s = df.apply(lambda x: pd.Series(x['anomalies']), axis=1).stack().reset_index(level=1, drop=True)
-      s.name = 'asn'
-      df = df.join(s)
-      df = df[df['asn'].isin(selected_asns)]
-      df = df.drop('asn', axis=1).drop_duplicates(subset=['alarm_id'])
-  if selected_sites:
-      df = df[(df['src_netsite'].isin(selected_sites)) | (df['dest_netsite'].isin(selected_sites))]
-  
-  return df
+    # Use the new utility for filtering
+    return apply_common_filters(df, selected_asns, selected_sites)
 
 
+@timer
 def create_data_tables(sitesState, asnState, selected_keys):
-    dateFrom, dateTo = hp.defaultTimeRange(2)
+    dateFrom, dateTo = hp.defaultTimeRange(days=2)
     frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
     dataTables = []
     for event in sorted(selected_keys):
@@ -272,9 +267,9 @@ def create_data_tables(sitesState, asnState, selected_keys):
 
     return html.Div(dataTables)
 
-
+@timer
 def generate_data_tables(selected_keys, asn_anomalies):
-    dateFrom, dateTo = hp.defaultTimeRange(2)
+    dateFrom, dateTo = hp.defaultTimeRange(days=2)
     frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
     dataTables = []
 
@@ -293,21 +288,19 @@ def generate_data_tables(selected_keys, asn_anomalies):
     return html.Div(dataTables)
 
 
-@cache.memoize(timeout=21600)  # Cache for 6 hours
-def get_heatmap_fig(asn_anomalies, dateFrom, dateTo):
-    return create_anomalies_heatmap(asn_anomalies, dateFrom, dateTo)
+def get_heatmap_fig(asn_anomalies, dateFrom, dateTo, selected_asns=[], selected_sites=[]):
+    return create_anomalies_heatmap(asn_anomalies, dateFrom, dateTo, selected_asns=selected_asns, selected_sites=selected_sites)
 
 
-@cache.memoize(timeout=21600)  # Cache for 6 hours
 def get_parallel_cat_fig(sitesState, asnState):
     return build_parallel_categories_plot(sitesState, asnState)
 
 
+@timer
 def create_anomalies_heatmap(asn_anomalies, dateFrom, dateTo, selected_asns=[], selected_sites=[]):
-    print('Creating heatmap', dateFrom, dateTo, selected_asns, selected_sites)
     df = asn_anomalies.copy()
     df = df[df['to_date'] >= dateFrom]
-    df = filterASN(df, selected_asns=selected_asns, selected_sites=selected_sites)
+    df = apply_common_filters(df, selected_asns, selected_sites)
 
     if len(df) > 0:
         # Create a summary table with counts and ASN list per IPv6 and IPv4
@@ -398,12 +391,13 @@ def create_anomalies_heatmap(asn_anomalies, dateFrom, dateTo, selected_asns=[], 
     return fig
 
 
+@timer
 # '''Takes the sites from the dropdown list and generates a Dash datatable'''
 def generate_tables(frame, pivotFrame, event, alarmsInst):
     ids = pivotFrame['id'].values
     dfr = frame[frame.index.isin(ids)]
     dfr = alarmsInst.formatDfValues(dfr, event).sort_values('to', ascending=False)
-    print('Paths page,', event, "Number of alarms:", len(dfr))
+    # print('Paths page,', event, "Number of alarms:", len(dfr))
 
     element = html.Div([
         html.Br(),
@@ -442,6 +436,7 @@ def generate_tables(frame, pivotFrame, event, alarmsInst):
     return element
 
 
+@timer
 # '''Creates a list of labels with network providers'''
 def addNetworkOwners(df, asn_list):
     owners = qrs.getASNInfo(asn_list)
@@ -454,24 +449,34 @@ def addNetworkOwners(df, asn_list):
     return customdata
 
 
+@timer
 def build_parallel_categories_plot(sitesState, asnState) -> go.Figure:
     """
     Query all docs with transitions existing and to_date==to_date,
     then build one combined parallel-categories figure.
+    Handles list-type 'previously_used_asn' and 'new_asn' columns.
     """
     # Read pre-stored data from parquet file generated by Updater()
     try:
-        df = pd.read_parquet('parquet/asn_path_changes.parquet')
+        df = read_parquet_safe('parquet/asn_path_changes.parquet')
     except Exception as e:
         print("Error reading parquet file:", e)
         return go.Figure()
     if df.empty:
         return go.Figure()
 
+    # Explode both list columns to get all combinations
+    df = df.explode('previously_used_asn')
+    df = df.explode('new_asn')
+
+    # Convert to string for display
+    df['previously_used_asn'] = df['previously_used_asn'].astype(str)
+    df['new_asn'] = df['new_asn'].astype(str)
+
+    # Filtering
     if len(sitesState) > 0 and len(asnState) > 0:
         df = df[((df['source_site'].isin(sitesState)) | (df['destination_site'].isin(sitesState))) &
                 ((df['new_asn'].isin(asnState)) | (df['previously_used_asn'].isin(asnState)))]
-
     elif len(sitesState) > 0:
         df = df[(df['source_site'].isin(sitesState)) | (df['destination_site'].isin(sitesState))]
     elif len(asnState) > 0:
@@ -536,8 +541,9 @@ def build_parallel_categories_plot(sitesState, asnState) -> go.Figure:
     return fig
 
 
+
 def generate_figures(asn_anomalies):
-    dateFrom, dateTo = hp.defaultTimeRange(2)
+    dateFrom, dateTo = hp.defaultTimeRange(days=2)
 
     # Generate the heatmap figure
     heatmap_fig = get_heatmap_fig(asn_anomalies, dateFrom, dateTo)
