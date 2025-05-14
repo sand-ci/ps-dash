@@ -1,7 +1,3 @@
-#IDEA: to visualise the percent of missing data for each site separately
-# how to count this percent? is it worth time?
-#TODO: @timer
-#TODO: add loading interactive while waiting for uploading of the page
 
 import dash
 from dash import dcc, html
@@ -158,8 +154,6 @@ def getHostsNotFoundDataFromParquet(data, path='parquet/frames/hosts_not_found.p
     """
     tests_types_results = {'owd': None, 'throughput': None, 'trace': None}
     try:
-        # alarmCnt = pq.readFile(path)
-        # #TODO: change to getting the data from parquet after approving the pull request
         expected_tests_and_hosts = getExpectedHosts().to_dict()['Count']
         all_missing_num = 0
         for key in tests_types_results.keys():
@@ -184,7 +178,6 @@ def build_pie_chart(total, part, title):
     The function builds pie chart with general
     statistics about data availability in Elasticsearch.
     """
-    #TODO: add inside the donut chart trend(has the percent of got data grown or vice verse)
     percentage = (part / total) * 100
 
     labels = ['Not Found', 'Found']

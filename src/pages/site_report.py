@@ -128,7 +128,6 @@ def layout(q=None, **other_unknown_query_strings):
                     site_df.at[i, 'hosts list'] = hosts_list
                     site_df.at[i, 'hosts'] = hosts_list
             site_df = alarmsInst.formatDfValues(site_df, frame, False, True)
-            # TODO: put it in the formating to the Alarms.py to def formatDfValues()?
             if 'hosts' in site_df.columns:
                 site_df['hosts'] = site_df['hosts'].apply(lambda x: html.Div([html.Div(item) for item in x.split('\n')]) if isinstance(x, str) else x)
             site_alarms_num += len(site_df)

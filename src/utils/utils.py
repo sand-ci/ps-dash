@@ -623,7 +623,6 @@ def generate_graphs(data, src, dest, dt):
 ####################################################
                 #pages/path_changed.py
 ####################################################
-# TODO: delete path_changed function
 def descChange(pair, chdf, posDf):
 
   owners = qrs.getASNInfo(posDf[(posDf['pair']==pair)]['asn'].values.tolist())

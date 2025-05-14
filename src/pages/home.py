@@ -592,7 +592,6 @@ def build_pie_chart(stats, test_type):
     The function builds pie chart with general
     statistics about data availability in Elasticsearch.
     """
-    #TODO: add inside the donut chart trend(has the percent of got data grown or vice verse)
     part, total = stats[test_type]
     percentage = (part / total) * 100
 
