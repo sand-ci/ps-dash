@@ -80,9 +80,7 @@ def total_number_of_alarms(sitesDf):
                     ),
                     md=3, xs=3, xl=3, className='status-count-numbers'
                 ) for s, icon in status.items()]
-            ], className='w-100 status-box', align="center", justify='center', style={
-        "background-color": "transparent",  # Make the card background transparent
-        }),
+            ], className='w-100 status-box gx-4', align="center", justify='center'),
         ], className='boxwithshadow g-0 mb-1')]
 
 
@@ -126,7 +124,7 @@ alarmsInst = Alarms()
 
 
 def layout(**other_unknown_query_strings):
-    dateFrom, dateTo = hp.defaultTimeRange(1)
+    dateFrom, dateTo = hp.defaultTimeRange(2)
     now = hp.defaultTimeRange(days=2, datesOnly=True)
     alarmCnt = pq.readFile('parquet/alarmsGrouped.parquet')
     statusTable, sitesDf = generate_status_table(alarmCnt)
@@ -312,8 +310,11 @@ def update_output(n_clicks, start_date, end_date, sites, all, events, allevents,
 
     if not ctx.triggered or ctx.triggered[0]['prop_id'].split('.')[0] == 'search-button':
         if start_date and end_date:
-            start_date, end_date = [f'{start_date}T00:01:00.000Z', f'{end_date}T23:59:59.000Z']
-        else: start_date, end_date = hp.defaultTimeRange(2)
+            current_hour = pd.Timestamp.now().hour
+            start_date = pd.Timestamp(start_date).replace(hour=current_hour, minute=0, second=0, microsecond=0).isoformat()
+            end_date = pd.Timestamp(end_date).replace(hour=current_hour, minute=0, second=0, microsecond=0).isoformat()
+        else: start_date, end_date = hp.defaultTimeRange(days=2)
+
         alarmsInst = Alarms()
         frames, pivotFrames = alarmsInst.loadData(start_date, end_date)
 
@@ -469,6 +470,9 @@ def generate_tables(frame, unpacked, event, alarmsInst):
 
     dfr = frame[frame.index.isin(ids)]
     dfr = alarmsInst.formatDfValues(dfr, event)
+    
+    dfr.sort_values('to', ascending=False, inplace=True)
+    
     # Replace NaN or empty values with valid defaults
     dfr = dfr.fillna("")  # Replace NaN with an empty string for all columns
     dfr = dfr.astype({col: str for col in dfr.select_dtypes(include=['object', 'category']).columns})  # Ensure all object columns are strings

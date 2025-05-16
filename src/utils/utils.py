@@ -30,6 +30,10 @@ def buildMap(mapDf):
     mapDf['lat'] = mapDf['lat'].astype(float) + np.random.normal(scale=0.01, size=len(mapDf))
     mapDf['lon'] = mapDf['lon'].astype(float) + np.random.normal(scale=0.01, size=len(mapDf))
 
+    # Sort so that '🔴' and '🟡' are last (drawn on top)
+    status_order = {'⚪': 0, '🟢': 1, '🟡': 2, '🔴': 3}
+    mapDf = mapDf.sort_values(by='Status', key=lambda x: x.map(status_order))
+
     color_mapping = {
     '⚪': '#6a6969',
     '🔴': '#c21515',
@@ -38,9 +42,9 @@ def buildMap(mapDf):
     }
 
     size_mapping = {
-    '⚪': 4,
-    '🔴': 3,
-    '🟡': 2,
+    '⚪': 1,
+    '🔴': 1,
+    '🟡': 1,
     '🟢': 1
     }
 
@@ -49,7 +53,7 @@ def buildMap(mapDf):
     fig = px.scatter_mapbox(data_frame=mapDf, lat="lat", lon="lon",
                         color="Status",
                         color_discrete_map=color_mapping,
-                        size_max=11,
+                        size_max=6,
                         size='size',
                         hover_name="site",
                         custom_data=['Infrastructure','Network','Other'],
@@ -110,10 +114,17 @@ def createDictionaryWithHistoricalData(dframe):
     ).to_dict()
     return site_dict
 
-
 def generateStatusTable(alarmCnt):
-    red_sites, yellow_sites, grey_sites = defineStatus(alarmCnt, 'event', 'site')
-    
+
+    red_sites = alarmCnt[(alarmCnt['event']=='bandwidth decreased from/to multiple sites')
+            & (alarmCnt['cnt']>0)]['site'].unique().tolist()
+
+    yellow_sites = alarmCnt[(alarmCnt['event'].isin(['ASN path anomalies']))
+                    & (alarmCnt['cnt']>0)]['site'].unique().tolist()
+
+    grey_sites = alarmCnt[(alarmCnt['event'].isin(['firewall issue', 'source cannot reach any', 'complete packet loss']))
+                    & (alarmCnt['cnt']>0)]['site'].unique().tolist()
+
     catdf = qrs.getSubcategories()
     catdf = pd.merge(alarmCnt, catdf, on='event', how='left')
 
@@ -148,9 +159,8 @@ def generateStatusTable(alarmCnt):
     status_order = ['🔴', '🟡', '🟢', '⚪']
     df_pivot = df_pivot.sort_values(by='Status', key=lambda x: x.map({status: i for i, status in enumerate(status_order)}))
     display_columns = [col for col in df_pivot.columns.tolist() if col not in ['Status', 'site']]
-    # print(display_columns)
-    # print(df_pivot)
-    # print(df_pivot.to_dict('records'))
+    print(display_columns)
+
     if len(df_pivot) > 0:
         element = html.Div([
                 dash_table.DataTable(
@@ -160,7 +170,7 @@ def generateStatusTable(alarmCnt):
                 sort_action="native",
                 is_focused=True,
                 markdown_options={"html": True},
-                page_size=8,
+                page_size=10,
                 style_cell={
                 'padding': '10px',
                 'font-size': '1.2em',
@@ -206,25 +216,39 @@ def createTable(df, id):
     return dash_table.DataTable(
             df.to_dict('records'),
             columns=[{"name": i, "id": i, "presentation": "markdown"} for i in df.columns],
-                markdown_options={"html": True},
-                style_cell={
-                    'padding': '2px',
-                    'font-size': '1.5em',
-                    'textAlign': 'center',
-                    'whiteSpace': 'pre-line',
-                    },
-                style_header={
-                    'backgroundColor': 'white',
-                    'fontWeight': 'bold'
-                },
-                style_data={
-                    'height': 'auto',
-                    'overflowX': 'auto',
-                },
-                style_table={
-                    'overflowY': 'auto',
-                    'overflowX': 'auto'
-                },
+            markdown_options={"html": True},
+            style_cell={
+                'padding': '10px',
+                'font-size': '1.5em',
+                'textAlign': 'center',
+                'whiteSpace': 'normal',
+                'backgroundColor': '#f9f9f9',
+                'border': '1px solid #ddd',
+                'fontFamily': 'sans-serif "Courier New", Courier, monospace !important'
+            },
+            style_header={
+                'fontWeight': 'bold',
+                'color': 'black',
+                'border': '1px solid #ddd',
+            },
+            style_data={
+                'height': 'auto',
+                'lineHeight': '20px',
+                'border': '1px solid #ddd',
+            },
+            style_table={
+                'overflowY': 'auto',
+                'overflowX': 'auto',
+                'border': '1px solid #ddd',
+                'borderRadius': '5px',
+                'boxShadow': '0 2px 5px rgba(0,0,0,0.1)',
+            },
+            style_data_conditional=[
+                {
+                    'if': {'row_index': 'odd'},
+                    'backgroundColor': '#f2f2f2',
+                }
+            ],
             id=id)
     
 def explainStatuses():
