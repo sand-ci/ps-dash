@@ -158,7 +158,24 @@ def layout(q=None, **other_unknown_query_strings):
 
     print(f"Total alarms collected: {site_alarms_num}")
 
-    
+    if site_alarms_num == 0:
+        return html.Div(
+            className="boxwithshadow",
+            style={
+                'padding': '20px',
+                'text-align': 'center',
+                'margin': '10px 0'
+            },
+            children=[
+                html.Div(
+                    html.I(className="fas fa-check-circle", 
+                        style={'color': 'green', 'font-size': '48px'}),
+                    style={'margin-bottom': '15px'}
+                ),
+                html.H4("No Alarms Detected", style={'margin-bottom': '10px'}),
+                html.P(f"There were no alarms during the last 7 days at {q}")
+            ]
+        )
     # extract meta data like CPU, country and hosts
     meta_df = qrs.getMetaData()
     meta_df['host_ip'] = meta_df.apply(
