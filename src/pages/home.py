@@ -27,12 +27,10 @@ from utils.utils import buildMap, generateStatusTable, explainStatuses
 @timer
 def builMap(df):
     return buildMap(df)
-
-
+  
 @timer
 def generate_status_table(alarmCnt):
     return generateStatusTable(alarmCnt)
-
 
 def get_country_code(country_name):
     try:
@@ -41,7 +39,7 @@ def get_country_code(country_name):
     except LookupError:
         return ''
 
-
+@timer
 def total_number_of_alarms(sitesDf):
     metaDf = pq.readFile('parquet/raw/metaDf.parquet')
     sitesDf = pd.merge(sitesDf, metaDf[['lat', 'lon', 'country']], on=['lat', 'lon'], how='left').drop_duplicates()
@@ -115,7 +113,6 @@ def total_number_of_alarms(sitesDf):
     )
 
     return html_elements
- 
 
 dash.register_page(__name__, path='/')
 
@@ -272,7 +269,7 @@ def layout(**other_unknown_query_strings):
                     ], className="w-100 site g-0", justify="center", align="center"),
                 ], className='w-100 boxwithshadow page-cont row', align="center")
             ], className='w-100 h-100 g-0 pl-1 pb-2'),
-                
+
             dbc.Row([
                 dbc.Col([
                     html.H1(f"List of alarms", className="text-center"),
@@ -285,6 +282,7 @@ def layout(**other_unknown_query_strings):
             ], className="g-0"),    
         ]),
     ], className='')
+    
     
 @dash.callback(
     [
@@ -368,6 +366,7 @@ def update_output(n_clicks, start_date, end_date, sites, all, events, allevents,
     else:
         raise dash.exceptions.PreventUpdate 
 
+
 @dash.callback(
     [
     Output("how-status-modal", "is_open"),
@@ -398,6 +397,7 @@ def toggle_modal(n1, n2, is_open):
     return is_open, dash.no_update
 
 
+@timer
 def create_bar_chart(graphData):
     # Calculate the total counts for each event type
     # event_totals = graphData.groupby('event')['cnt'].transform('sum')
@@ -463,7 +463,7 @@ def create_bar_chart(graphData):
 
     return fig
 
-
+@timer
 # '''Takes selected site from the dropdpwn and generates a Dash datatable'''
 def generate_tables(frame, unpacked, event, alarmsInst):
     ids = unpacked['id'].values

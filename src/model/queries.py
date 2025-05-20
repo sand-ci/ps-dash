@@ -483,7 +483,6 @@ def query_ASN_anomalies(src, dest, dt):
   ddf = pd.DataFrame(data)
   return ddf
 
-
 def query4Avg(idx, dateFrom, dateTo):
   # TODO: stick to 1 date format
   # dateFrom = convertDate(dateFrom)

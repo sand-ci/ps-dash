@@ -48,9 +48,11 @@ class ParquetUpdater(object):
             # Set the schedulers
             Scheduler(60*60*12, self.storeMetaData)
             Scheduler(60*60, self.cacheIndexData)
+
             Scheduler(60*30, self.storeAlarms)
             Scheduler(60*60*12, self.storeASNPathChanged)
             Scheduler(60*60*24, self.psConfigData)
+
 
             # Scheduler(60*60*12, self.storeThroughputDataAndModel)
             # Scheduler(60*60*12, self.storePacketLossDataAndModel)
