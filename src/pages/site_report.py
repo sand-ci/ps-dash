@@ -2,7 +2,6 @@
 This file contains the code for the page "site-report" in ps-dash.
 It summarises all the alarms per site.
 """
-#TODO: something specific for 0 alarms?
 
 
 from datetime import datetime, timedelta
@@ -71,7 +70,7 @@ def layout(q=None, **other_unknown_query_strings):
     pq = Parquet()
     
     now = datetime.now()
-    fromDay_date = (now - timedelta(days=8)).replace(hour=0, minute=0, second=0, microsecond=0)
+    fromDay_date = (now - (days=7)).replace(hour=0, minute=0, second=0, microsecond=0)
     fromDay = fromDay_date.strftime('%Y-%m-%dT%H:%M:%S.000Z')  # "2024-02-20 00:00:00"
 
     # Calculate toDay (2 days ago at 23:59:59)
@@ -80,7 +79,7 @@ def layout(q=None, **other_unknown_query_strings):
     
     global pivotFrames
     frames, pivotFrames = alarmsInst.loadData(fromDay, toDay)
-    toDay_date = toDay_date-timedelta(days=2)
+    toDay_date = toDay_date-timedelta(days=1)
     toDay = toDay_date.strftime('%Y-%m-%dT%H:%M:%S.000Z')
     print(f"fromDay: {fromDay}, toDay: {toDay}")
     
