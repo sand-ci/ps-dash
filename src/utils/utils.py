@@ -152,7 +152,7 @@ def generateStatusTable(alarmCnt):
 
     df_pivot = df_pivot[['site', 'site name', 'Status', 'Network', 'Infrastructure', 'Other']]
 
-    url = f'{request.host_url}site'
+    url = f'{request.host_url}site_report'
     df_pivot['url'] = df_pivot['site'].apply(lambda name: 
                                              f"<a class='btn btn-secondary' role='button' href='{url}/{name}' target='_blank'>See latest alarms</a>" if name else '-')
 
