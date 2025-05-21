@@ -5,7 +5,6 @@ It summarises all the alarms per site.
 
 
 from datetime import datetime, timedelta
-from functools import lru_cache
 from itertools import combinations
 
 import numpy as np
@@ -19,7 +18,6 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 
 import pandas as pd
-from flask import request
 
 from model.Alarms import Alarms
 import utils.helpers as hp
@@ -70,7 +68,7 @@ def layout(q=None, **other_unknown_query_strings):
     pq = Parquet()
     
     now = datetime.now()
-    fromDay_date = (now - (days=7)).replace(hour=0, minute=0, second=0, microsecond=0)
+    fromDay_date = (now - timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0)
     fromDay = fromDay_date.strftime('%Y-%m-%dT%H:%M:%S.000Z')  # "2024-02-20 00:00:00"
 
     # Calculate toDay (2 days ago at 23:59:59)
@@ -204,13 +202,7 @@ def layout(q=None, **other_unknown_query_strings):
         dbc.Row([
             dbc.Row(
                 dbc.Col([
-                    # dashboard card begins
-                    # html.Div(className="boxwithshadowhidden", style={"background-color": "white"}, children=[
-                        # header line with site name
-                        # html.H3(f"\t{q}", className="header-line p-2",  
-                        #         style={"background-color": "#00245a", "color": "white", "font-size": "25px"}),
-                        
-                        # first row: status of the site throughout the week
+                    
                         dbc.Row(children=[
                             dbc.Col([
                                 html.Div(
@@ -276,11 +268,9 @@ def layout(q=None, **other_unknown_query_strings):
                                             size="lg",
                                             is_open=False,
                                         )
-                                    ]
-                                )
-                        ]
-                                    )
-                            ], className="mb-1 pr-1 pl-1"),
+                                    ])
+                                ])
+                            ], className="mb-1 pl-1"),
                         
                         # second row of stats: number of alarms, alarms types and categories distribution, metadata
                         dbc.Row([
@@ -408,7 +398,7 @@ def layout(q=None, **other_unknown_query_strings):
                                     )
                             
                             ]), width=4, style={"background-color": "#b9c4d4;", "height": "100%"})
-                        ], className="my-3 pr-1 pl-1", style={"height": "300px"}),
+                        ], className="my-3 pl-1", style={"height": "300px"}),
                     
                         
                         
@@ -510,66 +500,70 @@ def layout(q=None, **other_unknown_query_strings):
                                     ]
                                 )
                             ], width=9, style={"height": "600px"})
-                        ], className="my-3 pr-1 pl-1", style={"height": "600px"})
-                        ]),
-                    # ])                 
-                )
-        ], className="ml-1 mt-1 mr-0 mb-1"),
-    
-        # section with alarm visualisation that is shown if the button near an alarm was pressed
-       dbc.Row([
-            dbc.Row(
-                dbc.Col([
-                    html.Div(
-                            id="alarm-content-section",
-                            children=[
-                                    dcc.Loading(
-                                            id="loading-content",  # Changed ID to avoid duplication
-                                            type="default",
-                                            color="#00245A",
-                                            children=[
-                                                        html.Div(
-                                                                className="boxwithshadowhidden",
-                                                                style={"background-color": "#ffffff"},
-                                                                children=[
-                                                                    html.H3(
-                                                                        id="alarm-name-display",  # Changed ID
-                                                                        className="card header-line p-2",
-                                                                        style={
-                                                                            "background-color": "#00245a",
-                                                                            "color": "white",
-                                                                            "font-size": "25px",
-                                                                            "border-top-left-radius": "0.25rem",
-                                                                            "border-top-right-radius": "0.25rem"
-                                                                        }
-                                                                    ),
+                        ], className="my-3 pl-1", style={"height": "600px"}),
+                        
+                        #extension with the chosen alarm visualisation
+                        dbc.Row([
+                            dbc.Col([
+                                html.Div(
+                                        id="alarm-content-section",
+                                        children=[
+                                                dcc.Loading(
+                                                        id="loading-content",  # Changed ID to avoid duplication
+                                                        type="default",
+                                                        color="#00245A",
+                                                        children=[
                                                                     html.Div(
-                                                                        id="dynamic-content-container",
-                                                                        className=""
-                                                                    )
-                                                                ]
-                                                            )
-                                                        ])
-                                    ], style={"scroll-margin-top": "0px", "visibility": "hidden"}
-                    ), 
-                ])
-            )
-       ], className="ml-1 mt-1 mr-0 mb-1"),
+                                                                            className="boxwithshadowhidden",
+                                                                            style={"background-color": "#ffffff"},
+                                                                            children=[
+                                                                                html.H3(
+                                                                                    id="alarm-name-display",  # Changed ID
+                                                                                    className="card header-line p-1",
+                                                                                    style={
+                                                                                        "background-color": "#00245a",
+                                                                                        "color": "white",
+                                                                                        "font-size": "25px",
+                                                                                        "border-top-left-radius": "0.25rem",
+                                                                                        "border-top-right-radius": "0.25rem"
+                                                                                    }
+                                                                                ),
+                                                                                html.Div(
+                                                                                    id="dynamic-content-container",
+                                                                                    className=""
+                                                                                )
+                                                                            ]
+                                                                        )
+                                                                    ])
+                                                ], style={"scroll-margin-top": "0px", "visibility": "hidden"}
+                                ), 
+                            ])
+                        ], className="my-3 pl-1"),
+                        
+                        # general websites' measurements
+                        dbc.Row([
+                            html.Div(id='site-measurements',
+                                    children=siteMeasurements(q, pq),
+                                    style={'margin-top': "10px"},
+                                                ),
+                        ], className="my-3 pl-1"),
+                        
+                        html.Div(id="dummy-output", style={"display": "none"}),
+                        html.Div(
+                                id="site-status-explanation",
+                                className="boxwithshadow p-0 mt-3",
+                                children=[
+                                    # 
+                                ]
+                            )
+                    ]),
+                    # ])                 
+                ),
+               
+        ], className="ml-1 mt-0 mr-0 mb-1"),
+    
        
-       # general websites' measurements
-        html.Div(id='site-measurements',
-                children=siteMeasurements(q, pq),
-                style={'margin-top': "20px"},
-                            ),
-        html.Div(id="dummy-output", style={"display": "none"}),
-        html.Div(
-                id="site-status-explanation",
-                className="boxwithshadow p-0 mt-3",
-                children=[
-                    # 
-                ]
-            )
-    ], className="scroll-container ml-2")
+    ], className="scroll-container ml-1 mt-1 mr-0 mb-1")
     
 
 def create_bar_chart(graphData, column_name='alarm group'):
