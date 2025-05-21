@@ -141,3 +141,4 @@ venv/
 # Yana's experimental files
 dev
 creds.key
+ps-dash.code-workspace

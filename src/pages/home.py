@@ -27,10 +27,12 @@ from utils.utils import buildMap, generateStatusTable, explainStatuses
 @timer
 def builMap(df):
     return buildMap(df)
-  
+
+
 @timer
 def generate_status_table(alarmCnt):
     return generateStatusTable(alarmCnt)
+
 
 def get_country_code(country_name):
     try:
@@ -39,7 +41,7 @@ def get_country_code(country_name):
     except LookupError:
         return ''
 
-@timer
+
 def total_number_of_alarms(sitesDf):
     metaDf = pq.readFile('parquet/raw/metaDf.parquet')
     sitesDf = pd.merge(sitesDf, metaDf[['lat', 'lon', 'country']], on=['lat', 'lon'], how='left').drop_duplicates()
@@ -113,6 +115,7 @@ def total_number_of_alarms(sitesDf):
     )
 
     return html_elements
+ 
 
 dash.register_page(__name__, path='/')
 
@@ -136,153 +139,165 @@ def layout(**other_unknown_query_strings):
     total_number = total_number_of_alarms(sitesDf)
     return html.Div([
         dbc.Col([
-            dbc.Row([
-                # Top left column with the map and the stacked bar chart
-                dbc.Col([
-                        dbc.Col(dcc.Graph(figure=builMap(sitesDf), id='site-map',
-                                    className='cls-site-map'),
-                            className='boxwithshadow page-cont mb-1 g-0 p-2 column-margin',
-                            xl=12, lg=12, style={"background-color": "#b9c4d4;", "padding-top": "3%"}
-                            # ), className="align-content-start", align='start'),
-                            ),        
-                        dbc.Col(
-                        dcc.Loading(
-                            html.Div(id="alarms-stacked-bar"),
-                            style={'height': '1rem'}, color='#00245A'
-                        ),
-                        className="boxwithshadow page-cont mb-1 p-2 align-content-around",),
-                ], lg=6, md=12, className='d-flex flex-column', align='around'), # d-flex and flex-column make the columns the same size
-                # end of top left column
+                dbc.Row([
+                    # Top left column with the map and the stacked bar chart
+                        dbc.Col([
+                            dbc.Col(dcc.Graph(figure=builMap(sitesDf), id='site-map',
+                                        className='cls-site-map'),
+                                className='boxwithshadow page-cont mb-1 g-0 p-2 column-margin',
+                                xl=12, lg=12, style={"background-color": "#b9c4d4;", "padding-top": "3%"}
+                                # ), className="align-content-start", align='start'),
+                                ),        
+                            dbc.Col(
+                            dcc.Loading(
+                                html.Div(id="alarms-stacked-bar"),
+                                style={'height': '1rem'}, color='#00245A'
+                            ),
+                            className="boxwithshadow page-cont mb-1 p-2 align-content-around",),
+                        ], lg=6, sm=12, className='d-flex flex-column'), # d-flex and flex-column make the columns the same size
+                        # end of top left column
 
-                # Top right column with status table, status statistics, and the search fields
-                dbc.Col([
-                    dbc.Row(children=total_number, className="h-100"),
-                    dbc.Row([
-                        dbc.Col(
-                            [
-                                html.Div(children=statusTable, id='site-status', className='status-table-cls'),
-                                html.Div(
+                        # Top right column with status table, status statistics, and the search fields
+                        dbc.Col([
+                            dbc.Row(children=total_number, className="h-100"),
+                            dbc.Row([
+                                dbc.Col(
                                     [
-                                        dbc.Button(
-                                            "How was the status determined?",
-                                            id="how-status-collapse-button",
-                                            className="mb-3",
-                                            color="secondary",
-                                            n_clicks=0,
-                                        ),
-                                        dbc.Modal(
+                                        html.Div(children=statusTable, id='site-status', className='status-table-cls'),
+                                        html.Div(
                                             [
-                                                dbc.ModalHeader(dbc.ModalTitle("How was the status determined?")),
-                                                dbc.ModalBody(id="how-status-modal-body"),
-                                                dbc.ModalFooter(
-                                                    dbc.Button("Close", id="close-how-status-modal", className="ml-auto", n_clicks=0)
+                                                dbc.Button(
+                                                    "How was the status determined?",
+                                                    id="how-status-collapse-button",
+                                                    className="mb-3",
+                                                    color="secondary",
+                                                    n_clicks=0,
                                                 ),
-                                            ],
-                                            id="how-status-modal",
-                                            size="lg",
-                                            is_open=False,
+                                                dbc.Modal(
+                                                    [
+                                                        dbc.ModalHeader(dbc.ModalTitle("How was the status determined?")),
+                                                        dbc.ModalBody(id="how-status-modal-body"),
+                                                        dbc.ModalFooter(
+                                                            dbc.Button("Close", id="close-how-status-modal", className="ml-auto", n_clicks=0)
+                                                        ),
+                                                    ],
+                                                    id="how-status-modal",
+                                                    size="lg",
+                                                    is_open=False,
+                                                ),
+                                            ], className="how-status-div",
                                         ),
-                                    ], className="how-status-div",
-                                ),
-                            ], className='page-cont mb-1 p-1', xl=12
-                        )
-                    ], className="boxwithshadow page-cont mb-1"),
+                                    ], className='page-cont mb-1 p-1', xl=12
+                                )
+                            ], className="boxwithshadow page-cont mb-1"),
 
-                    # Bottom part with the three pie charts
-                   dbc.Row([
-                        dbc.Row([
+                            # Bottom part with the three pie charts
                             dbc.Row([
                                 dbc.Row([
-                                    # Title for the section
-                                    dbc.Col([
-                                        html.H3(children=f'Expected Testing Data Availability (per host) in Elasticsearch [{stats_date.strftime("%d-%m-%Y")}]',
-                                                className='stats-title'
-                                            )
-                                        ], width=10),
-                                    # Button to switch to historical data
-                                    dbc.Col([
-                                        dcc.Store(id='historical-data-for-graph', data=get_data_for_histogram(dt)),
-                                        dcc.Store(id='hosts-not-found-stats', data=expected_received_stats),
-                                        dcc.Store(id='date', data=dt),
-                                        dcc.Dropdown(
-                                            id='data-over-time-dropdown',
-                                            options=['all (pie charts)', 'all (histograms)'],
-                                            value='all (pie charts)',
-                                            placeholder="Test Type",
-                                            multi=False  # Allow multiple selections
-                                        )
-                                        ], width=2, className="align-left")
-                                    ], className="mt-2 ml-1"),
-                                # adding the pie charts or histogram
-                                html.Div(id='graph-placeholder'),                          
-                            ]),
-                        ], className="mt-2 ml-2"),
-                    ], className='boxwithshadow page-cont mb-1 p-1 align-center')
-                ], lg=6, sm=12, className='d-flex flex-column h-100 pl-1'),
-                # End of top right column
-                
-            ], className='w-100 h-100 g-0'),
+                                    dbc.Row([
+                                        dbc.Row([
+                                            # Title for the section
+                                            dbc.Col([
+                                                html.H3(children=f'Expected Testing Data Availability (per host) in Elasticsearch [{stats_date.strftime("%d-%m-%Y")}]',
+                                                        className='stats-title'
+                                                    )
+                                                ], width=10),
+                                            # Button to switch to historical data
+                                            dbc.Col([
+                                                dcc.Store(id='historical-data-for-graph', data=get_data_for_histogram(dt)),
+                                                dcc.Store(id='hosts-not-found-stats', data=expected_received_stats),
+                                                dcc.Store(id='date', data=dt),
+                                                dcc.Dropdown(
+                                                    id='data-over-time-dropdown',
+                                                    options=['all (pie charts)', 'all (histograms)'],
+                                                    value='all (pie charts)',
+                                                    placeholder="Test Type",
+                                                    multi=False  # Allow multiple selections
+                                                )
+                                                ], width=2, className="align-left")
+                                            ], className="mt-2 ml-1"),
+                                        # adding the pie charts or histogram
+                                        html.Div(id='graph-placeholder'),                          
+                                    ]),
+                                ], className="mt-2 ml-2"),
+                            ], className='boxwithshadow page-cont mb-1 p-1')
+                        ], lg=6, sm=12, className='d-flex flex-column h-100 pl-1'),
+                    # End of top right column      
+                ], className="w-100 h-100 g-0 px-1 pb-2", style={"margin-left": "8px", "margin-right": "50px"}),
 
-            # Bottom part with search field and the list of alarms
-            dbc.Row([
+
+
+
+                # Bottom part with search field and the list of alarms
+                # row with two rows: 1) search field and 2) list of alarms
                 dbc.Row([
                     dbc.Row([
-                        dbc.Col([
-                            dbc.Row([
-                                dbc.Col([
-                                    html.H3([
-                                        html.I(className="fas fa-search"),
-                                        "Search the Networking Alarms"
-                                    ], className="l-h-3"),
-                                ], align="center", className="text-left rounded-border-1"
-                                    , md=12, xl=6),
-                                dbc.Col([
-                                    dcc.DatePickerRange(
-                                        id='date-picker-range',
-                                        month_format='M-D-Y',
-                                        min_date_allowed=date.today() - pd.Timedelta(days=30),
-                                        initial_visible_month=now[0],
-                                        start_date=now[0],
-                                        end_date=now[1]
-                                    )
-                                ], md=12, xl=6, className="mb-1 text-right")
-                            ], justify="around", align="center", className="flex-wrap"),
-                            dbc.Row([
-                                dbc.Col([
-                                    dcc.Dropdown(multi=True, id='sites-dropdown', placeholder="Search for a site"),
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.Row([
+                                    dbc.Col([
+                                        html.H3([
+                                            html.I(className="fas fa-search"),
+                                            "Search the Networking Alarms"
+                                        ], className="l-h-3"),
+                                    ], align="center", className="text-left rounded-border-1"
+                                        , md=12, xl=6),
+                                    dbc.Col([
+                                        dcc.DatePickerRange(
+                                            id='date-picker-range',
+                                            month_format='M-D-Y',
+                                            min_date_allowed=date.today() - pd.Timedelta(days=30),
+                                            initial_visible_month=now[0],
+                                            start_date=now[0],
+                                            end_date=now[1]
+                                        )
+                                    ], md=12, xl=6, className="mb-1 text-right")
+                                ], className="flex-wrap"),
+                                dbc.Row([
+                                    dbc.Col([
+                                        dcc.Dropdown(multi=True, id='sites-dropdown', placeholder="Search for a site"),
+                                    ]),
                                 ]),
-                            ]),
-                            html.Br(),
-                            dbc.Row([
-                                dbc.Col([
-                                    dcc.Dropdown(multi=True, id='events-dropdown', placeholder="Search for an event type"),
+                                html.Br(),
+                                dbc.Row([
+                                    dbc.Col([
+                                        dcc.Dropdown(multi=True, id='events-dropdown', placeholder="Search for an event type"),
+                                    ]),
                                 ]),
-                            ]),
-                            html.Br(),
-                            dbc.Row([
-                                dbc.Col([
-                                    dbc.Button("Search", id="search-button", color="secondary",
-                                            className="mlr-2", style={"width": "100%", "font-size": "1.5em"})
-                                ])
-                            ]),
-                        ], lg=12, md=12, className="p-1"),
-                    ], className="w-100 site g-0", justify="center", align="center"),
-                ], className='w-100 boxwithshadow page-cont row', align="center")
-            ], className='w-100 h-100 g-0 pl-1 pb-2'),
-
-            dbc.Row([
-                dbc.Col([
-                    html.H1(f"List of alarms", className="text-center"),
-                    html.Hr(className="my-2"),
-                    html.Br(),
-                    dcc.Loading(
-                        html.Div(id='results-table'),
-                        style={'height': '0.5rem'}, color='#00245A')
-                ], className="boxwithshadow page-cont p-2",),
-            ], className="g-0"),    
-        ]),
+                                html.Br(),
+                                dbc.Row([
+                                    dbc.Col([
+                                        dbc.Button("Search", id="search-button", color="secondary",
+                                                className="mlr-2", style={"width": "100%", "font-size": "1.5em"})
+                                    ])
+                                ]),
+                            ], lg=12, md=12, className="p-1"),
+                        ], className="w-100 site g-0"),
+                    ], className='w-100 boxwithshadow page-cont row mb-1'),
+                    # end of the search row
+                    
+                    
+                    # list of alarms row
+                    dbc.Row([
+                        dbc.Row([
+                            dbc.Col([
+                                html.H1(f"List of alarms", className="text-center mt-1"),
+                                html.Hr(className="my-2"),
+                                html.Br(),
+                                dcc.Loading(
+                                    html.Div(id='results-table'),
+                                    style={'height': '0.5rem'}, color='#00245A')
+                            ])
+                        ], className="w-100 site g-0"),
+                    ], className="w-100 boxwithshadow page-cont row mb-1"), 
+                    #end of the list of alarms
+                
+                ], className="w-100 h-100 g-0 px-1 pb-2", style={"margin-left": "14px", "margin-right": "50px"},),
+                # end of row with the search and the list of alarms      
+        
+        ], className="g-0 p-0"),
+    #html.Div ends
     ], className='')
-    
     
 @dash.callback(
     [
@@ -366,7 +381,6 @@ def update_output(n_clicks, start_date, end_date, sites, all, events, allevents,
     else:
         raise dash.exceptions.PreventUpdate 
 
-
 @dash.callback(
     [
     Output("how-status-modal", "is_open"),
@@ -397,7 +411,6 @@ def toggle_modal(n1, n2, is_open):
     return is_open, dash.no_update
 
 
-@timer
 def create_bar_chart(graphData):
     # Calculate the total counts for each event type
     # event_totals = graphData.groupby('event')['cnt'].transform('sum')
@@ -463,7 +476,7 @@ def create_bar_chart(graphData):
 
     return fig
 
-@timer
+
 # '''Takes selected site from the dropdpwn and generates a Dash datatable'''
 def generate_tables(frame, unpacked, event, alarmsInst):
     ids = unpacked['id'].values
