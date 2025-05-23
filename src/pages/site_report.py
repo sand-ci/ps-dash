@@ -530,7 +530,7 @@ def layout(q=None, **other_unknown_query_strings):
                                                                                 ),
                                                                                 html.Div(
                                                                                     id="dynamic-content-container",
-                                                                                    className=""
+                                                                                    className="p-2"
                                                                                 )
                                                                             ]
                                                                         )
@@ -935,7 +935,7 @@ def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, visibility, 
                     site_name, id = button_id['index'].split(', ')
                     fig, test_types, hosts, site = create_heatmap(pd_df, site, fromDay.replace("T", " ").replace(".000Z", ""), toDay.replace("T", " ").replace(".000Z", ""))
                     alarm = qrs.getAlarm(id)['source']
-                    return dcc.Graph(figure=fig), event, alarm, visibility
+                    return dcc.Graph(figure=fig, className="p-3"), event, alarm, visibility
 
                 #ASN anomalies visualisation
                 if event == 'ASN path anomalies':
@@ -972,7 +972,7 @@ def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, visibility, 
                 else:
                     print(f"id: {id}, event: {event}")
                     alarm_cont = qrs.getAlarm(id)
-                    if event in ["complete packet loss", "high packet loss", "firewall issue"]:
+                    if event in ["complete packet loss", "high packet loss", "high packet loss on multiple links", "firewall issue"]:
                         
                         # print('URL query:', id)
                         # print()

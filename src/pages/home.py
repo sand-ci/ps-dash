@@ -81,7 +81,7 @@ def total_number_of_alarms(sitesDf):
                     md=3, xs=3, xl=3, className='status-count-numbers'
                 ) for s, icon in status.items()]
             ], className='w-100 status-box gx-4', align="center", justify='center'),
-        ], className='boxwithshadow g-0 mb-1')]
+        ], className='boxwithshadowhidden g-0 mb-1', style={"background-color": "#ffffff"})]
 
 
     # html_elements.append(dbc.Col([
@@ -148,14 +148,14 @@ def layout(**other_unknown_query_strings):
                                     className='boxwithshadow page-cont mb-1 g-0 p-2 column-margin',
                                     xl=12, lg=12, style={"background-color": "#b9c4d4;", "padding-top": "3%"}
                                     # ), className="align-content-start", align='start'),
-                                    ),        
+                                ),        
                                 dbc.Col(
-                                dcc.Loading(
-                                    html.Div(id="alarms-stacked-bar"),
-                                    style={'height': '1rem'}, color='#00245A'
+                                    dcc.Loading(
+                                        html.Div(id="alarms-stacked-bar"),
+                                        style={'height': '1rem'}, color='#00245A'
                                 ),
                                 className="boxwithshadow page-cont mb-1 p-2 align-content-around",),
-                            ], lg=6, sm=12, className='d-flex flex-column', style={"padding-right": "15px"}), # d-flex and flex-column make the columns the same size
+                            ], lg=6, md=12, className='d-flex flex-column', align='around'),# d-flex and flex-column make the columns the same size
                             # end of top left column
 
                             # Top right column with status table, status statistics, and the search fields
@@ -221,10 +221,10 @@ def layout(**other_unknown_query_strings):
                                             html.Div(id='graph-placeholder'),                          
                                         ]),
                                     ], className="mt-2 ml-2"),
-                                ], className='boxwithshadow page-cont mb-1 p-1')
-                            ], lg=6, sm=12, className='d-flex flex-column h-100'),
+                                ], className='boxwithshadow page-cont mb-1 row', align="center")],
+                            lg=6, sm=12, className='d-flex flex-column h-100'),
                     # End of top right column      
-                    ], className="h-100 pb-2"),
+                    ], className='h-100'),
                     
                     
                     # Bottom part with search field and the list of alarms
@@ -273,7 +273,7 @@ def layout(**other_unknown_query_strings):
                                         ]),
                                     ], lg=12, md=12, className="p-1"),
                                 ], className=""),
-                            ], className='boxwithshadow page-cont mb-1'),
+                            ], className='boxwithshadow page-cont', style={"margin-bottom": "10px"}),
                             # end of the search row
                                 
                                 
@@ -289,16 +289,16 @@ def layout(**other_unknown_query_strings):
                                             style={'height': '0.5rem'}, color='#00245A')
                                     ])
                                 ], className=""),
-                            ], className="boxwithshadow page-cont "), 
+                            ], className="boxwithshadow page-cont p-2"), 
                             #end of the list of alarms
                         ], lg=12, md=12)
                     ], style={"padding-left":'15px'})
-                ], className="my-3 pl-1"),
+                ], className="m-1"),
    
         
         ], className=""),
     #html.Div ends
-    ], className='')
+    ], className='', style={"margin-top": "5px"})
     
 @dash.callback(
     [
