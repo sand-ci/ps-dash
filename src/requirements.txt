@@ -16,3 +16,4 @@ xgboost>=1.7.5
 pycountry>=20.7.3
 pyarrow
 flask-caching
+psconfig-client

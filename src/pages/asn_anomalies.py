@@ -1,6 +1,8 @@
 import dash
-from dash import html, dcc, Input, Output, callback, State, ctx, dash_table
 
+from dash import html
+from dash import Dash, html, dcc, Input, Output, dcc, html, callback
+import dash_bootstrap_components as dbc
 import urllib3
 
 import pandas as pd
@@ -10,9 +12,12 @@ import plotly.express as px
 import dash_bootstrap_components as dbc
 
 import model.queries as qrs
+from utils.utils import generate_graphs
 from utils.helpers import timer
 
 urllib3.disable_warnings()
+
+
 
 dash.register_page(
     __name__,
@@ -64,10 +69,10 @@ def update_graphs_and_title(query_params):
     src = query_params.get('src_netsite')
     dest = query_params.get('dest_netsite')
     dt = query_params.get('dt')
-
+    
     if not (src and dest):
         return html.Div(), "ASN-path anomalies"
-
+     
     data = qrs.query_ASN_anomalies(src, dest, dt)
     if len(data) == 0:
         return html.Div([
@@ -301,3 +306,4 @@ def build_anomaly_heatmap(subset_sample):
     )
 
     return fig
+

@@ -6,7 +6,13 @@
 body{
     background-color: #f1efef;
     font-family: Arial, Helvetica, sans-serif;
-    font-size: 14px !important;
+    scroll-behavior: smooth;
+    overflow-x: hidden;
+}
+
+html {
+    scroll-behavior: smooth;
+    overflow-x: hidden; /* Only if needed */
 }
 
 .subtitle {
@@ -709,4 +715,45 @@ count-box {
     padding: 10px;
     margin-right: 10px;
     border-radius: 5px;
+}
+
+/**********   Site Report   **********/
+.boxwithshadowhidden {
+    border: 1px solid rgba(0,0,0,.125);
+    box-shadow: 4px 4px 7px -1px #b4b2b2;
+    border-radius: 1rem;
+    overflow: hidden; /* This ensures child elements respect the border radius */
+}
+
+.header-line {
+    border-radius: 1rem 1rem 0 0 !important; /* Rounded top corners */
+    /* margin: -1rem -1rem 1rem -1rem !important; Counteracts the parent padding */
+    width: calc(100% + 2rem) !important; /* Expands to full width including padding */
+}
+
+/* This ensures smooth scrolling behavior */
+/* html {
+    scroll-behavior: smooth;
+} */
+
+/* Optional: Add some padding above your target section */
+/* .loading-spinner-2 {
+    scroll-behavior: smooth;
+    scroll-margin-top: 100px; /* Adjust as needed */
+/* } */ 
+
+
+.scroll-container {
+    overflow-y: scroll;
+    scroll-behavior: auto;
+  }
+
+.scroll-object {
+    scroll-margin-top: 20px;
+}
+
+.badge-pill {
+    font-size: 0.95em;
+    padding: 0.25em 0.6em;
+    color:#00245a
 }
