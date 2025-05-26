@@ -711,9 +711,9 @@ def update_hosts_not_found_graphs(options, selected, histData, pieData, dt):
                         figure=build_pie_chart(pieData, 'owd'),  
                         id='owd-stats',
                         className='cls-owd-stats',
-                        style={'height': '200px'} 
+                        style={'height': '200px', 'width': '200px'} 
                     ),
-                ], width=4, className='mt-2', style={'width': '200px', 'margin-right': '90px'}), 
+                ], width=2, className='mt-2', style={'width': '200px', 'justify-self':'start'}), 
 
                 # Throughput stats
                 dbc.Col([
@@ -721,9 +721,9 @@ def update_hosts_not_found_graphs(options, selected, histData, pieData, dt):
                         figure=build_pie_chart(pieData, 'throughput'), 
                         id='throughput-stats',
                         className='cls-throughput-stats',
-                        style={'height': '200px'} 
+                        style={'height': '200px', 'width': '200px'} 
                     ),
-                ], width=4, className='mt-2', style={'width': '200px', 'margin-right': '90px'}),  
+                ], width=2, className='mt-2', style={'width': '200px', 'justify-self':'center'}),  
 
                 # Trace stats
                 dbc.Col([
@@ -731,10 +731,10 @@ def update_hosts_not_found_graphs(options, selected, histData, pieData, dt):
                         figure=build_pie_chart(pieData, 'trace'), 
                         id='trace-stats',
                         className='cls-trace-stats',
-                        style={'height': '200px'} 
+                        style={'height': '200px', 'width': '200px'} 
                     ),
-                ], width=4, className='mt-2', style={'width': '200px'})
-            ], style={'justify-content': 'center'}),  # Added border here
+                ], width=2, className='mt-2', style={'width': '200px', 'justify-self':'end'})
+            ], style={'justify-content':'space-evenly', 'width': '100%'}),  # Added border here
             
             # Colored dots and explanations
             dbc.Row([
