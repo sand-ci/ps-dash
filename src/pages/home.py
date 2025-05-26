@@ -215,13 +215,13 @@ def layout(**other_unknown_query_strings):
                                                         placeholder="Test Type",
                                                         multi=False  # Allow multiple selections
                                                     )
-                                                    ], width=2, className="align-left")
-                                                ], className="mt-2 ml-1"),
+                                                    ], width=2, style={'align-items':'top'})
+                                                ], className="w-100 mt-2 g-0", style={'justify-content':'space-between'}),
                                             # adding the pie charts or histogram
-                                            html.Div(id='graph-placeholder'),                          
-                                        ]),
-                                    ], className="mt-2 ml-2"),
-                                ], className='boxwithshadow page-cont mb-1 row', align="center")],
+                                            html.Div(id='graph-placeholder', style={'margin-left': '15px'}),                          
+                                        ], className="w-100", style={'justify-content':'center'}),
+                                    ], className="mt-2 w-100", style={'justify-content':'center'}),
+                                ], className='boxwithshadow page-cont mb-1 p-2', align="center")],
                             lg=6, sm=12, className='d-flex flex-column h-100'),
                     # End of top right column      
                     ], className='h-100'),
@@ -704,73 +704,72 @@ def update_hosts_not_found_graphs(options, selected, histData, pieData, dt):
         
         # three pie charts
         graph = dbc.Row([
-                    dbc.Row([
-                        # OWD stats
-                        dbc.Col([
-                            dcc.Graph(
-                                figure=build_pie_chart(pieData, 'owd'),  
-                                id='owd-stats',
-                                className='cls-owd-stats',
-                                style={'height': '200px'} 
-                            ),
-                        ], width=4, className='mt-2'), 
+            dbc.Row([
+                # OWD stats
+                dbc.Col([
+                    dcc.Graph(
+                        figure=build_pie_chart(pieData, 'owd'),  
+                        id='owd-stats',
+                        className='cls-owd-stats',
+                        style={'height': '200px'} 
+                    ),
+                ], width=4, className='mt-2', style={'width': '200px', 'margin-right': '90px'}), 
 
-                        # Throughput stats
-                        dbc.Col([
-                            dcc.Graph(
-                                figure=build_pie_chart(pieData, 'throughput'), 
-                                id='throughput-stats',
-                                className='cls-throughput-stats',
-                                style={'height': '200px'}  
-                            ),
-                        ], width=4, className='mt-2'),  
+                # Throughput stats
+                dbc.Col([
+                    dcc.Graph(
+                        figure=build_pie_chart(pieData, 'throughput'), 
+                        id='throughput-stats',
+                        className='cls-throughput-stats',
+                        style={'height': '200px'} 
+                    ),
+                ], width=4, className='mt-2', style={'width': '200px', 'margin-right': '90px'}),  
 
-                        # Trace stats
-                        dbc.Col([
-                            dcc.Graph(
-                                figure=build_pie_chart(pieData, 'trace'), 
-                                id='trace-stats',
-                                className='cls-trace-stats',
-                                style={'height': '200px'} 
-                            ),
-                        ], width=4, className='mt-2')
-                    ]),
-                    # Colored dots and explanations
-                    dbc.Row([
-                        dbc.Col([
-                            html.Div([
-                                # First colored dot and explanation
-                                html.Div([
-                                    html.Span(style={
-                                        'display': 'inline-block',
-                                        'width': '10px',
-                                        'height': '10px',
-                                        'border-radius': '50%',
-                                        'background-color': '#69c4c4',  # custom color
-                                        'margin-right': '8px',
-                                        'margin-left': '8px'
-                                    }),
-                                    html.Span("expected hosts found in the Elasticsearch", style={'font-size': '10px'})
-                                ]),
-
-                                # Second colored dot and explanation
-                                html.Div([
-                                    html.Span(style={
-                                        'display': 'inline-block',
-                                        'width': '10px',
-                                        'height': '10px',
-                                        'border-radius': '50%',
-                                        'background-color': '#00245a', 
-                                        'margin-right': '8px',
-                                        'margin-left': '8px'
-                                    }),
-                                    html.Span("expected hosts NOT found in the Elasticsearch", style={'font-size': '10px'})
-                                        ])
-                                    ], style={'background-color': 'transparent'})
-                        ], width=2, className='w-100 mb-1'), 
-                    ])
-                ])
-        return graph, "all (pie charts)"
+                # Trace stats
+                dbc.Col([
+                    dcc.Graph(
+                        figure=build_pie_chart(pieData, 'trace'), 
+                        id='trace-stats',
+                        className='cls-trace-stats',
+                        style={'height': '200px'} 
+                    ),
+                ], width=4, className='mt-2', style={'width': '200px'})
+            ], style={'justify-content': 'center'}),  # Added border here
+            
+            # Colored dots and explanations
+            dbc.Row([
+                dbc.Col([
+                    html.Div([
+                        # First colored dot and explanation
+                        html.Div([
+                            html.Span(style={
+                                'display': 'inline-block',
+                                'width': '10px',
+                                'height': '10px',
+                                'border-radius': '50%',
+                                'background-color': '#69c4c4',
+                                'margin-right': '8px',
+                                'margin-left': '8px'
+                            }),
+                            html.Span("expected hosts found in the Elasticsearch", style={'font-size': '10px'})
+                        ]),
+                        # Second colored dot and explanation
+                        html.Div([
+                            html.Span(style={
+                                'display': 'inline-block',
+                                'width': '10px',
+                                'height': '10px',
+                                'border-radius': '50%',
+                                'background-color': '#00245a', 
+                                'margin-right': '8px',
+                                'margin-left': '8px'
+                            }),
+                            html.Span("expected hosts NOT found in the Elasticsearch", style={'font-size': '10px'})
+                        ])
+                    ], style={'background-color': 'transparent'})
+                ], width=2, className='w-100 mb-1'), 
+            ])
+        ]) 
     
     else:
         # histogram 14 days data
