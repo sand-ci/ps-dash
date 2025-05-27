@@ -284,7 +284,7 @@ def layout(q=None, **other_unknown_query_strings):
                                             id="num-alarms",
                                             style={
                                                 "color": "white", 
-                                                "font-size": "120px",
+                                                "font-size": "1000%",
                                                 "display": "flex",          # Enables Flexbox
                                                 "justify-content": "center", # Centers horizontally
                                                 "align-items": "center",     # Centers vertically
@@ -331,7 +331,7 @@ def layout(q=None, **other_unknown_query_strings):
                                                 ), width=5, style={"height": "100%"}),
                             # metadata card
                             dbc.Col(
-                                html.Div(className="boxwithshadow page-cont p-2 h-100", style={"background-color": "#ffffff", "align-content":"center"}, children=[
+                                html.Div(className="boxwithshadow page-cont p-2 h-100", style={"background-color": "#ffffff", "align-content":"center", 'justify-items':'stretch'}, children=[
                                     # html.H3("Summary", style={"padding-top": "5%", "padding-left": "5%"}),
                                     dbc.Row(
                                         [
@@ -348,12 +348,13 @@ def layout(q=None, **other_unknown_query_strings):
                                                     style={
                                                         "border-right": "1px solid #ddd",  # Thin vertical line
                                                         "padding-right": "20px",
-                                                        "padding-top": "20px"
+                                                        "padding-top": "20px",
+                                                        "align-content":"center"
                                                         
                                                     }
                                         ),
                                         dbc.Col([
-                                            html.H4(f"{site} hosts:", style={"padding-top": "20px"}),
+                                            html.H4(f"{site} hosts:", style={"padding-left": "10%", "padding-top": "20px"}),
                                             html.Div([
                                                 
                                                 html.Ul(
@@ -377,25 +378,26 @@ def layout(q=None, **other_unknown_query_strings):
                                                             'height': '200px', 
                                                             'overflow-y': 'auto',  # Enable vertical scrolling
                                                             'width': '100%', # Thin vertical line
-                                                            "padding-right": "20px"
+                                                            "padding-right": "20px",
+                                                            "padding-left": "10%",
+                                                            "justify-self": "end"
                                                         }
                                             )
-                                    ], width=6
-                                    )
+                                        ], width=6)
                                         
-                                ], className="align-items-stretch",  # Makes columns equal height
-                            ),
-                            dbc.Button(
-                                        "View Measurements →",
-                                        id="view-measurements-btn",
-                                        color="link",
-                                        style={
-                                            "margin-left": "80px",
-                                            "margin-top": "8px",
-                                            "width": "60%",
-                                            # "border-radius": "5px"
-                                        }
-                                    )
+                                    ], className="align-items-stretch",  # Makes columns equal height
+                                ),
+                                dbc.Button(
+                                            "View Measurements →",
+                                            id="view-measurements-btn",
+                                            color="link",
+                                            style={
+                                                # "margin-left": "80px",
+                                                "margin-top": "1%",
+                                                "width": "100%",
+                                                # "border-radius": "5px"
+                                            }
+                                        )
                             
                             ]), width=4, style={"background-color": "#b9c4d4;", "height": "100%"})
                         ], className="my-3 pl-1", style={"height": "300px"}),
@@ -419,10 +421,12 @@ def layout(q=None, **other_unknown_query_strings):
                                         html.H4(generate_summary(fromDay_date, toDay_date, site_alarms), style={
                                                     "display": "flex",
                                                     "justify-content": "center",
+                                                    "align-items": "stretch",
                                                     "margin-top": "20px",
                                                     "height": "90%",
-                                                    "padding-left": "5%",
-                                                    "padding-right": "5%"
+                                                    "padding-left": "8%",
+                                                    "padding-right": "8%",
+                                                    "font-size": "120%"
                                                     
                                                 })
                                     ], style={"height": "100%"}
@@ -802,7 +806,7 @@ def update_alarms_table(date_filter, ip_filter, group_filter, type_filter, btn_t
             figure = create_bar_chart(df, active_btn)
                 
         
-        df = df.sort_values(by='to', ascending=True)
+        df = df.sort_values(by='to', ascending=False)
         df.rename(columns={'to': "Date", 'alarm group':'Category', 'alarm name': 'Alarm', 'hosts': 'Hosts'}, inplace=True)
         element = dbc.Table.from_dataframe(
                                             df,
