@@ -970,7 +970,7 @@ def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, visibility, 
                                 dcc.Loading(id='loading-spinner-2', type='default', children=[
                                     html.Div(children=figures)
                                 ], color='#00245A'),
-                            ], className="l-h-3 p-2 boxwithshadow page-cont ml-1 p-1"), event, data.to_dict(), visibility
+                            ], className=""), event, data.to_dict(), visibility
                 
                 #other alarms visualisations
                 else:
