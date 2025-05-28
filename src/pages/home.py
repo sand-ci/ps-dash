@@ -610,6 +610,10 @@ def build_pie_chart(stats, test_type):
     The function builds pie chart with general
     statistics about data availability in Elasticsearch.
     """
+    title = test_type
+    if test_type == 'owd':
+        title = 'latency'
+    
     part, total = stats[test_type]
     percentage = (part / total) * 100
 
@@ -630,7 +634,7 @@ def build_pie_chart(stats, test_type):
         autosize=False,  # Disable autosizing to enforce custom dimensions
         margin=dict(l=20, r=20, t=20, b=20),
         title={
-            'text': test_type.upper(),  
+            'text': title.upper(),  
             'y': 0.95,  
             'x': 0.05,
             'xanchor': 'left',
@@ -662,7 +666,7 @@ def build_histogram(dictionary):
     df = pd.DataFrame(dictionary).T.reset_index()
     df[['owd', 'throughput', 'trace']] = df[['owd', 'throughput', 'trace']] * -1
     
-    df.rename(columns={"index": "date"}, inplace=True)
+    df.rename(columns={"index": "date", "owd": "latency"}, inplace=True)
 
     # Normalize the data (percentage change from the first day)
     # df_normalized = df.copy()
