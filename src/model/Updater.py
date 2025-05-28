@@ -20,6 +20,7 @@ from ml.packet_loss_one_month_onehot import one_month_data
 from ml.packet_loss_train_model import packet_loss_train_model
 import os
 from datetime import datetime, timedelta
+import psconfig.api
 
 
 @timer
@@ -42,12 +43,16 @@ class ParquetUpdater(object):
 
                 # self.storeThroughputDataAndModel()
                 # self.storePacketLossDataAndModel()
+                self.psConfigData()
 
             # Set the schedulers
             Scheduler(60*60*12, self.storeMetaData)
             Scheduler(60*60, self.cacheIndexData)
-            Scheduler(60*60, self.storeAlarms)
-            Scheduler(60*60, self.storeASNPathChanged)
+
+            Scheduler(60*30, self.storeAlarms)
+            Scheduler(60*60*12, self.storeASNPathChanged)
+            Scheduler(60*60*24, self.psConfigData)
+
 
             # Scheduler(60*60*12, self.storeThroughputDataAndModel)
             # Scheduler(60*60*12, self.storePacketLossDataAndModel)
@@ -56,7 +61,7 @@ class ParquetUpdater(object):
 
 
     # The following function is used to group alarms by site 
-    # taking into account the most recent 24 hours only
+    # taking into account the most recent 48 hours only
     def groupAlarms(self, pivotFrames):
         dateFrom, dateTo = hp.defaultTimeRange(days=2)
         metaDf = self.pq.readFile('parquet/raw/metaDf.parquet')
@@ -158,29 +163,42 @@ class ParquetUpdater(object):
             measures = pd.concat([measures, df])
         self.pq.writeToFile(measures, f'{self.location}raw/measures.parquet')
 
-
-    # @timer  
-    # def cacheTraceChanges(self, days=60):
-    #     location = 'parquet/raw/'
-    #     dateFrom, dateTo = hp.defaultTimeRange(days)
-    #     chdf, posDf, baseline, altPaths = qrs.queryTraceChanges(dateFrom, dateTo)
-    #     chdf = chdf.round(2)
-    #     posDf = posDf.round(2)
-    #     baseline = baseline.round(2)
-    #     altPaths = altPaths.round(2)
-
-    #     self.pq.writeToFile(chdf, f'{location}chdf.parquet')
-    #     self.pq.writeToFile(posDf, f'{location}posDf.parquet')
-    #     self.pq.writeToFile(baseline, f'{location}baseline.parquet')
-    #     self.pq.writeToFile(altPaths, f'{location}altPaths.parquet')
-
-
     @timer
     def storeMetaData(self):
         metaDf = qrs.getMetaData()
         self.pq.writeToFile(metaDf, f"{self.location}raw/metaDf.parquet")
 
-
+    @timer
+    def psConfigData(self):
+        mesh_url = "https://psconfig.aglt2.org/pub/config"
+        mesh_config = psconfig.api.PSConfig(mesh_url)
+        all_hosts = mesh_config.get_all_hosts()
+        host_test_type = pd.DataFrame({
+                                        'host': list(all_hosts),
+                                        'owd': False,
+                                        'trace': False,
+                                        'throughput': False
+                                        })
+        def checkTestsForHost(host, mesh_conf):
+            """
+            Classifies the host as belonging to one of
+            the three test groups (latency, trace and throughput).
+            """
+            try:
+                types = mesh_conf.get_test_types(host)
+            except Exception:
+                return False, False
+            latency = any(test in ['latency', 'latencybg'] for test in types)
+            trace = 'trace' in types
+            throughput = any(test in ['throughput', 'rtt'] for test in types) # as rtt is now in ps_throughput
+            return host, latency, trace, throughput
+        
+        host_test_type = host_test_type['host'].apply(
+            lambda host: pd.Series(checkTestsForHost(host, mesh_config))
+        )
+        host_test_type.columns = ['host', 'owd', 'trace', 'throughput']
+        self.pq.writeToFile(host_test_type, f"{self.location}raw/psConfigData.parquet")
+        
     @timer
     def storeAlarms(self):
         dateFrom, dateTo = hp.defaultTimeRange(30)
@@ -200,7 +218,6 @@ class ParquetUpdater(object):
         dateFrom, dateTo = hp.defaultTimeRange(days=2)
         df = qrs.queryPathAnomaliesDetails(dateFrom, dateTo)
         self.pq.writeToFile(df, f"parquet/asn_path_changes.parquet")
-
 
     def createLocation(self, required_folders):
 
