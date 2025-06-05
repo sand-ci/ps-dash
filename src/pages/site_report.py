@@ -86,7 +86,9 @@ def layout(q=None, **other_unknown_query_strings):
     alarmsInst = Alarms()
     frames, pivotFrames = alarmsInst.loadData(start_date, end_date)
     print(f"fromDay: {start_date}, toDay: {end_date}")
-     
+    
+    
+    
     site_alarms = pd.DataFrame(columns=["to", "alarm group", "alarm name", "hosts", "IP version", "Details"])
     site_alarms_num = 0
     subcategories = qrs.getSubcategories()
