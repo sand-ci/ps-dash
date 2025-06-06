@@ -285,7 +285,7 @@ def layout(q=None, **other_unknown_query_strings):
                                 html.Div(
                                     className="boxwithshadow page-cont p-2 h-100",
                                     children=[
-                                        html.H3(f"Number of Alarms from {q}", style={"color": "white", "padding-left": "5%", "padding-top": "5%"}),
+                                        html.H3(f"Number of Alarms", style={"color": "white", "padding-left": "5%", "padding-top": "5%"}),
                                         html.H1(
                                             # f"{site_alarms_num if site_alarms_num > 0 else 0}", 
                                             id="num-alarms",
