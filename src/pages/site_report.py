@@ -931,13 +931,15 @@ def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, visibility, 
     This function extracts the visualisation of the chosen alarm and shows it under the table with alarms.
     """
     print("Dynamic content callback")
+    print(f"alarm_clicks: {alarm_clicks}")
+    button_clicks = {'alarm-link-btn': alarm_clicks, 'path-anomaly-btn': path_clicks, 'hosts-not-found-btn': hosts_clicks}
     ctx = dash.callback_context
     if not ctx.triggered:
-        return dash.no_update, dash.no_update
-    
+        return dash.no_update, dash.no_update, {}, visibility
+
     global site
     alarmsInst = Alarms()
-    
+
     
     button_content_mapping = {'hosts-not-found-btn': "hosts not found",
                               'path-anomaly-btn': "ASN path anomalies"
@@ -947,6 +949,8 @@ def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, visibility, 
         button_id = ctx.triggered[0]['prop_id'].split('.')[0]
         if button_id:
             button_id = eval(button_id)
+            if sum(button_clicks[button_id['type']]) == 0:
+                return dash.no_update, dash.no_update, {}, visibility
             if button_id['type'] in button_content_mapping:
                 event = button_content_mapping[button_id['type']]
             else:
@@ -1064,13 +1068,24 @@ dash.clientside_callback(
     """
     function(alarmClicks, pathClicks, hostsClicks, measurementsClick) {
         const ctx = dash_clientside.callback_context;
-        // Only proceed if something was triggered
+
         if (ctx.triggered.length > 1) return dash_clientside.no_update;
-        
+
         const triggered = ctx.triggered[0];
         console.log('Triggered by:', triggered.prop_id);
 
-        // Check if measurements button was clicked
+        const sumClicks = (arr) => Array.isArray(arr) ? arr.reduce((a, b) => a + (b || 0), 0) : 0;
+        const totalAlarmClicks = sumClicks(alarmClicks);
+        const totalPathClicks = sumClicks(pathClicks);
+        const totalHostsClicks = sumClicks(hostsClicks);
+
+        const isInitialLoad = triggered.prop_id === '.' || (
+            totalAlarmClicks + totalPathClicks + totalHostsClicks + (measurementsClick || 0) === 0
+        );
+
+        // Skip scroll on initial load or when no buttons were actually clicked
+        if (isInitialLoad) return dash_clientside.no_update;
+
         if (triggered.prop_id === 'view-measurements-btn.n_clicks') {
             setTimeout(() => {
                 const element = document.getElementById('site-measurements');
@@ -1081,21 +1096,17 @@ dash.clientside_callback(
                     });
                 }
             }, 300);
-        } 
-        // Handle pattern-matched buttons (original logic)
-        else {
-            const isInitialLoad = triggered.prop_id === '.' && triggered.value === null;
-            if (!isInitialLoad) {
-                setTimeout(() => {
-                    const element = document.getElementById('alarm-content-section');
-                    if (element) {
-                        const yOffset = -100;
-                        const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
-                        window.scrollTo({top: y, behavior: 'smooth'});
-                    }
-                }, 350);
-            }
+        } else {
+            setTimeout(() => {
+                const element = document.getElementById('alarm-content-section');
+                if (element) {
+                    const yOffset = -100;
+                    const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+                    window.scrollTo({top: y, behavior: 'smooth'});
+                }
+            }, 350);
         }
+
         return dash_clientside.no_update;
     }
     """,
