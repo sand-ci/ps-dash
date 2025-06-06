@@ -92,6 +92,7 @@ def buildMap(mapDf):
 def defineStatus(data, key_value, count_value):
     # remove the path changed between sites event because sites tend to show big numbers for this event
     # and it dominates the table. Use the summary event "path changed" instead
+    data = data.groupby(['to', key_value]).size().reset_index(name='cnt')
     data = data[data[key_value] != 'path changed between sites']
 
     red_status = data[(data[key_value].isin(['bandwidth decreased from/to multiple sites']))
@@ -102,7 +103,7 @@ def defineStatus(data, key_value, count_value):
 
     grey_status = data[(data[key_value].isin(['firewall issue', 'source cannot reach any', 'complete packet loss']))
                     & (data['cnt']>0)][count_value]
-    return red_status, yellow_status, grey_status
+    return red_status, yellow_status, grey_status, data
 
 
 def createDictionaryWithHistoricalData(dframe):
