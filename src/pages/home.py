@@ -321,14 +321,15 @@ def layout(**other_unknown_query_strings):
 )
 def update_output(n_clicks, start_date, end_date, sites, all, events, allevents, sitesState, eventsState):
     ctx = dash.callback_context
-
+    print('Check date picker')
+    print('start:', start_date)
+    print('end:', end_date)
     if not ctx.triggered or ctx.triggered[0]['prop_id'].split('.')[0] == 'search-button':
-        if start_date and end_date:
-            current_hour = pd.Timestamp.now().hour
-            start_date = pd.Timestamp(start_date).replace(hour=current_hour, minute=0, second=0, microsecond=0).isoformat()
-            end_date = pd.Timestamp(end_date).replace(hour=current_hour, minute=0, second=0, microsecond=0).isoformat()
-        else: start_date, end_date = hp.defaultTimeRange(days=2)
-
+        if not start_date and not end_date:
+            start_date, end_date = hp.defaultTimeRange(days=2)
+        start_date = pd.Timestamp(start_date).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        end_date = pd.Timestamp(end_date).replace(hour=23, minute=59, second=59, microsecond=0).isoformat()
+         
         alarmsInst = Alarms()
         frames, pivotFrames = alarmsInst.loadData(start_date, end_date)
 
@@ -610,6 +611,10 @@ def build_pie_chart(stats, test_type):
     The function builds pie chart with general
     statistics about data availability in Elasticsearch.
     """
+    title = test_type
+    if test_type == 'owd':
+        title = 'latency'
+    
     part, total = stats[test_type]
     percentage = (part / total) * 100
 
@@ -630,7 +635,7 @@ def build_pie_chart(stats, test_type):
         autosize=False,  # Disable autosizing to enforce custom dimensions
         margin=dict(l=20, r=20, t=20, b=20),
         title={
-            'text': test_type.upper(),  
+            'text': title.upper(),  
             'y': 0.95,  
             'x': 0.05,
             'xanchor': 'left',
@@ -662,7 +667,7 @@ def build_histogram(dictionary):
     df = pd.DataFrame(dictionary).T.reset_index()
     df[['owd', 'throughput', 'trace']] = df[['owd', 'throughput', 'trace']] * -1
     
-    df.rename(columns={"index": "date"}, inplace=True)
+    df.rename(columns={"index": "date", "owd": "latency"}, inplace=True)
 
     # Normalize the data (percentage change from the first day)
     # df_normalized = df.copy()
