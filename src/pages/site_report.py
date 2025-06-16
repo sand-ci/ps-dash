@@ -48,11 +48,11 @@ dash.register_page(
     description=description,
 )
 
-site = None
+# site = None
 alarmsInst = Alarms()
 
 def layout(q=None, **other_unknown_query_strings):
-    global site
+    # global site
     site = q
     
     if q is not None:
@@ -205,7 +205,7 @@ def layout(q=None, **other_unknown_query_strings):
         dcc.Store(id='toDay', data=toDate.strftime('%Y-%m-%dT%H:%M:%S.000Z')),
         dcc.Store(id='now', data=now.strftime('%Y-%m-%dT%H:%M:%S.000Z')),
         dcc.Store(id='alarm-storage', data={}),
-        
+        dcc.Store(id='site', data=site),
         dbc.Row([
             dbc.Row(
                 dbc.Col([
@@ -913,6 +913,7 @@ def toggle_modal(n1, n2, is_open):
         Output("alarm-content-section", "style")
     ],
     [
+        Input('site', 'data'),
         Input({'type': 'alarm-link-btn', 'index': ALL}, 'n_clicks'),
         Input({'type': 'path-anomaly-btn', 'index': ALL}, 'n_clicks'),
         Input({'type': 'hosts-not-found-btn', 'index': ALL}, 'n_clicks'),
@@ -926,7 +927,7 @@ def toggle_modal(n1, n2, is_open):
     ],
     prevent_initial_call=True
 )
-def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, visibility, current_children, fromDay, toDay, now):
+def update_dynamic_content(site, alarm_clicks, path_clicks, hosts_clicks, visibility, current_children, fromDay, toDay, now):
     """
     This function extracts the visualisation of the chosen alarm and shows it under the table with alarms.
     """
@@ -937,7 +938,7 @@ def update_dynamic_content(alarm_clicks, path_clicks, hosts_clicks, visibility, 
     if not ctx.triggered:
         return dash.no_update, dash.no_update, {}, visibility
 
-    global site
+    # global site
     alarmsInst = Alarms()
 
     
