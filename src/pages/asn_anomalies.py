@@ -1,7 +1,7 @@
 import dash
 
 from dash import html
-from dash import Dash, html, dcc, Input, Output, dcc, html, callback
+from dash import Dash, html, dcc, Input, Output, dcc, html, callback, MATCH, State
 import dash_bootstrap_components as dbc
 import urllib3
 
@@ -27,6 +27,7 @@ dash.register_page(
 )
 
 def layout(q=None, **other_unknown_query_strings):
+    print(q)
     return html.Div([
         dcc.Location(id='url', refresh=False),
         dcc.Store(id='alarm-data-store'),
@@ -41,7 +42,58 @@ def layout(q=None, **other_unknown_query_strings):
         ], className="l-h-3 p-2 boxwithshadow page-cont ml-1 p-1")
     ], style={"padding": "0.5% 1.5%"})
 
-
+# def bandwidth_increased_decreased(alarm, alarmData, alarmsInst, alarmsIn48h, sitePairs, expand, index_extension=""):
+#     return html.Div([
+#             dbc.Row([
+#               dbc.Row([
+#                 dbc.Col([
+#                   html.H3(alarm['event'].upper(), className="text-center bold p-3"),
+#                   html.H5(alarmData['to'], className="text-center bold"),
+#                 ], lg=2, md=12, className="p-3"),
+#                 dbc.Col(
+#                     html.Div(
+#                       [
+#                         dbc.Row([
+#                           dbc.Row([
+#                             html.H1(f"Summary", className="text-left"),
+#                             html.Hr(className="my-2")]),
+#                           dbc.Row([
+#                               html.P(alarmsInst.buildSummary(alarm), className='subtitle'),
+#                             ], justify="start"),
+#                           ])
+#                       ],
+#                     ),
+#                 lg=10, md=12, className="p-3")
+#               ], className="boxwithshadow alarm-header pair-details g-0", justify="between", align="center")                
+#             ], style={"padding": "0.5% 1.5%"}, className='g-0'),
+#           alarmsIn48h,
+#           dcc.Store(id='asn-alarm-store', data=alarm),
+#           dbc.Row([
+#             html.Div(id=f'site-section-throughput{i}',
+#               children=[
+#                 dbc.Button(
+#                     alarmData['src_site']+' to '+alarmData['dest_site'],
+#                     value = alarmData,
+#                     id={
+#                         'type': 'tp-collapse-button'+index_extension,
+#                         'index': f'throughput{i}'+index_extension
+#                     },
+#                     className="collapse-button",
+#                     color="white",
+#                     n_clicks=0,
+#                 ),
+#                 dcc.Loading(
+#                   dbc.Collapse(
+#                       id={
+#                           'type': 'tp-collapse'+index_extension,
+#                           'index': f'throughput{i}'+index_extension
+#                       },
+#                       is_open=expand, className="collaps-container rounded-border-1"
+#                 ), color='#e9e9e9', style={"top":0}),
+#               ]) for i, alarmData in enumerate(sitePairs)
+#             ], className="rounded-border-1 g-0", align="start", style={"padding": "0.5% 1.5%"})
+#           ])
+    
 @callback(
     Output('alarm-data-store', 'data'),
     Input('url', 'pathname')
@@ -65,33 +117,53 @@ def update_store(pathname):
 def update_graphs_and_title(query_params):
     if not query_params:
         return html.Div(), "ASN-path anomalies"
-
+        
+    alarm_id = query_params.get('id')
     src = query_params.get('src_netsite')
     dest = query_params.get('dest_netsite')
     dt = query_params.get('dt')
-    
-    if not (src and dest):
+    if alarm_id:
+        site = query_params.get('site')
+        dt = query_params.get('date')
+        print("Alarm per site")
+        print(site, dt, id)
+        alarm = qrs.getAlarm(alarm_id)
+        print('URL query:', alarm)
+        print("HERE")
+        # all_asn_alarms_src = alarm['source']['all_alarm_ids_src']
+        # asn_alarms_src = [[dest, qrs.query_ASN_anomalies(site, dest, dt)] for dest, id in all_asn_alarms_src]
+        # all_asn_alarms_dest = alarm['source']['all_alarm_ids_dest']
+        # print(all_asn_alarms)
+        # sitePairs = getSitePairs(alarm)
+        # alarmData = alarm['source']
+        # dateFrom, dateTo = hp.getPriorNhPeriod(alarmData['to'])
+        # print('Alarm\'s content:', alarmData)
+        # pivotFrames = alarmsInst.loadData(dateFrom, dateTo)[1]
+
+        # data = alarmsInst.getOtherAlarms(
+        #                                 currEvent=alarm['event'],
+        #                                 alarmEnd=alarmData['to'],
+        #                                 pivotFrames=pivotFrames,
+        #                                 site=alarmData['site'] if 'site' in alarmData.keys() else None,
+        #                                 src_site=alarmData['src_site'] if 'src_site' in alarmData.keys() else None,
+        #                                 dest_site=alarmData['dest_site'] if 'dest_site' in alarmData.keys() else None
+        #                                 )
+
+        # otherAlarms = alarmsInst.formatOtherAlarms(data)
+
+        # expand = True
+        # alarmsIn48h = ''
+        # if alarm['event'] not in ['bandwidth decreased', 'bandwidth increased']:
+        # expand = False
+        # alarmsIn48h = dbc.Row([
+        #                 dbc.Row([
+        #                         html.P(f'Site {alarmData["site"]} takes part in the following alarms in the period 24h prior \
+        #                         and up to 24h after the current alarm end ({alarmData["to"]})', className='subtitle'),
+        #                         html.B(otherAlarms, className='subtitle')
+        #                     ], className="boxwithshadow alarm-header pair-details g-0 p-3", justify="between", align="center"),
+        #                 ], style={"padding": "0.5% 1.5%"}, className='g-0')
+        # content = bandwidth_increased_decreased(alarm, alarmData, alarmsInst, alarmsIn48h, sitePairs, expand, index_extension="")
         return html.Div(), "ASN-path anomalies"
-     
-    data = qrs.query_ASN_anomalies(src, dest, dt)
-    if len(data) == 0:
-        return html.Div([
-            html.H1(f"No data found for alarm {src} to {dest}"),
-            html.P('No data was found for the alarm selected. Please try another alarm.',
-                   className="plot-subtitle")
-        ], className="l-h-3 p-2 boxwithshadow page-cont ml-1 p-1"), "ASN-path anomalies"
-
-    anomalies = data['anomalies'].values[0]
-    title = html.Div([
-        dbc.Row([
-            html.Span(f"{src} → {dest}", className="sites-anomalies-title")]),
-        dbc.Row([
-            html.Span("", style={"margin": "0 10px", "color": "#C50000", "fontSize": "20px"}),
-            html.Span(f"Anomalies: {anomalies}", className="anomalies-title", style={"color": "#910000"}),
-        ])     
-    ], style={"textAlign": "center", "marginBottom": "20px"})
-
-    figures = generate_graphs(data, src, dest, dt)
 
     return figures, title
 
@@ -415,3 +487,104 @@ def build_anomaly_heatmap(subset_sample):
         yaxis1=dict(showticklabels=False)
     )
     return fig
+
+@dash.callback(
+    [
+      Output({'type': 'tp-collapse', 'index': MATCH},  "is_open"),
+      Output({'type': 'tp-collapse', 'index': MATCH},  "children")
+    ],
+    [
+      Input({'type': 'tp-collapse-button', 'index': MATCH}, "n_clicks"),
+      Input({'type': 'tp-collapse-button', 'index': MATCH}, "value"),
+      Input('asn-alarm-store', 'data')
+    ],
+    [State({'type': 'tp-collapse', 'index': MATCH},  "is_open")],
+)
+def toggle_collapse(n, alarmData, alarm, is_open):
+  data = ''
+
+  dateFrom, dateTo = hp.getPriorNhPeriod(alarm['source']['to'])
+  pivotFrames = alarmsInst.loadData(dateFrom, dateTo)[1]
+  if n:
+    if is_open==False:
+      data = buildGraphComponents(alarmData, alarm['source']['from'], alarm['source']['to'], alarm['event'], pivotFrames)
+    return [not is_open, data]
+  if is_open==True:
+    data = buildGraphComponents(alarmData, alarm['source']['from'], alarm['source']['to'], alarm['event'], pivotFrames)
+    return [is_open, data]
+  return [is_open, data]
+
+@timer
+def buildGraphComponents(alarmData, dateFrom, dateTo, event, pivotFrames):
+
+  df = getRawDataFromES(alarmData['src_site'], alarmData['dest_site'], alarmData['ipv6'], dateFrom, dateTo)
+  df.loc[:, 'MBps'] = df['throughput'].apply(lambda x: round(x/1e+6, 2))
+
+  data = alarmsInst.getOtherAlarms(currEvent=event, alarmEnd=dateTo, pivotFrames=pivotFrames,
+                                   src_site=alarmData['src_site'], dest_site=alarmData['dest_site'])
+  otherAlarms = alarmsInst.formatOtherAlarms(data)
+  return throughput_graph_components(alarmData, df, otherAlarms)
+
+
+
+
+
+
+
+def asnAnomaliesGroupedAlarmVisualisation(alarm, site, sites_list, date, sources=True):
+    if sources:
+        titles = [[src+' to '+site] for src in sites_list]
+        alarms = [[src, site, qrs.query_ASN_anomalies(src, site, date)] for src in sites_list]
+    else:
+        titles = [site+' to '+dest for dest in sites_list]
+        alarms = [[site, dest, qrs.query_ASN_anomalies(site, dest, date)] for dest in sites_list]
+    return_component = html.Div([
+            dbc.Row([
+              dbc.Row([
+                dbc.Col([
+                  html.H3("ASN path anomalies", className="text-center bold p-3"),
+                  html.H5(date, className="text-center bold"),
+                ], lg=2, md=12, className="p-3"),
+                dbc.Col(
+                    html.Div(
+                      [
+                        dbc.Row([
+                          dbc.Row([
+                            html.H1(f"Summary for {site}", className="text-left"),
+                            html.Hr(className="my-2")]),
+                          dbc.Row([
+                              html.P(f"{alarm['source']['total_paths_anomalies']} path change(s) were detected involving site BEIJING-LCG2-LHCONE. New ASN(s) appeared on routes where BEIJING-LCG2-LHCONE acted as a source {len(alarm['source']['as_source_to'])} time(s) and {len(alarm['source']['as_destination_from'])} time(s) as destination", className='subtitle'),
+                            ], justify="start"),
+                          ])
+                      ],
+                    ),
+                lg=10, md=12, className="p-3")
+              ], className="boxwithshadow alarm-header pair-details g-0", justify="between", align="center")                
+            ], style={"padding": "0.5% 1.5%"}, className='g-0'),
+          dcc.Store(id='asn-alarm-store', data=alarm),
+          dbc.Row([
+            html.Div(id=f'site-section-asn-anomalies{i}',
+              children=[
+                dbc.Button(
+                    site+' to '+dest,
+                    value = alarm_data,
+                    id={
+                        'type': 'tp-collapse-button'+index_extension,
+                        'index': f'throughput{i}'+index_extension
+                    },
+                    className="collapse-button",
+                    color="white",
+                    n_clicks=0,
+                ),
+                dcc.Loading(
+                  dbc.Collapse(
+                      id={
+                          'type': 'tp-collapse'+index_extension,
+                          'index': f'throughput{i}'+index_extension
+                      },
+                      is_open=expand, className="collaps-container rounded-border-1"
+                ), color='#e9e9e9', style={"top":0}),
+              ]) for dest, alarm_data in asn_alarms_src
+            ], className="rounded-border-1 g-0", align="start", style={"padding": "0.5% 1.5%"})
+          ])
+    return return_component
