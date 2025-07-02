@@ -127,6 +127,7 @@ def generate_asn_cards(asn_data, anomalies):
 @timer
 def generate_graphs(data, src, dest, dt):
     def create_graphs(ipv6_filter):
+        print(data[data['ipv6'] == ipv6_filter])
         heatmap_figure = build_anomaly_heatmap(data[data['ipv6'] == ipv6_filter])
         path_prob_figure = build_position_based_heatmap(src, dest, dt, int(ipv6_filter), data)
         # path_prob_figure, cards = build_position_based_heatmap(src, dest, dt, int(ipv6_filter), data)
@@ -134,24 +135,24 @@ def generate_graphs(data, src, dest, dt):
             # html.H3("New (anomalous) ASNs and their frequency of appearance (24 hours):"),
             # cards,
             dbc.Col([
-                dcc.Graph(figure=heatmap_figure, id=f"asn-sankey-ipv{'6' if ipv6_filter else '4'}"),
+                dcc.Graph(figure=heatmap_figure, id=f"asn-sankey-ipv{'6' if ipv6_filter else '4'}", style={'height': '90%', "display": "flex", "flex-direction": "column"}),
                 html.P(
                     'This is a sample of the paths between the pair of sites. '
                     'The plot shows new (anomalous) ASNs framed in white. '
                     'The data is based on the alarms of type "ASN path anomalies".',
                     className="plot-subtitle"
                 ),
-            ], lg=12, xl=12, xxl=6, align="top", className="responsive-col"),
+            ], lg=12, xl=12, xxl=6, align="top", className="responsive-col", style={'height': '100%', "display": "flex", "flex-direction": "column"}),
             dbc.Col([
-                dcc.Graph(figure=path_prob_figure, id=f"asn-path-prob-ipv{'6' if ipv6_filter else '4'}"),
+                dcc.Graph(figure=path_prob_figure, id=f"asn-path-prob-ipv{'6' if ipv6_filter else '4'}", style={'height': '90%', "display": "flex", "flex-direction": "column"}),
                 html.P(
                     'The plot shows how often each ASN appears on a position, '
                     '(1 is 100% of time)',
                     className="plot-subtitle",
                     
                 )
-            ], lg=12, xl=12, xxl=6, align="top", className="responsive-col"),
-        ], className="graph-pair")
+            ], lg=12, xl=12, xxl=6, align="top", className="responsive-col align-items-stretch", style={'height': '100%', "display": "flex", "flex-direction": "column"}),
+        ], className="graph-pair align-items-stretch", style={'height': '800px'})
 
     
     # Extract all ASNs and their owners
@@ -174,23 +175,23 @@ def generate_graphs(data, src, dest, dt):
         figures = html.Div([
             dbc.Row([
                 dbc.Col([
-                    dcc.Graph(figure=heatmap_figure, id="asn-sankey-ipv4"),
+                    dcc.Graph(figure=heatmap_figure, id="asn-sankey-ipv4", style={'height': '90%', "display": "flex", "flex-direction": "column"}),
                     html.P(
                         'This is a sample of the paths between the pair of sites. '
                         'The plot shows new (anomalous) ASNs framed in white. '
                         'The data is based on the alarms of type "ASN path anomalies".',
                         className="plot-subtitle"
                     ),
-                ], lg=12, xl=12, xxl=6, align="top", className="responsive-col"),
+                ], lg=12, xl=12, xxl=6, align="top", className="responsive-col", style={'height': '100%', "display": "flex", "flex-direction": "column"}),
                 dbc.Col([
-                    dcc.Graph(figure=path_prob_figure, id="asn-path-prob-ipv4"),
+                    dcc.Graph(figure=path_prob_figure, id="asn-path-prob-ipv4", style={'height': '90%', "display": "flex", "flex-direction": "column"}),
                     html.P(
                         'The plot shows how often each ASN appears on a position, '
                         'where 1 is 100% of time.',
                         className="plot-subtitle"
                     )
-                ], lg=12, xl=12, xxl=6, align="top", className="responsive-col"),
-            ], className="graph-pair", justify="between"),
+                ], lg=12, xl=12, xxl=6, align="top", className="responsive-col h-100", style={'height': '100%', "display": "flex", "flex-direction": "column"}),
+            ], className="graph-pair", justify="between", style={'height': '800px'}),
         ], className="responsive-graphs")
 
     # Return the graphs and the ASN cards
@@ -255,7 +256,7 @@ def build_position_based_heatmap(src, dest, dt, ipv, data) -> go.Figure:
 
 
     fig.update_layout(
-        title=(f"{ipv} paths - position-based ASN frequency (24 hours)"),
+        title=(f"{ipv} paths - position-based ASN frequency (7 days stats)"),
         xaxis_title="Position on Path",
         yaxis_title="ASN",
         height=600
@@ -270,6 +271,8 @@ def build_anomaly_heatmap(subset_sample):
     ipv = 'IPv6' if ipv else 'IPv4'
 
     subset_sample['last_appearance_path'] = pd.to_datetime(subset_sample['last_appearance_path'], errors='coerce')
+    time_start = subset_sample['last_appearance_path'].min()
+    time_end = subset_sample['last_appearance_path'].max()
     subset_sample['last_appearance_short'] = subset_sample['last_appearance_path'].dt.strftime('%H:%M:%S %d-%b')
 
     print('Size of dataset:', len(subset_sample))
@@ -364,8 +367,8 @@ def build_anomaly_heatmap(subset_sample):
         vertical_spacing=0.1,
         row_heights=[0.1, 0.9],
         subplot_titles=[
-            "Normal Path (Based on 24-hour frequency observation)",
-            f"Time Period With Anomalies on Paths from {subset_sample['last_appearance_short'][0]} to {subset_sample['last_appearance_short'][len(subset_sample['last_appearance_short'])-1]}"
+            "Regular Path (Based on 7-day frequency observation)",
+            f"Sample of Regular vs Anomalious Paths from {time_start.strftime('%H:%M:%S %d-%b')} to {time_end.strftime('%H:%M:%S %d-%b')}"
         ]
     )
     fig.add_trace(usual_heatmap_trace, row=1, col=1)
@@ -406,7 +409,7 @@ def build_anomaly_heatmap(subset_sample):
                     )
 
     fig.update_layout(
-        title_text=f"{ipv} ASN Paths — Usual vs Anomaly Period",
+        title_text=f"{ipv} ASN Paths — Regular vs Anomaly Period",
         height=700,
         margin=dict(r=150),
         paper_bgcolor='#FFFFFF',
