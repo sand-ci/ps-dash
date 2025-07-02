@@ -150,14 +150,14 @@ def layout(**other_unknown_query_strings):
                 html.Br(),
                 dbc.Row([
                     dbc.Col([
-                        dcc.Dropdown(multi=True, id='paths-sites-dropdown', options=sitesDropdownData,
+                        dcc.Dropdown(multi=True, id='paths-sites-dropdown', options=sitesDropdownData, value=sitesDropdownData,
                                      placeholder="Search for a site"),
                     ]),
                 ]),
                 html.Br(),
                 dbc.Row([
                     dbc.Col([
-                        dcc.Dropdown(multi=True, id='paths-asn-dropdown', options=asnsDropdownData,
+                        dcc.Dropdown(multi=True, id='paths-asn-dropdown', options=asnsDropdownData, value=asnsDropdownData,
                                      placeholder="Search ASNs"),
                     ]),
                 ]),
@@ -222,10 +222,13 @@ def update_figures(n_clicks, asnStateValue, sitesStateValue):
     if n_clicks is not None:
         asn_anomalies = read_parquet_safe('parquet/frames/ASN_path_anomalies.parquet')
         dateFrom, dateTo = hp.defaultTimeRange(days=2)
-
+        print("sitesStateValue:", sitesStateValue)
         sitesState = sitesStateValue if sitesStateValue else []
         asnState = asnStateValue if asnStateValue else []
-
+        print("asnStateValue:", asnStateValue)
+        print("asnState:", asnState)
+        print("sitesStateValue:", sitesStateValue)
+        print("sitesState:", sitesState)
         parallel_cat_fig = get_parallel_cat_fig(sitesState, asnState)
         heatmap_fig = get_heatmap_fig(asn_anomalies, dateFrom, dateTo, selected_asns=asnState, selected_sites=sitesState)
         datatables = create_data_tables(sitesState, asnState, selected_keys)
@@ -244,16 +247,20 @@ def create_data_tables(sitesState, asnState, selected_keys):
     dateFrom, dateTo = hp.defaultTimeRange(days=2)
     frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
     dataTables = []
+    print("selected_keys:", selected_keys)
+    print('asnState:', asnState)
+    print('sitesState:', sitesState)
     for event in sorted(selected_keys):
+        
         df = pivotFrames[event]
-
         df = df[df['tag'].isin(sitesState)] if len(sitesState) > 0 else df
         if 'diff' in df.columns and len(asnState) > 0:
             df = df[df['diff'].isin(asnState)]
         elif 'asn' in df.columns and len(asnState) > 0:
             df = df[df['asn'].isin(asnState)]
         elif 'anomalies' in df.columns and len(asnState) > 0:
-            df = df[df['anomalies'].isin(asnState)]
+            # in df 'anomalies' column contains of list with integars while asnState is a list of strings
+            df = df[df['anomalies'].apply(lambda x: any(int(item) in x for item in asnState))]
 
         if 'src_site' in df.columns and 'dest_site' in df.columns and len(sitesState) > 0:
             df = df[(df['src_site'].isin(sitesState)) | (df['dest_site'].isin(sitesState))]
@@ -281,7 +288,7 @@ def generate_data_tables(selected_keys, asn_anomalies):
 
     if len(dataTables) == 0:
         dataTables.append(html.P(
-            f'There are no alarms related to the selected criteria',
+            f'There are no alarms related to the selected criteria {selected_keys}',
             style={"padding-left": "1.5%", "font-size": "14px"}
         ))
 
