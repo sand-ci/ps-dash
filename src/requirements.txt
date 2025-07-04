@@ -14,6 +14,6 @@ scikit_learn>=0.24.1
 urllib3>=1.26.10
 xgboost>=1.7.5
 pycountry>=20.7.3
-pyarrow
+blinker=1.7.0
 flask-caching
 psconfig-client
