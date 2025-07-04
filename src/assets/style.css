@@ -264,6 +264,7 @@ html {
 
 @media (min-width: 1700px) {
     .responsive-col {
+        height: 800px;
         flex: 0 0 48%;
         /* Each column takes 48% of the width */
         max-width: 48%;
@@ -272,11 +273,28 @@ html {
 
 @media (max-width: 1700px) {
     .responsive-col {
+        height: 800px;
         flex: 0 0 100%;
         /* Each column takes 100% of the width */
         max-width: 100%;
     }
 }
+/* Make sure both graphs fill their column height */
+.full-height-graph {
+  height: 90% !important;
+  display: flex;
+  flex-direction: column;
+}
+
+/* .graph-pair {
+  height: 800px;
+}
+
+@media (max-width: 1400px) {
+  .graph-pair {
+    height: 1600px;
+  }
+} */
 
 .badge {
     font-size: 1.75em;
@@ -757,3 +775,4 @@ count-box {
     padding: 0.25em 0.6em;
     color:#00245a
 }
+

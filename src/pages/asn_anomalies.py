@@ -1,7 +1,7 @@
 import dash
 
 from dash import html
-from dash import Dash, html, dcc, Input, Output, dcc, html, callback
+from dash import Dash, html, dcc, Input, Output, dcc, html, callback, MATCH, State
 import dash_bootstrap_components as dbc
 import urllib3
 
@@ -14,6 +14,7 @@ from plotly.subplots import make_subplots
 import model.queries as qrs
 from utils.utils import generate_graphs
 from utils.helpers import timer
+from flask import request
 
 urllib3.disable_warnings()
 
@@ -27,21 +28,18 @@ dash.register_page(
 )
 
 def layout(q=None, **other_unknown_query_strings):
+    print(q)
     return html.Div([
         dcc.Location(id='url', refresh=False),
         dcc.Store(id='alarm-data-store'),
         html.Div(id='asn-anomalies-content'),
         html.Div([
-            html.Div([
-                html.H1(id="page-title"),
-            ], className="l-h-3 p-2"),
             dcc.Loading(id='loading-spinner', type='default', children=[
                 html.Div(id='asn-anomalies-graphs')
             ], color='#00245A'),
         ], className="l-h-3 p-2 boxwithshadow page-cont ml-1 p-1")
     ], style={"padding": "0.5% 1.5%"})
-
-
+    
 @callback(
     Output('alarm-data-store', 'data'),
     Input('url', 'pathname')
@@ -57,43 +55,55 @@ def update_store(pathname):
 
 
 @callback(
-    [Output('asn-anomalies-graphs', 'children'),
-     Output('page-title', 'children'),
-     ],
+    Output('asn-anomalies-graphs', 'children'),
     Input('alarm-data-store', 'data')
 )
 def update_graphs_and_title(query_params):
     if not query_params:
-        return html.Div(), "ASN-path anomalies"
-
+        return html.Div()
+        
+    alarm_id = query_params.get('id')
     src = query_params.get('src_netsite')
     dest = query_params.get('dest_netsite')
     dt = query_params.get('dt')
-    
-    if not (src and dest):
-        return html.Div(), "ASN-path anomalies"
-     
-    data = qrs.query_ASN_anomalies(src, dest, dt)
-    if len(data) == 0:
+    if alarm_id:
+        site = query_params.get('site')
+        dt = query_params.get('date')
+        print("Alarm per site")
+        print(site, dt, id)
+        alarm = qrs.getAlarm(alarm_id)
+        print('URL query:', alarm)
+        print("HERE")
+        asn_alarms_src = alarm['source']['all_alarm_ids_src']
+        asn_alarms_dest = alarm['source']['all_alarm_ids_dest']
+        asn_alarms_src_component = asnAnomaliesGroupedAlarmVisualisation(alarm, site, asn_alarms_src, asn_alarms_dest, dt)
+        return asn_alarms_src_component
+    if src and dest and dt:
+        data = qrs.query_ASN_anomalies(src, dest, dt)
+        if len(data) == 0:
+            return html.Div([
+                html.H1(f"No data found for alarm {src} to {dest}"),
+                html.P('No data was found for the alarm selected. Please try another alarm.',
+                    className="plot-subtitle")
+            ], className="l-h-3 p-2 boxwithshadow page-cont ml-1 p-1"), "ASN-path anomalies"
+
+        anomalies = data['anomalies'].values[0]
+        title = html.H1(children=html.Div([
+            dbc.Row([
+                html.Span(f"{src} → {dest}", className="sites-anomalies-title")]),
+            dbc.Row([
+                html.Span("", style={"margin": "0 10px", "color": "#C50000", "fontSize": "40px"}),
+                html.Span(f"Anomalies: {anomalies}", className="anomalies-title", style={"color": "#910000"}),
+            ])     
+        ], style={"textAlign": "center", "marginBottom": "20px"})
+        )
+
+        figures = generate_graphs(data, src, dest, dt)
         return html.Div([
-            html.H1(f"No data found for alarm {src} to {dest}"),
-            html.P('No data was found for the alarm selected. Please try another alarm.',
-                   className="plot-subtitle")
-        ], className="l-h-3 p-2 boxwithshadow page-cont ml-1 p-1"), "ASN-path anomalies"
-
-    anomalies = data['anomalies'].values[0]
-    title = html.Div([
-        dbc.Row([
-            html.Span(f"{src} → {dest}", className="sites-anomalies-title")]),
-        dbc.Row([
-            html.Span("", style={"margin": "0 10px", "color": "#C50000", "fontSize": "20px"}),
-            html.Span(f"Anomalies: {anomalies}", className="anomalies-title", style={"color": "#910000"}),
-        ])     
-    ], style={"textAlign": "center", "marginBottom": "20px"})
-
-    figures = generate_graphs(data, src, dest, dt)
-
-    return figures, title
+            title,
+            figures])
+        
+    return html.Div('No data available for these parameters.')
 
 @timer
 def addNetworkOwners(asn_list):
@@ -127,32 +137,28 @@ def generate_asn_cards(asn_data, anomalies):
 @timer
 def generate_graphs(data, src, dest, dt):
     def create_graphs(ipv6_filter):
-        print(data[data['ipv6'] == ipv6_filter])
         heatmap_figure = build_anomaly_heatmap(data[data['ipv6'] == ipv6_filter])
         path_prob_figure = build_position_based_heatmap(src, dest, dt, int(ipv6_filter), data)
-        # path_prob_figure, cards = build_position_based_heatmap(src, dest, dt, int(ipv6_filter), data)
         return dbc.Row([
-            # html.H3("New (anomalous) ASNs and their frequency of appearance (24 hours):"),
-            # cards,
-            dbc.Col([
-                dcc.Graph(figure=heatmap_figure, id=f"asn-sankey-ipv{'6' if ipv6_filter else '4'}", style={'height': '90%', "display": "flex", "flex-direction": "column"}),
-                html.P(
-                    'This is a sample of the paths between the pair of sites. '
-                    'The plot shows new (anomalous) ASNs framed in white. '
-                    'The data is based on the alarms of type "ASN path anomalies".',
-                    className="plot-subtitle"
-                ),
-            ], lg=12, xl=12, xxl=6, align="top", className="responsive-col", style={'height': '100%', "display": "flex", "flex-direction": "column"}),
-            dbc.Col([
-                dcc.Graph(figure=path_prob_figure, id=f"asn-path-prob-ipv{'6' if ipv6_filter else '4'}", style={'height': '90%', "display": "flex", "flex-direction": "column"}),
-                html.P(
-                    'The plot shows how often each ASN appears on a position, '
-                    '(1 is 100% of time)',
-                    className="plot-subtitle",
-                    
-                )
-            ], lg=12, xl=12, xxl=6, align="top", className="responsive-col align-items-stretch", style={'height': '100%', "display": "flex", "flex-direction": "column"}),
-        ], className="graph-pair align-items-stretch", style={'height': '800px'})
+                dbc.Col([
+                    dcc.Graph(figure=heatmap_figure, id="asn-sankey-ipv4", className="full-height-graph"),
+                    html.P(
+                        'This is a sample of the paths between the pair of sites. '
+                        'The plot shows new (anomalous) ASNs framed in white. '
+                        'The data is based on the alarms of type "ASN path anomalies".',
+                        className="plot-subtitle"
+                    ),
+                ], xxl=6, className="responsive-col"),
+                dbc.Col([
+                    dcc.Graph(figure=path_prob_figure, id="asn-path-prob-ipv4", className="full-height-graph"),
+                    html.P(
+                        'The plot shows how often each ASN appears on a position, '
+                        'where 1 is 100% of time.',
+                        className="plot-subtitle"
+                    )
+                ], xxl=6, className="responsive-col"),
+            ])
+
 
     
     # Extract all ASNs and their owners
@@ -175,23 +181,25 @@ def generate_graphs(data, src, dest, dt):
         figures = html.Div([
             dbc.Row([
                 dbc.Col([
-                    dcc.Graph(figure=heatmap_figure, id="asn-sankey-ipv4", style={'height': '90%', "display": "flex", "flex-direction": "column"}),
+                    dcc.Graph(figure=heatmap_figure, id="asn-sankey-ipv4", className="full-height-graph"),
+
                     html.P(
                         'This is a sample of the paths between the pair of sites. '
                         'The plot shows new (anomalous) ASNs framed in white. '
                         'The data is based on the alarms of type "ASN path anomalies".',
                         className="plot-subtitle"
                     ),
-                ], lg=12, xl=12, xxl=6, align="top", className="responsive-col", style={'height': '100%', "display": "flex", "flex-direction": "column"}),
+                ], xxl=6, className="responsive-col"),
                 dbc.Col([
-                    dcc.Graph(figure=path_prob_figure, id="asn-path-prob-ipv4", style={'height': '90%', "display": "flex", "flex-direction": "column"}),
+                    dcc.Graph(figure=path_prob_figure, id="asn-path-prob-ipv4", className="full-height-graph"),
                     html.P(
                         'The plot shows how often each ASN appears on a position, '
                         'where 1 is 100% of time.',
                         className="plot-subtitle"
                     )
-                ], lg=12, xl=12, xxl=6, align="top", className="responsive-col h-100", style={'height': '100%', "display": "flex", "flex-direction": "column"}),
-            ], className="graph-pair", justify="between", style={'height': '800px'}),
+                ], xxl=6, className="responsive-col"),
+            ]),
+
         ], className="responsive-graphs")
 
     # Return the graphs and the ASN cards
@@ -418,3 +426,97 @@ def build_anomaly_heatmap(subset_sample):
         yaxis1=dict(showticklabels=False)
     )
     return fig
+
+@dash.callback(
+    [
+      Output({'type': 'asn-collapse', 'index': MATCH},  "is_open"),
+      Output({'type': 'asn-collapse', 'index': MATCH},  "children")
+    ],
+    [
+      Input({'type': 'asn-collapse-button', 'index': MATCH}, "n_clicks"),
+      Input({'type': 'asn-collapse-button', 'index': MATCH}, "value"),
+      Input('asn-alarm-store', 'data')
+    ],
+    [State({'type': 'asn-collapse', 'index': MATCH},  "is_open")],
+)
+def toggle_collapse(n, alarmData, alarm, is_open):
+    ctx = dash.callback_context
+    if ctx.triggered:
+        if n:
+            if is_open==False:
+                source = alarmData['src']
+                destination = alarmData['dest']
+                date = alarmData['date']
+                data = qrs.query_ASN_anomalies(source, destination, date)
+                visuals = generate_graphs(data, source, destination, date)
+                return [not is_open, visuals]
+            else:
+                return [not is_open, None]
+        return [is_open, None]
+    return dash.no_update
+
+@timer
+def asnAnomaliesGroupedAlarmVisualisation(alarm, site, sites_list_src, sites_list_dest, date):
+    alarms_dest = []
+    alarms_src = []
+    if len(sites_list_src) > 0:
+        alarms_src = [[src[0]+' to '+site, src[0], site, 'dest'] for src in sites_list_src]
+    if len(sites_list_dest) > 0:
+        alarms_dest = [[site+' to '+dest[0], site, dest[0], 'src'] for dest in sites_list_dest]
+    all_alarms = alarms_dest + alarms_src
+    return_component = html.Div([
+            dbc.Row([
+              dbc.Row([
+                dbc.Col([
+                  html.H3("ASN path anomalies", className="text-center bold p-3"),
+                  html.H5(date, className="text-center bold"),
+                ], lg=2, md=12, className="p-3"),
+                dbc.Col(
+                    html.Div([
+                        dbc.Row([
+                            dbc.Row([
+                                html.H1(f"Summary for {site}", className="text-left"),
+                                html.Hr(className="my-2")
+                            ]),
+                            dbc.Row([
+                                html.P([
+                                    f"{alarm['source']['total_paths_anomalies']} path change(s) were detected involving site {site}. "
+                                    f"New ASN(s) appeared on routes where {site} acted as a source {len(alarm['source']['as_source_to'])} time(s) "
+                                    f"and {len(alarm['source']['as_destination_from'])} time(s) as destination. "
+                                    "You can see visualisation for all the path anomalies below or explore paths for a given site and date here: ",
+                                    html.A("Explore paths", href=f"{request.host_url}/explore-paths", target="_blank")
+                                ], className='subtitle')
+                            ], justify="start"),
+                        ])
+                    ]),
+                    lg=10, md=12, className="p-3"
+                )
+              ], className="boxwithshadow alarm-header pair-details g-0", justify="between", align="center")                
+            ], style={"padding": "0.5% 1.5%"}, className='g-0'),
+          dcc.Store(id='asn-alarm-store', data=alarm),
+          dbc.Row([
+            html.Div(id=f'site-section-asn-anomalies-{a[0]}',
+              children=[
+                dbc.Button(
+                    a[0],
+                    value = {'src': a[1], 'dest': a[2], 'date': date},
+                    id={
+                        'type': 'asn-collapse-button',
+                        'index': f'asn-anomalies'+a[0]
+                    },
+                    className="collapse-button",
+                    color="white",
+                    n_clicks=0,
+                ),
+                dcc.Loading(
+                  dbc.Collapse(
+                      id={
+                          'type': 'asn-collapse',
+                          'index': f'asn-anomalies'+a[0]
+                      },
+                      is_open=False, className="collaps-container rounded-border-1"
+                ), color='#e9e9e9', style={"top":0}),
+              ]) for a in all_alarms
+            ], className="rounded-border-1 g-0", align="start", style={"padding": "0.5% 1.5%"})
+          ])
+    return return_component
