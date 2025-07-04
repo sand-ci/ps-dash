@@ -681,28 +681,27 @@ def generate_graphs(data, src, dest, dt):
         heatmap_figure = build_anomaly_heatmap(data[data['ipv6'] == ipv6_filter])
         path_prob_figure = build_position_based_heatmap(src, dest, dt, int(ipv6_filter), data)
         # path_prob_figure, cards = build_position_based_heatmap(src, dest, dt, int(ipv6_filter), data)
-        return dbc.Row([
-            # html.H3("New (anomalous) ASNs and their frequency of appearance (24 hours):"),
-            # cards,
-            dbc.Col([
-                dcc.Graph(figure=heatmap_figure, id=f"asn-sankey-ipv{'6' if ipv6_filter else '4'}"),
-                html.P(
-                    'This is a sample of the paths between the pair of sites. '
-                    'The plot shows new (anomalous) ASNs framed in white. '
-                    'The data is based on the alarms of type "ASN path anomalies".',
-                    className="plot-subtitle"
-                ),
-            ], lg=12, xl=12, xxl=6, align="top", className="responsive-col"),
-            dbc.Col([
-                dcc.Graph(figure=path_prob_figure, id=f"asn-path-prob-ipv{'6' if ipv6_filter else '4'}"),
-                html.P(
-                    'The plot shows how often each ASN appears on a position, '
-                    '(1 is 100% of time)',
-                    className="plot-subtitle",
-                    
-                )
-            ], lg=12, xl=12, xxl=6, align="top", className="responsive-col"),
-        ], className="graph-pair")
+        return html.Div([
+            dbc.Row([
+                dbc.Col([
+                    dcc.Graph(figure=heatmap_figure, id="asn-sankey-ipv4", className="full-height-graph"),
+                    html.P(
+                        'This is a sample of the paths between the pair of sites. '
+                        'The plot shows new (anomalous) ASNs framed in white. '
+                        'The data is based on the alarms of type "ASN path anomalies".',
+                        className="plot-subtitle"
+                    ),
+                ], xxl=6, className="responsive-col"),
+                dbc.Col([
+                    dcc.Graph(figure=path_prob_figure, id="asn-path-prob-ipv4", className="full-height-graph"),
+                    html.P(
+                        'The plot shows how often each ASN appears on a position, '
+                        'where 1 is 100% of time.',
+                        className="plot-subtitle"
+                    )
+                ], xxl=6, className="responsive-col"),
+            ]),
+        ], className="responsive-graphs")
 
     
     # Extract all ASNs and their owners
@@ -725,23 +724,23 @@ def generate_graphs(data, src, dest, dt):
         figures = html.Div([
             dbc.Row([
                 dbc.Col([
-                    dcc.Graph(figure=heatmap_figure, id="asn-sankey-ipv4"),
+                    dcc.Graph(figure=heatmap_figure, id="asn-sankey-ipv4", className="full-height-graph"),
                     html.P(
                         'This is a sample of the paths between the pair of sites. '
                         'The plot shows new (anomalous) ASNs framed in white. '
                         'The data is based on the alarms of type "ASN path anomalies".',
                         className="plot-subtitle"
                     ),
-                ], lg=12, xl=12, xxl=6, align="top", className="responsive-col"),
+                ], xxl=6, className="responsive-col"),
                 dbc.Col([
-                    dcc.Graph(figure=path_prob_figure, id="asn-path-prob-ipv4"),
+                    dcc.Graph(figure=path_prob_figure, id="asn-path-prob-ipv4", className="full-height-graph"),
                     html.P(
                         'The plot shows how often each ASN appears on a position, '
                         'where 1 is 100% of time.',
                         className="plot-subtitle"
                     )
-                ], lg=12, xl=12, xxl=6, align="top", className="responsive-col"),
-            ], className="graph-pair", justify="between"),
+                ], xxl=6, className="responsive-col"),
+            ]),
         ], className="responsive-graphs")
 
     # Return the graphs and the ASN cards
