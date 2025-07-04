@@ -466,7 +466,8 @@ def build_anomaly_heatmap(subset_sample):
 
     subset_sample['last_appearance_path'] = pd.to_datetime(subset_sample['last_appearance_path'], errors='coerce')
     subset_sample['last_appearance_short'] = subset_sample['last_appearance_path'].dt.strftime('%H:%M:%S %d-%b')
-
+    time_start = subset_sample['last_appearance_path'].min()
+    time_end = subset_sample['last_appearance_path'].max()
     print('Size of dataset:', len(subset_sample))
     max_length = subset_sample["path_len"].max()
 
@@ -559,8 +560,8 @@ def build_anomaly_heatmap(subset_sample):
         vertical_spacing=0.1,
         row_heights=[0.1, 0.9],
         subplot_titles=[
-            "Normal Path (Based on 24-hour frequency observation)",
-            f"Time Period With Anomalies on Paths from {subset_sample['last_appearance_short'][0]} to {subset_sample['last_appearance_short'][len(subset_sample['last_appearance_short'])-1]}"
+            "Regular Path (Based on 7-day frequency observation)",
+            f"Sample of Regular vs Anomalious Paths from {time_start.strftime('%H:%M:%S %d-%b')} to {time_end.strftime('%H:%M:%S %d-%b')}"
         ]
     )
     fig.add_trace(usual_heatmap_trace, row=1, col=1)
@@ -662,7 +663,7 @@ def build_position_based_heatmap(src, dest, dt, ipv, data) -> go.Figure:
 
 
     fig.update_layout(
-        title=(f"{ipv} paths - position-based ASN frequency (24 hours)"),
+        title=(f"{ipv} paths - position-based ASN frequency (7 days)"),
         xaxis_title="Position on Path",
         yaxis_title="ASN",
         height=600
@@ -703,6 +704,7 @@ def generate_graphs(data, src, dest, dt):
             ]),
         ], className="responsive-graphs")
 
+
     
     # Extract all ASNs and their owners
     asn_list = list(set([asn for sublist in data['repaired_asn_path'] for asn in sublist]))
@@ -742,6 +744,7 @@ def generate_graphs(data, src, dest, dt):
                 ], xxl=6, className="responsive-col"),
             ]),
         ], className="responsive-graphs")
+
 
     # Return the graphs and the ASN cards
     return html.Div([
