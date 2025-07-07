@@ -997,7 +997,7 @@ def update_dynamic_content(site, alarm_clicks, path_clicks, hosts_clicks, visibi
                         return html.Div([
                                     html.H1(f"No data found for alarm {src} to {dest}"),
                                     html.P('No data was found for the alarm selected. Please try another alarm.',
-                                        className="plot-subtitle")
+                                        className="plot-sub")
                                 ], className="l-h-3 p-2 boxwithshadow page-cont ml-1 p-1"), event, data.to_dict(), visibility
                     return html.Div([
                                 html.Div([

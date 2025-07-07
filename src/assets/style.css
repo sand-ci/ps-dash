@@ -16,7 +16,7 @@ html {
 }
 
 .subtitle {
-    font-size: 1.5em !important;
+    font-size: 1.5rem !important;
     margin-bottom: 1rem;
 }
 
@@ -179,7 +179,7 @@ html {
 }
 
 .cls-site-map {
-    height: 540px;
+    min-height: 540px;
     /* padding: 20px;
     border: 1px solid rgba(0, 0, 0, .125);
     border-radius: 1rem */
@@ -232,8 +232,8 @@ html {
     color: rgb(9, 9, 9);
 }
 
-.plot-subtitle {
-    font-size: 1.3em !important;
+.plot-sub {
+    font-size: 1.3rem !important;
     margin: 1rem;
     text-align: center;
     line-height: 1.2em;

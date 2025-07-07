@@ -84,7 +84,7 @@ def update_graphs_and_title(query_params):
             return html.Div([
                 html.H1(f"No data found for alarm {src} to {dest}"),
                 html.P('No data was found for the alarm selected. Please try another alarm.',
-                    className="plot-subtitle")
+                    className="plot-sub")
             ], className="l-h-3 p-2 boxwithshadow page-cont ml-1 p-1"), "ASN-path anomalies"
 
         anomalies = data['anomalies'].values[0]
@@ -121,8 +121,8 @@ def generate_asn_cards(asn_data, anomalies):
     cards = [
         dbc.Card(
             dbc.CardBody([
-                html.H2(f"AS {asn['asn']}", className="card-title plot-subtitle text-left"),
-                html.P(f"{asn['owner']}", className="card-text plot-subtitle text-left"),
+                html.H2(f"AS {asn['asn']}", className="card-title plot-sub text-left"),
+                html.P(f"{asn['owner']}", className="card-text plot-sub text-left"),
             ]),
             className=f"mb-3 shadow-sm h-100 {'border-danger' if int(asn['asn']) in anomalies else 'border-secondary'}",
             style={"width": "100%", "overflow": "hidden", "display": "flex", "flexDirection": "column", "justifyContent": "space-between"}
@@ -146,7 +146,7 @@ def generate_graphs(data, src, dest, dt):
                         'This is a sample of the paths between the pair of sites. '
                         'The plot shows new (anomalous) ASNs framed in white. '
                         'The data is based on the alarms of type "ASN path anomalies".',
-                        className="plot-subtitle"
+                        className="plot-sub"
                     ),
                 ], xxl=6, className="responsive-col"),
                 dbc.Col([
@@ -154,7 +154,7 @@ def generate_graphs(data, src, dest, dt):
                     html.P(
                         'The plot shows how often each ASN appears on a position, '
                         'where 1 is 100% of time.',
-                        className="plot-subtitle"
+                        className="plot-sub"
                     )
                 ], xxl=6, className="responsive-col"),
             ])
@@ -187,7 +187,7 @@ def generate_graphs(data, src, dest, dt):
                         'This is a sample of the paths between the pair of sites. '
                         'The plot shows new (anomalous) ASNs framed in white. '
                         'The data is based on the alarms of type "ASN path anomalies".',
-                        className="plot-subtitle"
+                        className="plot-sub"
                     ),
                 ], xxl=6, className="responsive-col"),
                 dbc.Col([
@@ -195,7 +195,7 @@ def generate_graphs(data, src, dest, dt):
                     html.P(
                         'The plot shows how often each ASN appears on a position, '
                         'where 1 is 100% of time.',
-                        className="plot-subtitle"
+                        className="plot-sub"
                     )
                 ], xxl=6, className="responsive-col"),
             ]),
