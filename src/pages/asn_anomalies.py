@@ -15,6 +15,7 @@ import model.queries as qrs
 from utils.utils import generate_graphs
 from utils.helpers import timer
 from flask import request
+from collections import Counter
 
 urllib3.disable_warnings()
 
@@ -460,10 +461,14 @@ def asnAnomaliesGroupedAlarmVisualisation(alarm, site, sites_list_src, sites_lis
     alarms_dest = []
     alarms_src = []
     if len(sites_list_src) > 0:
-        alarms_src = [[src[0]+' to '+site, src[0], site, 'dest'] for src in sites_list_src]
+        alarms_src = [[src[0]+' to '+site+f' ||| Anomalies: {src[2]}', src[0], site, 'dest'] for src in sites_list_src]
     if len(sites_list_dest) > 0:
-        alarms_dest = [[site+' to '+dest[0], site, dest[0], 'src'] for dest in sites_list_dest]
+        alarms_dest = [[site+' to '+dest[0]+f' ||| Anomalies: {dest[2]}', site, dest[0], 'src'] for dest in sites_list_dest]
     all_alarms = alarms_dest + alarms_src
+    src_alarms = alarm['source']['all_alarm_ids_dest']
+    dest_alarms = alarm['source']['all_alarm_ids_src']
+    asn_counts_src = dict(Counter(asn for _, _, asn_list in src_alarms for asn in asn_list))
+    asn_counts_dest = dict(Counter(asn for _, _, asn_list in dest_alarms for asn in asn_list))
     return_component = html.Div([
             dbc.Row([
               dbc.Row([
@@ -481,8 +486,8 @@ def asnAnomaliesGroupedAlarmVisualisation(alarm, site, sites_list_src, sites_lis
                             dbc.Row([
                                 html.P([
                                     f"{alarm['source']['total_paths_anomalies']} path change(s) were detected involving site {site}. "
-                                    f"New ASN(s) appeared on routes where {site} acted as a source {len(alarm['source']['as_source_to'])} time(s) "
-                                    f"and {len(alarm['source']['as_destination_from'])} time(s) as destination. "
+                                    f"New ASN(s) appeared on routes where {site} acted as a source {len(alarm['source']['as_source_to'])} time(s) with the next anomalies and their frequencies: {asn_counts_src},"
+                                    f"and {len(alarm['source']['as_destination_from'])} time(s) as destination with {asn_counts_dest}. "
                                     "You can see visualisation for all the path anomalies below or explore paths for a given site and date here: ",
                                     html.A("Explore paths", href=f"{request.host_url}/explore-paths", target="_blank")
                                 ], className='subtitle')
