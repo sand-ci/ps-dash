@@ -366,7 +366,8 @@ def update_output(n_clicks, start_date, end_date, sites, all, events, allevents,
 
         dataTables = []
         events = list(pivotFrames.keys()) if not eventsState or events else eventsState
-
+        print("EVENTS")
+        print(events)
         for event in sorted(events):
             df = pivotFrames[event]
             if 'site' in df.columns:
@@ -491,9 +492,9 @@ def generate_tables(frame, unpacked, event, alarmsInst):
     # Replace NaN or empty values with valid defaults
     dfr = dfr.fillna("")  # Replace NaN with an empty string for all columns
     dfr = dfr.astype({col: str for col in dfr.select_dtypes(include=['object', 'category']).columns})  # Ensure all object columns are strings
-    if event == 'hosts not found':
-                    if 'hosts' in dfr.columns:
-                        dfr.drop(columns=['hosts'], inplace=True)
+    drop_columns = {"ASN path anomalies per site": ['sites'], 'unresolvable host': ['alarm_link']}
+    if event in drop_columns:
+        dfr.drop(columns=drop_columns[event], inplace=True)
     dfr.sort_values('to', ascending=False, inplace=True)
     print('Home page,', event, "Number of alarms:", len(dfr))
     try:

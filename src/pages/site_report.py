@@ -25,7 +25,7 @@ from utils.helpers import timer
 import model.queries as qrs
 from utils.parquet import Parquet
 from utils.utils import defineStatus, explainStatuses, create_heatmap, createDictionaryWithHistoricalData, generate_graphs, extractAlarm, getSitePairs, getRawDataFromES
-from utils.components import siteMeasurements, pairDetails, loss_delay_kibana, bandwidth_increased_decreased, throughput_graph_components
+from utils.components import siteMeasurements, pairDetails, loss_delay_kibana, bandwidth_increased_decreased, throughput_graph_components, asnAnomalesPerSiteVisualisation
 import functools
 from collections import Counter
 
@@ -89,13 +89,16 @@ def layout(q=None, **other_unknown_query_strings):
     
     
     
-    site_alarms = pd.DataFrame(columns=["to", "alarm group", "alarm name", "hosts", "IP version", "Details"])
+    site_alarms = pd.DataFrame(columns=["to", "alarm group", "alarm name", "hosts", "IP version", "Details", 'cnt'])
     site_alarms_num = 0
     subcategories = qrs.getSubcategories()
-    if 'path changed between sites' in frames:
-        frames.pop("path changed between sites", None)
-    if 'path changed' in frames:
-        frames.pop("path changed", None)
+    keys_to_remove = [
+                        'path changed between sites',
+                        'path changed',
+                        'ASN path anomalies'
+                    ]
+    for key in keys_to_remove:
+        frames.pop(key, None)
 
     # prepare table with alarms
     for frame in frames:
@@ -148,16 +151,14 @@ def layout(q=None, **other_unknown_query_strings):
                     'IP version': alarm.get('IP version', None),  # Added IP version if available
                     'hosts': alarm[add_hosts] if add_hosts in alarm else None,
                     'Details': alarm.get('alarm_link', None),  # Added Details if available
+                    'cnt': alarm.get('total_paths_anomalies', 1)
                 }
-                dest_site_fields = ['dest_site', 'dest_netsite', 'sites']  # ordered by priority if multiple exist
-                destination_sites = None
-
+                dest_site_fields = ['sites', 'tags', 'tag', 'site', 'cannotBeReachedFrom', 'dest_netsite', 'dest_site', 'src_site', 'src_netsite', 'as_source_to', 'as_destination_from']  # ordered by priority if multiple exist
+                destination_sites = []
                 for field in dest_site_fields:
                     if field in alarm:
-                        destination_sites = html.Div([html.Div(item) for item in alarm[field].split('\n')])
-                        break
-
-                new_row['Destination Site(s)'] = destination_sites
+                        destination_sites = destination_sites + [html.Div(item) for item in alarm[field].split('\n')]
+                new_row['Involved Site(s)'] = destination_sites
                 site_alarms = pd.concat([site_alarms, pd.DataFrame([new_row])], ignore_index=True)
 
     print(f"Total alarms collected: {site_alarms_num}")
@@ -582,7 +583,7 @@ def full_range_dates_df(all_dates, column, df):
     """
     df['to'] = pd.to_datetime(df['to']).dt.normalize()
     all_dates = pd.to_datetime(all_dates).normalize()
-    df= df.groupby(['to', f"{column}"]).size().reset_index(name='count')
+    df= df.groupby(['to', column])['cnt'].sum().reset_index(name='count')
     df.rename(columns={'to':'day'}, inplace=True)
     unique_categories = df[column].unique()
 
@@ -720,7 +721,7 @@ def create_status_chart_explained(graphData, fromDay, toDay, full_range_dates):
     # --- BOTTOM PLOT (ALARMS) ---
     alarm_colors = {
         'bandwidth decreased from multiple': ('darkred','critical'),
-        'ASN path anomalies': ('goldenrod', 'significant'),
+        'ASN path anomalies per site': ('goldenrod', 'significant'),
         'firewall issue': ('grey', 'moderate'),
         'source cannot reach any': ('grey', 'moderate'),
         'complete packet loss': ('grey', 'moderate')
@@ -819,7 +820,6 @@ def update_alarms_table(date_filter, ip_filter, group_filter, type_filter, btn_t
     if len(df) > 0:
         ctx = dash.callback_context
         print(f"ctx.triggered: {ctx.triggered}")
-        [{'prop_id': 'filter-date.value', 'value': ['04 Mar 2025 (~04:08)']}]
         date_options = [{'label': date, 'value': date} for date in df['to'].unique()]
         ip_options = [{'label': ip.lower(), 'value': ip} for ip in sorted(df['IP version'].dropna().unique())]
         group_options = [{'label': group, 'value': group} for group in sorted(df['alarm group'].unique())]
@@ -844,7 +844,7 @@ def update_alarms_table(date_filter, ip_filter, group_filter, type_filter, btn_t
         df = df.sort_values(by='to', ascending=False)
         df.rename(columns={'to': "Date", 'alarm group':'Category', 'alarm name': 'Alarm', 'hosts': 'Hosts'}, inplace=True)
         element = dbc.Table.from_dataframe(
-                                            df,
+                                            df[['Date', 'Category', 'Alarm', 'Involved Site(s)', 'Details', 'Hosts', 'IP version']],
                                             id='alarms-site-table',
                                             striped=True,
                                             bordered=True,
@@ -916,6 +916,7 @@ def toggle_modal(n1, n2, is_open):
         Input('site', 'data'),
         Input({'type': 'alarm-link-btn', 'index': ALL}, 'n_clicks'),
         Input({'type': 'path-anomaly-btn', 'index': ALL}, 'n_clicks'),
+        Input({'type': 'path-anomaly-btn-site', 'index': ALL}, 'n_clicks'),
         Input({'type': 'hosts-not-found-btn', 'index': ALL}, 'n_clicks'),
         Input("alarm-content-section", "style")
     ],
@@ -927,13 +928,13 @@ def toggle_modal(n1, n2, is_open):
     ],
     prevent_initial_call=True
 )
-def update_dynamic_content(site, alarm_clicks, path_clicks, hosts_clicks, visibility, current_children, fromDay, toDay, now):
+def update_dynamic_content(site, alarm_clicks, path_clicks, path_clicks_2, hosts_clicks, visibility, current_children, fromDay, toDay, now):
     """
     This function extracts the visualisation of the chosen alarm and shows it under the table with alarms.
     """
     print("Dynamic content callback")
     print(f"alarm_clicks: {alarm_clicks}")
-    button_clicks = {'alarm-link-btn': alarm_clicks, 'path-anomaly-btn': path_clicks, 'hosts-not-found-btn': hosts_clicks}
+    button_clicks = {'alarm-link-btn': alarm_clicks, 'path-anomaly-btn': path_clicks, 'path-anomaly-btn-site': path_clicks_2, 'hosts-not-found-btn': hosts_clicks}
     ctx = dash.callback_context
     if not ctx.triggered:
         return dash.no_update, dash.no_update, {}, visibility
@@ -943,7 +944,8 @@ def update_dynamic_content(site, alarm_clicks, path_clicks, hosts_clicks, visibi
 
     
     button_content_mapping = {'hosts-not-found-btn': "hosts not found",
-                              'path-anomaly-btn': "ASN path anomalies"
+                            #   'path-anomaly-btn': "ASN path anomalies",
+                              'path-anomaly-btn-site': "ASN path anomalies per site"
                               }
     if len(ctx.triggered) == 1:
         print(f"ctx.triggered: {ctx.triggered}")
@@ -978,35 +980,24 @@ def update_dynamic_content(site, alarm_clicks, path_clicks, hosts_clicks, visibi
                     return dcc.Graph(figure=fig, className="p-3"), event, alarm, visibility
 
                 #ASN anomalies visualisation
-                if event == 'ASN path anomalies':
-                    src, dest, dt = button_id['index'].split('*')
-                    # print("==========================")
-                    # print(dt)
-                    data = qrs.query_ASN_anomalies(src, dest, dt)
-                    if len(data) > 0:
-                            anomalies = data['anomalies'].values[0]
-                            title = html.Div([
-                                html.Span(f"{src} → {dest}", className="sites-anomalies-title"),
-                                html.Span(" ||| ", style={"margin": "0 10px", "color": "#6c757d", "fontSize": "20px"}),
-                                html.Span(f"Anomalies: {anomalies}", className="anomalies-title"),
-                            ], style={"textAlign": "center", "marginBottom": "20px"})
-
-                            figures = generate_graphs(data, src, dest, dt)
-                            
+                if 'ASN path anomalies' in event:
+                    print(event)
+                    print(button_id['index'])
+                    params = {'id': None, 'src': None, 'dest': None, 'dt': None, 'site': None, 'date': None}
+                    if event == "ASN path anomalies":
+                        src, dest, dt = button_id['index'].split('*')
+                        params['src'] = src
+                        params['dest'] = dest
+                        params['dt'] = dt
                     else:
-                        return html.Div([
-                                    html.H1(f"No data found for alarm {src} to {dest}"),
-                                    html.P('No data was found for the alarm selected. Please try another alarm.',
-                                        className="plot-sub")
-                                ], className="l-h-3 p-2 boxwithshadow page-cont ml-1 p-1"), event, data.to_dict(), visibility
-                    return html.Div([
-                                html.Div([
-                                    html.H1(children=title),
-                                ], className="l-h-3 p-2"),
-                                dcc.Loading(id='loading-spinner-2', type='default', children=[
-                                    html.Div(children=figures)
-                                ], color='#00245A'),
-                            ], className=""), event, data.to_dict(), visibility
+                        site, dt, aId = button_id['index'].split('*')
+                        params['site'] = site
+                        params['date'] = dt
+                        params['id'] = aId
+                    print("PARAMS")
+                    print(params)
+                    figures, data = asnAnomalesPerSiteVisualisation(params)
+                    return figures, event, data, visibility
                 
                 #other alarms visualisations
                 else:
@@ -1115,6 +1106,7 @@ dash.clientside_callback(
     [
         Input({'type': 'alarm-link-btn', 'index': ALL}, 'n_clicks'),
         Input({'type': 'path-anomaly-btn', 'index': ALL}, 'n_clicks'),
+        Input({'type': 'path-anomaly-btn-site', 'index': ALL}, 'n_clicks'),
         Input({'type': 'hosts-not-found-btn', 'index': ALL}, 'n_clicks'),
         Input('view-measurements-btn', 'n_clicks'),
     ],
@@ -1289,3 +1281,30 @@ def generate_summary(dataFrom, dataTo, alarms):
         ])
     ])
     return summary
+
+@dash.callback(
+    [
+      Output({'type': 'asn-collapse-site', 'index': MATCH},  "is_open"),
+      Output({'type': 'asn-collapse-site', 'index': MATCH},  "children")
+    ],
+    [
+      Input({'type': 'asn-collapse-button-site', 'index': MATCH}, "n_clicks"),
+      Input({'type': 'asn-collapse-button-site', 'index': MATCH}, "value")
+    ],
+    [State({'type': 'asn-collapse-site', 'index': MATCH},  "is_open")],
+)
+def toggle_collapse(n, alarmData, is_open):
+    ctx = dash.callback_context
+    if ctx.triggered:
+        if n:
+            if is_open==False:
+                source = alarmData['src']
+                destination = alarmData['dest']
+                date = alarmData['date']
+                data = qrs.query_ASN_anomalies(source, destination, date)
+                visuals = generate_graphs(data, source, destination, date)
+                return [not is_open, visuals]
+            else:
+                return [not is_open, None]
+        return [is_open, None]
+    return dash.no_update

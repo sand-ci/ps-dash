@@ -207,6 +207,9 @@ class ParquetUpdater(object):
         self.groupAlarms(pivotFrames)
 
         for event,df in pivotFrames.items():
+            if event == 'ASN path anomalies per site':
+                print(df.info())
+                # df['all_alarm_ids_src'] = df['all_alarm_ids_src'].eval()
             filename = self.alarms.eventCF(event)
             fdf = frames[event]
             if len(fdf)>0:

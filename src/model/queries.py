@@ -235,6 +235,7 @@ def queryAlarms(dateFrom, dateTo):
                     'high packet loss on multiple links',
                     'firewall issue',
                     'ASN path anomalies',
+                    'ASN path anomalies per site',
                     'destination cannot be reached from any',
                     'destination cannot be reached from multiple',
                     'source cannot reach any',
@@ -414,7 +415,7 @@ def getSubcategories():
                        	 'unresolvable host', 'hosts not found'],
 
   'Network': 		 ['bandwidth decreased from/to multiple sites',
-                          'ASN path anomalies'],
+                          'ASN path anomalies','ASN path anomalies per site'],
 
   'Other': 		 ['bandwidth increased from/to multiple sites', 'bandwidth increased', 'bandwidth decreased',
                           'high packet loss', 'high packet loss on multiple links']
@@ -707,3 +708,80 @@ def getSiteMetadata(site, date_from=None, date_to=None, index='ps_meta'):
     except Exception as e:
         print(f"Error fetching metadata: {str(e)}")
         return None
+      
+def queryUnreachableDestination(alarm_name, site, dateTo):
+  # period = hp.GetTimeRanges(dateFrom, dateTo)
+  # print(period)
+  q = {
+  "query": {
+    "bool": {
+      "filter": [
+        {
+          "bool": {
+            "must": [
+              {
+                "term": {
+                  "event": {
+                    "value": alarm_name
+                  }
+                }
+              },
+              {
+                "term": {
+                  "tags": {
+                    "value": site
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "range": {
+            "created_at": {
+              "format": "strict_date_optional_time",
+              "gte": dateTo,
+              "lte": dateTo
+            }
+          }
+        }
+      ]
+      
+    }
+  }
+}
+  # print(str(q).replace("\'", "\""))
+  try:
+    result = scan(client=hp.es, index='aaas_alarms', query=q)
+    data = {}
+
+    for item in result:
+        event = item['_source']['event']
+        temp = []
+        if event in data.keys():
+            temp = data[event]
+
+        if 'source' in item['_source'].keys():
+          desc = item['_source']['source']
+          if 'tags' in item['_source'].keys():
+            tags = item['_source']['tags']
+            desc['tag'] = tags
+
+          if 'to' not in desc.keys():
+            desc['to'] = pd.to_datetime(item['_source']['created_at'], unit='ms', utc=True)
+
+          if 'from' in desc.keys() and 'to' in desc.keys():
+            desc['from'] = desc['from'].replace('T', ' ')
+            desc['to'] = desc['to'].replace('T', ' ')
+          
+          if 'to_date' in desc.keys():
+             desc['to'] = desc['to_date'].split('T')[0]
+          
+          temp.append(desc)
+
+          data[event] = temp
+
+    return data
+  except Exception as e:
+    print('Exception:', e)
+    print(traceback.format_exc())

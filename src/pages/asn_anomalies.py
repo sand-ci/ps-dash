@@ -13,6 +13,7 @@ import dash_bootstrap_components as dbc
 from plotly.subplots import make_subplots
 import model.queries as qrs
 from utils.utils import generate_graphs
+from utils.components import asnAnomalesPerSiteVisualisation
 from utils.helpers import timer
 from flask import request
 from collections import Counter
@@ -62,49 +63,14 @@ def update_store(pathname):
 def update_graphs_and_title(query_params):
     if not query_params:
         return html.Div()
-        
     alarm_id = query_params.get('id')
     src = query_params.get('src_netsite')
     dest = query_params.get('dest_netsite')
     dt = query_params.get('dt')
-    if alarm_id:
-        site = query_params.get('site')
-        dt = query_params.get('date')
-        print("Alarm per site")
-        print(site, dt, id)
-        alarm = qrs.getAlarm(alarm_id)
-        print('URL query:', alarm)
-        print("HERE")
-        asn_alarms_src = alarm['source']['all_alarm_ids_src']
-        asn_alarms_dest = alarm['source']['all_alarm_ids_dest']
-        asn_alarms_src_component = asnAnomaliesGroupedAlarmVisualisation(alarm, site, asn_alarms_src, asn_alarms_dest, dt)
-        return asn_alarms_src_component
-    if src and dest and dt:
-        data = qrs.query_ASN_anomalies(src, dest, dt)
-        if len(data) == 0:
-            return html.Div([
-                html.H1(f"No data found for alarm {src} to {dest}"),
-                html.P('No data was found for the alarm selected. Please try another alarm.',
-                    className="plot-sub")
-            ], className="l-h-3 p-2 boxwithshadow page-cont ml-1 p-1"), "ASN-path anomalies"
-
-        anomalies = data['anomalies'].values[0]
-        title = html.H1(children=html.Div([
-            dbc.Row([
-                html.Span(f"{src} → {dest}", className="sites-anomalies-title")]),
-            dbc.Row([
-                html.Span("", style={"margin": "0 10px", "color": "#C50000", "fontSize": "40px"}),
-                html.Span(f"Anomalies: {anomalies}", className="anomalies-title", style={"color": "#910000"}),
-            ])     
-        ], style={"textAlign": "center", "marginBottom": "20px"})
-        )
-
-        figures = generate_graphs(data, src, dest, dt)
-        return html.Div([
-            title,
-            figures])
-        
-    return html.Div('No data available for these parameters.')
+    site = query_params.get('site')
+    date = query_params.get('date')
+    params = {'id': alarm_id, 'src': src, 'dest': dest, 'dt': dt, 'site': site, 'date':date}
+    return asnAnomalesPerSiteVisualisation(params)[0] # return only figures
 
 @timer
 def addNetworkOwners(asn_list):
@@ -133,84 +99,6 @@ def generate_asn_cards(asn_data, anomalies):
 
     # Wrap cards in a responsive grid with align-items-stretch
     return dbc.Row([dbc.Col(card, lg=2, md=2, sm=3, className="d-flex") for card in cards], className="g-3 align-items-stretch")
-
-
-@timer
-def generate_graphs(data, src, dest, dt):
-    def create_graphs(ipv6_filter):
-        heatmap_figure = build_anomaly_heatmap(data[data['ipv6'] == ipv6_filter])
-        path_prob_figure = build_position_based_heatmap(src, dest, dt, int(ipv6_filter), data)
-        return dbc.Row([
-                dbc.Col([
-                    dcc.Graph(figure=heatmap_figure, id="asn-sankey-ipv4", className="full-height-graph"),
-                    html.P(
-                        'This is a sample of the paths between the pair of sites. '
-                        'The plot shows new (anomalous) ASNs framed in white. '
-                        'The data is based on the alarms of type "ASN path anomalies".',
-                        className="plot-sub"
-                    ),
-                ], xxl=6, className="responsive-col"),
-                dbc.Col([
-                    dcc.Graph(figure=path_prob_figure, id="asn-path-prob-ipv4", className="full-height-graph"),
-                    html.P(
-                        'The plot shows how often each ASN appears on a position, '
-                        'where 1 is 100% of time.',
-                        className="plot-sub"
-                    )
-                ], xxl=6, className="responsive-col"),
-            ])
-
-
-    
-    # Extract all ASNs and their owners
-    asn_list = list(set([asn for sublist in data['repaired_asn_path'] for asn in sublist]))
-    asn_owners = addNetworkOwners(asn_list)
-
-    # Create ASN cards
-    anomalies = data['anomalies'].explode().unique()
-    asn_cards = generate_asn_cards(asn_owners, anomalies)
-    # anomalies_cards = generate_asn_anomalies_cards(data)
-    if len(data['ipv6'].unique()) == 2:
-        figures = html.Div([
-            create_graphs(False),  # IPv4
-            create_graphs(True),   # IPv6
-        ], className="responsive-graphs")
-    else:
-
-        heatmap_figure = build_anomaly_heatmap(data)
-        path_prob_figure = build_position_based_heatmap(src, dest, dt, -1, data)
-        figures = html.Div([
-            dbc.Row([
-                dbc.Col([
-                    dcc.Graph(figure=heatmap_figure, id="asn-sankey-ipv4", className="full-height-graph"),
-
-                    html.P(
-                        'This is a sample of the paths between the pair of sites. '
-                        'The plot shows new (anomalous) ASNs framed in white. '
-                        'The data is based on the alarms of type "ASN path anomalies".',
-                        className="plot-sub"
-                    ),
-                ], xxl=6, className="responsive-col"),
-                dbc.Col([
-                    dcc.Graph(figure=path_prob_figure, id="asn-path-prob-ipv4", className="full-height-graph"),
-                    html.P(
-                        'The plot shows how often each ASN appears on a position, '
-                        'where 1 is 100% of time.',
-                        className="plot-sub"
-                    )
-                ], xxl=6, className="responsive-col"),
-            ]),
-
-        ], className="responsive-graphs")
-
-    # Return the graphs and the ASN cards
-    return html.Div([
-        figures,
-        html.Div([
-            html.H3("Network Owners"),
-            asn_cards
-        ], className="asn-owner-section")
-    ])
 
 
 @timer
@@ -327,8 +215,6 @@ def build_anomaly_heatmap(subset_sample):
     index_to_color = {i: color_list[i] for i in range(len(color_list))}
     index_df = pivot_df.map(lambda x: rid_to_index.get(x, 0))
     best_asns_colors = [rid_to_index.get(asn, 0) for asn in best_asns]
-
-    
     
     best_asns_str = [str(asn) for asn in best_asns]
     positions = hm["positions"]
@@ -435,12 +321,11 @@ def build_anomaly_heatmap(subset_sample):
     ],
     [
       Input({'type': 'asn-collapse-button', 'index': MATCH}, "n_clicks"),
-      Input({'type': 'asn-collapse-button', 'index': MATCH}, "value"),
-      Input('asn-alarm-store', 'data')
+      Input({'type': 'asn-collapse-button', 'index': MATCH}, "value")
     ],
     [State({'type': 'asn-collapse', 'index': MATCH},  "is_open")],
 )
-def toggle_collapse(n, alarmData, alarm, is_open):
+def toggle_collapse(n, alarmData, is_open):
     ctx = dash.callback_context
     if ctx.triggered:
         if n:
@@ -455,73 +340,3 @@ def toggle_collapse(n, alarmData, alarm, is_open):
                 return [not is_open, None]
         return [is_open, None]
     return dash.no_update
-
-@timer
-def asnAnomaliesGroupedAlarmVisualisation(alarm, site, sites_list_src, sites_list_dest, date):
-    alarms_dest = []
-    alarms_src = []
-    if len(sites_list_src) > 0:
-        alarms_src = [[src[0]+' to '+site+f' ||| Anomalies: {src[2]}', src[0], site, 'dest'] for src in sites_list_src]
-    if len(sites_list_dest) > 0:
-        alarms_dest = [[site+' to '+dest[0]+f' ||| Anomalies: {dest[2]}', site, dest[0], 'src'] for dest in sites_list_dest]
-    all_alarms = alarms_dest + alarms_src
-    src_alarms = alarm['source']['all_alarm_ids_dest']
-    dest_alarms = alarm['source']['all_alarm_ids_src']
-    asn_counts_src = dict(Counter(asn for _, _, asn_list in src_alarms for asn in asn_list))
-    asn_counts_dest = dict(Counter(asn for _, _, asn_list in dest_alarms for asn in asn_list))
-    return_component = html.Div([
-            dbc.Row([
-              dbc.Row([
-                dbc.Col([
-                  html.H3("ASN path anomalies", className="text-center bold p-3"),
-                  html.H5(date, className="text-center bold"),
-                ], lg=2, md=12, className="p-3"),
-                dbc.Col(
-                    html.Div([
-                        dbc.Row([
-                            dbc.Row([
-                                html.H1(f"Summary for {site}", className="text-left"),
-                                html.Hr(className="my-2")
-                            ]),
-                            dbc.Row([
-                                html.P([
-                                    f"{alarm['source']['total_paths_anomalies']} path change(s) were detected involving site {site}. "
-                                    f"New ASN(s) appeared on routes where {site} acted as a source {len(alarm['source']['as_source_to'])} time(s) with the next anomalies and their frequencies: {asn_counts_src},"
-                                    f"and {len(alarm['source']['as_destination_from'])} time(s) as destination with {asn_counts_dest}. "
-                                    "You can see visualisation for all the path anomalies below or explore paths for a given site and date here: ",
-                                    html.A("Explore paths", href=f"{request.host_url}/explore-paths", target="_blank")
-                                ], className='subtitle')
-                            ], justify="start"),
-                        ])
-                    ]),
-                    lg=10, md=12, className="p-3"
-                )
-              ], className="boxwithshadow alarm-header pair-details g-0", justify="between", align="center")                
-            ], style={"padding": "0.5% 1.5%"}, className='g-0'),
-          dcc.Store(id='asn-alarm-store', data=alarm),
-          dbc.Row([
-            html.Div(id=f'site-section-asn-anomalies-{a[0]}',
-              children=[
-                dbc.Button(
-                    a[0],
-                    value = {'src': a[1], 'dest': a[2], 'date': date},
-                    id={
-                        'type': 'asn-collapse-button',
-                        'index': f'asn-anomalies'+a[0]
-                    },
-                    className="collapse-button",
-                    color="white",
-                    n_clicks=0,
-                ),
-                dcc.Loading(
-                  dbc.Collapse(
-                      id={
-                          'type': 'asn-collapse',
-                          'index': f'asn-anomalies'+a[0]
-                      },
-                      is_open=False, className="collaps-container rounded-border-1"
-                ), color='#e9e9e9', style={"top":0}),
-              ]) for a in all_alarms
-            ], className="rounded-border-1 g-0", align="start", style={"padding": "0.5% 1.5%"})
-          ])
-    return return_component

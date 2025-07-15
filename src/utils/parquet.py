@@ -16,6 +16,9 @@ class Parquet(object):
             # Convert date columns to the desired format
             for col in df.select_dtypes(include=['datetime']):
                 df[col] = df[col].dt.strftime(DATE_FORMAT)
+            if 'all_alarm_ids_src' in df.columns:
+                df['all_alarm_ids_src'] = df['all_alarm_ids_src'].apply(lambda x: ', '.join(map(str, x)))
+                df['all_alarm_ids_dest'] = df['all_alarm_ids_dest'].apply(lambda x: ', '.join(map(str, x)))
             table = pa.Table.from_pandas(df, preserve_index=True)
             pq.write_table(table, filename)
             print(f"Successfully wrote to file: {filename}")

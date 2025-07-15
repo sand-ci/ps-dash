@@ -11,6 +11,56 @@ from datetime import datetime
 import utils.helpers as hp
 from utils.helpers import DATE_FORMAT
 from utils.parquet import Parquet
+from utils.utils import asnAnomaliesGroupedAlarmVisualisation, generate_graphs
+import model.queries as qrs
+import pandas as pd
+###############################################
+            #ASN path anomalies.py
+###############################################
+def asnAnomalesPerSiteVisualisation(query_params):
+    alarm_id = query_params['id']
+    src = query_params['src']
+    dest = query_params['dest']
+    dt = query_params['dt']
+    if alarm_id:
+        site = query_params['site']
+        dt = query_params['date']
+        print("Alarm per site")
+        print(site, dt, id)
+        alarm = qrs.getAlarm(alarm_id)
+        print('URL query:', alarm)
+        print("HERE")
+        asn_alarms_src = alarm['source']['all_alarm_ids_src']
+        asn_alarms_dest = alarm['source']['all_alarm_ids_dest']
+        asn_alarms_src_component = asnAnomaliesGroupedAlarmVisualisation(alarm, site, asn_alarms_src, asn_alarms_dest, dt, '-site')
+        return asn_alarms_src_component, dict()
+    if src and dest and dt:
+        data = qrs.query_ASN_anomalies(src, dest, dt)
+        if len(data) == 0:
+            return html.Div([
+                html.H1(f"No data found for alarm {src} to {dest}"),
+                html.P('No data was found for the alarm selected. Please try another alarm.',
+                    className="plot-sub")
+            ], className="l-h-3 p-2 boxwithshadow page-cont ml-1 p-1"), dict()
+
+        anomalies = data['anomalies'].values[0]
+        title = html.H1(children=html.Div([
+            dbc.Row([
+                html.Span(f"{src} → {dest}", className="sites-anomalies-title")]),
+            dbc.Row([
+                html.Span("", style={"margin": "0 10px", "color": "#C50000", "fontSize": "40px"}),
+                html.Span(f"Anomalies: {anomalies}", className="anomalies-title", style={"color": "#910000"}),
+            ])     
+        ], style={"textAlign": "center", "marginBottom": "20px"})
+        )
+
+        figures = generate_graphs(data, src, dest, dt)
+        return html.Div([
+            title,
+            figures]), data.to_dict()
+        
+    return html.Div('No data available for these parameters.'), dict()
+
 
 ###############################################
             #site.py
