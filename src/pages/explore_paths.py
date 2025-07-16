@@ -1,7 +1,3 @@
-# TODO: it looks like the left graph is working, but the right one is not
-# TODO: check the link to the page on the home page
-# TODO: for alarm return immidiatly day and site in the alarm, but alow to chose the other site
-
 import dash
 from dash import Dash, html, dcc, Input, Output, Patch, callback, State, ctx, dash_table, dcc, html
 import dash_bootstrap_components as dbc
@@ -89,9 +85,9 @@ def layout(q=None, **other_unknown_query_strings):
     if q:
         if q == "all":
             selected_sites = []
-            fromDt, toDt = hp.defaultTimeRange(days=3)
+            fromDt, toDt = hp.defaultTimeRange(days=2, startEndOfDay=True)
             frames, pivotFrames = alarmsInst.loadData(fromDt, toDt)
-            period_to_display = hp.defaultTimeRange(days=3, datesOnly=True)
+            period_to_display = hp.defaultTimeRange(days=2, datesOnly=True)
             dataTables = generate_data_tables(selected_keys, asn_anomalies)
             # heatmap_fig = get_heatmap_fig(asn_anomalies, fromDt, toDt)
             # parallel_cat_fig = get_parallel_cat_fig([], [])
@@ -220,7 +216,7 @@ def layout(q=None, **other_unknown_query_strings):
 
 @timer
 def load_initial_data(selected_keys, asn_anomalies):
-    dateFrom, dateTo = hp.defaultTimeRange(days=3)
+    dateFrom, dateTo = hp.defaultTimeRange(days=2, startEndOfDay=True)
     frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
     dataTables = []
 
@@ -274,7 +270,7 @@ def filterASN(df, selected_asns=[], selected_sites=[]):
 @timer
 def create_data_tables(sitesState, asnState, selected_keys, dateFrom=None, dateTo=None):
     if dateFrom is None:
-        dateFrom, dateTo = hp.defaultTimeRange(days=3)
+        dateFrom, dateTo = hp.defaultTimeRange(days=2, startEndOfDay=True)
     frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
     dataTables = []
     print("selected_keys:", selected_keys)
@@ -307,7 +303,7 @@ def create_data_tables(sitesState, asnState, selected_keys, dateFrom=None, dateT
 @timer
 def generate_data_tables(selected_keys, asn_anomalies, dateFrom=None, dateTo=None, selected_sites=[]):
     if dateFrom is None:
-        dateFrom, dateTo = hp.defaultTimeRange(days=3)
+        dateFrom, dateTo = hp.defaultTimeRange(days=2, startEndOfDay=True)
     frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
     dataTables = []
 

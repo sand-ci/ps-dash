@@ -153,9 +153,12 @@ def layout(q=None, **other_unknown_query_strings):
                     'Details': alarm.get('alarm_link', None),  # Added Details if available
                     'cnt': alarm.get('total_paths_anomalies', 1)
                 }
-                dest_site_fields = ['sites', 'tags', 'tag', 'site', 'cannotBeReachedFrom', 'dest_netsite', 'dest_site', 'src_site', 'src_netsite', 'as_source_to', 'as_destination_from']  # ordered by priority if multiple exist
+                dest_site_fields = ['sites', 'cannotBeReachedFrom', 'to_dest_loss', 'from_src_loss', 'dest_netsite', 'dest_site', 'src_site', 'src_netsite']  # ordered by priority if multiple exist
                 destination_sites = []
                 for field in dest_site_fields:
+                    # if frame == "high packet loss on multiple links":
+                    #     print('high packet loss on multiple links')
+                    #     print(alarm.keys())
                     if field in alarm:
                         destination_sites = destination_sites + [html.Div(item) for item in alarm[field].split('\n')]
                 new_row['Involved Site(s)'] = destination_sites
