@@ -492,7 +492,7 @@ def generate_tables(frame, unpacked, event, alarmsInst):
     # Replace NaN or empty values with valid defaults
     dfr = dfr.fillna("")  # Replace NaN with an empty string for all columns
     dfr = dfr.astype({col: str for col in dfr.select_dtypes(include=['object', 'category']).columns})  # Ensure all object columns are strings
-    drop_columns = {"ASN path anomalies per site": ['sites'], 'unresolvable host': ['alarm_link']}
+    drop_columns = {"ASN path anomalies per site": ['sites'], 'unresolvable host': ['alarm_link'], 'destination cannot be reached from any': ['alarm_link'], 'destination cannot be reached from multiple': ['alarm_link'], 'source cannot reach any': ['alarm_link']}
     if event in drop_columns:
         dfr.drop(columns=drop_columns[event], inplace=True)
     dfr.sort_values('to', ascending=False, inplace=True)
