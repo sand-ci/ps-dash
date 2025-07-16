@@ -218,7 +218,7 @@ class ParquetUpdater(object):
 
     @timer
     def storeASNPathChanged(self):
-        dateFrom, dateTo = hp.defaultTimeRange(days=2)
+        dateFrom, dateTo = hp.defaultTimeRange(days=3)
         df = qrs.queryPathAnomaliesDetails(dateFrom, dateTo)
         self.pq.writeToFile(df, f"parquet/asn_path_changes.parquet")
 

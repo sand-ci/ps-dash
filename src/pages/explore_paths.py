@@ -1,3 +1,7 @@
+# TODO: it looks like the left graph is working, but the right one is not
+# TODO: check the link to the page on the home page
+# TODO: for alarm return immidiatly day and site in the alarm, but alow to chose the other site
+
 import dash
 from dash import Dash, html, dcc, Input, Output, Patch, callback, State, ctx, dash_table, dcc, html
 import dash_bootstrap_components as dbc
@@ -14,13 +18,13 @@ from utils.parquet import Parquet
 from utils.helpers import timer
 
 
-def title():
+def title(q=None):
     return f"Search & explore"
 
 
 
 def description(q=None):
-    return f"Explore the alarms related to traceroute paths"
+    return f"Explore the alarms related to traceroute paths for {q} site(s)"
 
 
 pq = Parquet()
@@ -30,7 +34,7 @@ selected_keys = ['ASN path anomalies']
 
 dash.register_page(
     __name__,
-    path_template="/explore-paths",
+    path_template="/explore-paths/<q>",
     title=title,
     description=description,
 )
@@ -71,128 +75,152 @@ def get_dropdown_data(asn_anomalies, pivotFrames):
 
 
 @timer
-def layout(**other_unknown_query_strings):
+def layout(q=None, **other_unknown_query_strings):
     asn_anomalies = read_parquet_safe('parquet/frames/ASN_path_anomalies.parquet')
-
     if asn_anomalies.empty:
-        return dbc.Row([
-            dbc.Col([
-                html.Div([
-                    html.H1("No Data Available", className="text-center"),
-                    html.P("There is currently no data to display on this page. Please check back later.", className="text-center")
-                ], className="boxwithshadow page-cont ml-1 p-1")
-            ], xl=12, lg=12, md=12, sm=12, className="mb-1 flex-grow-1")
-        ])
-
-    dateFrom, dateTo = hp.defaultTimeRange(days=2)
-    frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
-    period_to_display = hp.defaultTimeRange(days=2, datesOnly=True)
-
-    # Skip plot creation if there is no data
-    if asn_anomalies.empty:
-        dataTables = html.Div([
-            html.P("No data available for the selected criteria.", className="text-center")
-        ])
-        return dbc.Row([
-            dbc.Col([
-                html.Div([
-                    html.H1("No Data Available", className="text-center"),
-                    html.P("There is currently no data to display on this page. Please check back later.", className="text-center")
-                ], className="boxwithshadow page-cont ml-1 p-1")
-            ], xl=12, lg=12, md=12, sm=12, className="mb-1 flex-grow-1")
-        ])
-
-    dataTables = generate_data_tables(selected_keys, asn_anomalies)
-
-    heatmap_fig = get_heatmap_fig(asn_anomalies, dateFrom, dateTo)
-    parallel_cat_fig = get_parallel_cat_fig([], [])
-
-    sitesDropdownData, asnsDropdownData = get_dropdown_data(asn_anomalies, pivotFrames)
-
-    return dbc.Row([
-        dbc.Row([
-            dbc.Col([
-                html.Div([
+            return dbc.Row([
+                dbc.Col([
                     html.Div([
-                        html.H1(f"ASN Transition Effects"),
-                        html.P('The plot shows how ASNs were replaced in the period of 2 days. The data is based on the alarms of type "ASN path anomalies"', style={"font-size": "1.2rem"})
-                    ], className="l-h-3 p-2"),
-                    dcc.Loading(
-                        dcc.Graph(figure=parallel_cat_fig, id="asn-sankey"), color='#00245A'),
-                ], className="boxwithshadow page-cont ml-1 p-1")
-            ], xl=6, lg=12, md=12, sm=12, className=" mb-1 flex-grow-1",
-            ),
-            dbc.Col([
-                html.Div(id="asn-alarms-container", children=[
-                    html.Div([
-                        html.H1(f"ASN-path Anomalies Affected Links"),
-                        html.P('The plot shows the number of new ASNs that appeared between two sites. The data is based on the alarms of type "ASN path anomalies"', style={"font-size": "1.2rem"})
-                    ], className="l-h-3 p-2"),
-                    dcc.Loading(
-                        dcc.Graph(figure=heatmap_fig, id="asn-heatmap", style={"max-width": "1000px", "margin": "0 auto"}),
-                        color='#00245A')
-                ], className="boxwithshadow page-cont ml-1 p-1")
-            ], xl=6, lg=12, md=12, sm=12, className="mb-1 flex-grow-1")
-        ], className="gx-4 d-flex", justify="between", align="start"),
-        dbc.Row([
-            dbc.Col([
-                dbc.Row([
-                    dbc.Col([
-                        html.H1(f"Search for specific site and/or ASN and get all related alarms based on the traceroute measurements",
-                                className="l-h-3 pl-2"),
-                        html.P(
-                            f'Alarms generated in the period: {period_to_display[0]} - {period_to_display[1]} ',
-                            style={"padding-left": "1.5%", "font-size": "14px"})
-                    ], align="center", className="text-left pair-details rounded-border-1"),
-                ], justify="start", align="center"),
-                html.Br(),
-                html.Br(),
-                html.Br(),
-                dbc.Row([
-                    dbc.Col([
-                        dcc.Dropdown(multi=True, id='paths-sites-dropdown', options=sitesDropdownData, value=sitesDropdownData,
-                                     placeholder="Search for a site"),
-                    ]),
-                ]),
-                html.Br(),
-                dbc.Row([
-                    dbc.Col([
-                        dcc.Dropdown(multi=True, id='paths-asn-dropdown', options=asnsDropdownData, value=asnsDropdownData,
-                                     placeholder="Search ASNs"),
-                    ]),
-                ]),
-                html.Br(),
-                dbc.Row([
-                    dbc.Col([
-                        dbc.Button("Search", id="search-button", color="secondary", 
-                                   className="mlr-2", style={"width": "100%", "font-size": "1.5em"},
-                                   title="Click to apply the selected filters to the plots and tables.")
+                        html.H1("No Data Available", className="text-center"),
+                        html.P("There is currently no data to display on this page. Please check back later.", className="text-center")
+                    ], className="boxwithshadow page-cont ml-1 p-1")
+                ], xl=12, lg=12, md=12, sm=12, className="mb-1 flex-grow-1")
+            ])
+    if q:
+        if q == "all":
+            selected_sites = []
+            fromDt, toDt = hp.defaultTimeRange(days=3)
+            frames, pivotFrames = alarmsInst.loadData(fromDt, toDt)
+            period_to_display = hp.defaultTimeRange(days=3, datesOnly=True)
+            dataTables = generate_data_tables(selected_keys, asn_anomalies)
+            # heatmap_fig = get_heatmap_fig(asn_anomalies, fromDt, toDt)
+            # parallel_cat_fig = get_parallel_cat_fig([], [])
+            # sitesDropdownData, asnsDropdownData = get_dropdown_data(asn_anomalies, pivotFrames)
+            selected_sites = []
+        elif '=' in q:
+            params = q.split('&')
+            query_params = {param.split('=')[0]: param.split('=')[1] for param in params}
+            site = query_params.get('site')
+            dt = query_params.get('dt')
+            print("Site:", site)
+            print("Date:", dt)
+            fromDt = dt+"T00:00:00.000Z"
+            toDt = dt+"T23:59:59.000Z"
+            selected_sites = [site]
+            
+        frames, pivotFrames = alarmsInst.loadData(fromDt, toDt)
+        if not frames:
+            return dbc.Row([
+                        dbc.Col([
+                            html.Div([
+                                html.H1("No Data Available", className="text-center"),
+                                html.P("There is currently no data to display on this page. Please check back later.", className="text-center")
+                            ], className="boxwithshadow page-cont ml-1 p-1")
+                        ], xl=12, lg=12, md=12, sm=12, className="mb-1 flex-grow-1")
                     ])
-                ]),
-            ], lg=12, md=12),
-        ], className="p-1 site boxwithshadow page-cont mb-1", justify="center", align="center"),
-        html.Br(),
-        html.Br(),
-        dbc.Row([
-            html.Div([
-                dbc.Row([
-                    html.H1(f"List of alarms", className="text-center"),
-                    html.Hr(className="my-2"),
-                    html.Br(),
-                    dcc.Loading(
-                        html.Div(id='paths-results-table', children=dataTables),
-                        style={'height': '0.5rem'}, color='#00245A')
-                ], className="m-2"),
-            ], className="site page-cont"),
-        ], className="p-1 site boxwithshadow page-cont mb-1", justify="center", align="center"),
-        html.Br(),
-        html.Br(),
-    ], className=' main-cont', align="center", style={"padding": "0.5% 1.5%"})
+        period_to_display = (fromDt, toDt)
+        print("period_to_display:", period_to_display)
+        dataTables = generate_data_tables(selected_keys, asn_anomalies, fromDt, toDt, selected_sites=selected_sites)
+        print("dataTables:", dataTables)
+        heatmap_fig = get_heatmap_fig(asn_anomalies, fromDt, toDt, selected_sites=selected_sites)
+        parallel_cat_fig = get_parallel_cat_fig(selected_sites, [], fromDt, toDt)
+        sitesDropdownData, asnsDropdownData = get_dropdown_data(asn_anomalies, pivotFrames)
 
+
+        return dbc.Row([
+                dcc.Store(id='date-from', data=period_to_display[0]),
+                dcc.Store(id='date-to', data=period_to_display[1]),
+                dbc.Row([
+                    dbc.Col([
+                        html.Div([
+                            html.Div([
+                                html.H1("ASN Transition Effects"),
+                                html.P(f'The plot shows how ASNs were replaced in the period from {pd.to_datetime(period_to_display[0]).strftime("%Y-%m-%d")} to {pd.to_datetime(period_to_display[1]).strftime("%Y-%m-%d")}. The data is based on the alarms of type "ASN path anomalies"', style={"font-size": "1.2rem"})
+                            ], className="l-h-3 p-2"),
+                            dcc.Loading(
+                                dcc.Graph(figure=parallel_cat_fig, id="asn-sankey"), color='#00245A'),
+                        ], className="boxwithshadow page-cont ml-1 p-1")
+                    ], xl=6, lg=12, md=12, sm=12, className=" mb-1 flex-grow-1",
+                    ),
+                    dbc.Col([
+                        html.Div(id="asn-alarms-container", children=[
+                            html.Div([
+                                html.H1(f"ASN-path Anomalies Affected Links"),
+                                html.P('The plot shows the number of new ASNs that appeared between two sites. The data is based on the alarms of type "ASN path anomalies"', style={"font-size": "1.2rem"})
+                            ], className="l-h-3 p-2"),
+                            dcc.Loading(
+                                dcc.Graph(figure=heatmap_fig, id="asn-heatmap", style={"max-width": "1000px", "margin": "0 auto"}),
+                                color='#00245A')
+                        ], className="boxwithshadow page-cont ml-1 p-1")
+                    ], xl=6, lg=12, md=12, sm=12, className="mb-1 flex-grow-1")
+                ], className="gx-4 d-flex", justify="between", align="start"),
+                dbc.Row([
+                    dbc.Col([
+                        dbc.Row([
+                            dbc.Col([
+                                html.H1(f"Search for specific site and/or ASN and get all related alarms based on the traceroute measurements",
+                                        className="l-h-3 pl-2"),
+                                html.P(
+                                    f'Alarms generated in the period: {pd.to_datetime(period_to_display[0]).strftime("%Y-%m-%d %H:%M")} - {pd.to_datetime(period_to_display[1]).strftime("%Y-%m-%d %H:%M")}.',
+                                    style={"padding-left": "1.5%", "font-size": "14px"})
+                            ], align="center", className="text-left pair-details rounded-border-1"),
+                        ], justify="start", align="center"),
+                        html.Br(),
+                        html.Br(),
+                        html.Br(),
+                        dbc.Row([
+                            dbc.Col([
+                                dcc.Dropdown(multi=True, id='paths-sites-dropdown', options=sitesDropdownData, value=sitesDropdownData,
+                                            placeholder="Search for a site"),
+                            ]),
+                        ]),
+                        html.Br(),
+                        dbc.Row([
+                            dbc.Col([
+                                dcc.Dropdown(multi=True, id='paths-asn-dropdown', options=asnsDropdownData, value=asnsDropdownData,
+                                            placeholder="Search ASNs"),
+                            ]),
+                        ]),
+                        html.Br(),
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.Button("Search", id="search-button", color="secondary", 
+                                        className="mlr-2", style={"width": "100%", "font-size": "1.5em"},
+                                        title="Click to apply the selected filters to the plots and tables.")
+                            ])
+                        ]),
+                    ], lg=12, md=12),
+                ], className="p-1 site boxwithshadow page-cont mb-1", justify="center", align="center"),
+                html.Br(),
+                html.Br(),
+                dbc.Row([
+                    html.Div([
+                        dbc.Row([
+                            html.H1(f"List of alarms", className="text-center"),
+                            html.Hr(className="my-2"),
+                            html.Br(),
+                            dcc.Loading(
+                                html.Div(id='paths-results-table', children=dataTables),
+                                style={'height': '0.5rem'}, color='#00245A')
+                        ], className="m-2"),
+                    ], className="site page-cont"),
+                ], className="p-1 site boxwithshadow page-cont mb-1", justify="center", align="center"),
+                html.Br(),
+                html.Br(),
+            ], className=' main-cont', align="center", style={"padding": "0.5% 1.5%"})
+    else:
+        return dbc.Row([
+                    dbc.Col([
+                        html.Div([
+                            html.H1("No Data Available", className="text-center"),
+                            html.P("There is currently no data to display on this page. Please check back later.", className="text-center")
+                        ], className="boxwithshadow page-cont ml-1 p-1")
+                    ], xl=12, lg=12, md=12, sm=12, className="mb-1 flex-grow-1")
+                ])
 
 @timer
 def load_initial_data(selected_keys, asn_anomalies):
-    dateFrom, dateTo = hp.defaultTimeRange(days=2)
+    dateFrom, dateTo = hp.defaultTimeRange(days=3)
     frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
     dataTables = []
 
@@ -201,7 +229,7 @@ def load_initial_data(selected_keys, asn_anomalies):
             df = pivotFrames[event]
             if len(df) > 0:
                 dataTables.append(generate_tables(frames[event], df, event, alarmsInst))
-    fig = get_parallel_cat_fig([], [])
+    fig = get_parallel_cat_fig([], [], dateFrom, dateTo)
     return [dataTables, fig]
 
 
@@ -212,16 +240,17 @@ def load_initial_data(selected_keys, asn_anomalies):
     [
         Input("search-button", "n_clicks"),
     ],
-    [
+    [   
         State("paths-asn-dropdown", "value"),
         State("paths-sites-dropdown", "value"),
+        State("date-from", "data"),
+        State("date-to", "data")
     ],
     prevent_initial_call=True
 )
-def update_figures(n_clicks, asnStateValue, sitesStateValue):
+def update_figures(n_clicks, asnStateValue, sitesStateValue, dateFrom, dateTo):
     if n_clicks is not None:
         asn_anomalies = read_parquet_safe('parquet/frames/ASN_path_anomalies.parquet')
-        dateFrom, dateTo = hp.defaultTimeRange(days=2)
         print("sitesStateValue:", sitesStateValue)
         sitesState = sitesStateValue if sitesStateValue else []
         asnState = asnStateValue if asnStateValue else []
@@ -229,9 +258,9 @@ def update_figures(n_clicks, asnStateValue, sitesStateValue):
         print("asnState:", asnState)
         print("sitesStateValue:", sitesStateValue)
         print("sitesState:", sitesState)
-        parallel_cat_fig = get_parallel_cat_fig(sitesState, asnState)
+        parallel_cat_fig = get_parallel_cat_fig(sitesState, asnState, dateFrom, dateTo)
         heatmap_fig = get_heatmap_fig(asn_anomalies, dateFrom, dateTo, selected_asns=asnState, selected_sites=sitesState)
-        datatables = create_data_tables(sitesState, asnState, selected_keys)
+        datatables = create_data_tables(sitesState, asnState, selected_keys, dateFrom, dateTo)
         return parallel_cat_fig, heatmap_fig, datatables
 
     return dash.no_update
@@ -243,8 +272,9 @@ def filterASN(df, selected_asns=[], selected_sites=[]):
 
 
 @timer
-def create_data_tables(sitesState, asnState, selected_keys):
-    dateFrom, dateTo = hp.defaultTimeRange(days=2)
+def create_data_tables(sitesState, asnState, selected_keys, dateFrom=None, dateTo=None):
+    if dateFrom is None:
+        dateFrom, dateTo = hp.defaultTimeRange(days=3)
     frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
     dataTables = []
     print("selected_keys:", selected_keys)
@@ -275,14 +305,17 @@ def create_data_tables(sitesState, asnState, selected_keys):
     return html.Div(dataTables)
 
 @timer
-def generate_data_tables(selected_keys, asn_anomalies):
-    dateFrom, dateTo = hp.defaultTimeRange(days=2)
+def generate_data_tables(selected_keys, asn_anomalies, dateFrom=None, dateTo=None, selected_sites=[]):
+    if dateFrom is None:
+        dateFrom, dateTo = hp.defaultTimeRange(days=3)
     frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
     dataTables = []
 
     for event in sorted(selected_keys):
         if event in pivotFrames.keys():
             df = pivotFrames[event]
+            if len(selected_sites) > 0:
+                df = df[(df['src_netsite'].isin(selected_sites)) | (df['dest_netsite'].isin(selected_sites))]
             if len(df) > 0:
                 dataTables.append(generate_tables(frames[event], df, event, alarmsInst))
 
@@ -299,16 +332,27 @@ def get_heatmap_fig(asn_anomalies, dateFrom, dateTo, selected_asns=[], selected_
     return create_anomalies_heatmap(asn_anomalies, dateFrom, dateTo, selected_asns=selected_asns, selected_sites=selected_sites)
 
 
-def get_parallel_cat_fig(sitesState, asnState):
-    return build_parallel_categories_plot(sitesState, asnState)
+def get_parallel_cat_fig(sitesState, asnState, dtFrom=None, dtTo=None):
+    print("get_parallel_cat_fig")
+    return build_parallel_categories_plot(sitesState, asnState, dtFrom, dtTo)
 
 
 @timer
 def create_anomalies_heatmap(asn_anomalies, dateFrom, dateTo, selected_asns=[], selected_sites=[]):
+    print("create_anomalies_heatmap")
+    print("asn_anomalies")
+    print(asn_anomalies)
     df = asn_anomalies.copy()
-    df = df[df['to_date'] >= dateFrom]
+    dtFrom = pd.to_datetime(dateFrom).strftime('%Y-%m-%d')
+    dtTo = pd.to_datetime(dateTo).strftime('%Y-%m-%d')
+    print("dateFrom: ", dateFrom)
+    df['to_date'] = pd.to_datetime(df['to_date'])
+    df = df[(df['to_date'] >= dtFrom) & (df['to_date'] <= dtTo)]
+    print("df")
+    print(df)
     df = apply_common_filters(df, selected_asns, selected_sites)
-
+    print("df")
+    print(df)
     if len(df) > 0:
         # Create a summary table with counts and ASN list per IPv6 and IPv4
         heatmap_summary = df.groupby(['src_netsite', 'dest_netsite', 'ipv6']).agg(
@@ -457,21 +501,26 @@ def addNetworkOwners(df, asn_list):
 
 
 @timer
-def build_parallel_categories_plot(sitesState, asnState) -> go.Figure:
+def build_parallel_categories_plot(sitesState, asnState, dtFrom=None, dtTo=None) -> go.Figure:
     """
     Query all docs with transitions existing and to_date==to_date,
     then build one combined parallel-categories figure.
     Handles list-type 'previously_used_asn' and 'new_asn' columns.
     """
     # Read pre-stored data from parquet file generated by Updater()
+    print("build_parallel_categories_plot")
     try:
-        df = read_parquet_safe('parquet/asn_path_changes.parquet')
+        if dtFrom == None:
+            df = read_parquet_safe('parquet/asn_path_changes.parquet')
+        else:
+            df = qrs.queryPathAnomaliesDetails(dtFrom, dtTo)
     except Exception as e:
         print("Error reading parquet file:", e)
         return go.Figure()
     if df.empty:
         return go.Figure()
-
+    print("length: ", len(df))
+    print(df)
     # Explode both list columns to get all combinations
     df = df.explode('previously_used_asn')
     df = df.explode('new_asn')
@@ -479,7 +528,9 @@ def build_parallel_categories_plot(sitesState, asnState) -> go.Figure:
     # Convert to string for display
     df['previously_used_asn'] = df['previously_used_asn'].astype(str)
     df['new_asn'] = df['new_asn'].astype(str)
-
+    print("df parallel plot")
+    print("length: ", len(df))
+    print(df)
     # Filtering
     if len(sitesState) > 0 and len(asnState) > 0:
         df = df[((df['source_site'].isin(sitesState)) | (df['destination_site'].isin(sitesState))) &
@@ -549,13 +600,13 @@ def build_parallel_categories_plot(sitesState, asnState) -> go.Figure:
 
 
 
-def generate_figures(asn_anomalies):
-    dateFrom, dateTo = hp.defaultTimeRange(days=2)
+# def generate_figures(asn_anomalies):
+#     dateFrom, dateTo = hp.defaultTimeRange(days=2)
 
-    # Generate the heatmap figure
-    heatmap_fig = get_heatmap_fig(asn_anomalies, dateFrom, dateTo)
+#     # Generate the heatmap figure
+#     heatmap_fig = get_heatmap_fig(asn_anomalies, dateFrom, dateTo)
 
-    # Generate the parallel categories figure
-    parallel_cat_fig = get_parallel_cat_fig([], [])
+#     # Generate the parallel categories figure
+#     parallel_cat_fig = get_parallel_cat_fig([], [])
 
-    return heatmap_fig, parallel_cat_fig
+#     return heatmap_fig, parallel_cat_fig

@@ -207,7 +207,7 @@ def queryPathAnomaliesDetails(dateFrom, dateTo, idx='ps_traces_changes'):
                     "to_date": {
                       "format": "strict_date_optional_time",
                       "gte": dateFrom,
-                      # "lte": dateTo,
+                      "lte": dateTo,
                     }
                   }
                 }

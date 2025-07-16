@@ -588,7 +588,7 @@ def asnAnomaliesGroupedAlarmVisualisation(alarm, site, src_alarms, dest_alarms, 
                                     f"New ASN(s) appeared on routes where {site} acted as a source {len(alarm['source']['as_source_to'])} time(s), "
                                     f"and {len(alarm['source']['as_destination_from'])} time(s) as destination. "
                                     "You can see visualisation for all the path anomalies below or explore paths for a given site and date here: ",
-                                    html.A("Explore paths", href=f"{request.host_url}/explore-paths", target="_blank")
+                                    html.A("Explore paths", href=f"{request.host_url}/explore-paths/site={site}&dt={date}", target="_blank")
                                 ], className='subtitle'),
                                 dcc.Graph(figure=fig, style={'height': '400px'}),
                                 asn_legend
