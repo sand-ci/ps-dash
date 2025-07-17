@@ -175,11 +175,11 @@ html {
 }
 
 .cls-selected-site h1 {
-    font-size: 2.5rem !important;
+    font-size: 2.5em !important;
 }
 
 .cls-site-map {
-    height: 540px;
+    min-height: 540px;
     /* padding: 20px;
     border: 1px solid rgba(0, 0, 0, .125);
     border-radius: 1rem */
@@ -218,7 +218,7 @@ html {
 }
 
 .site-alarms-tables .card-title {
-    font-size: 2.1rem;
+    font-size: 2.1em;
     padding: 2rem;
     text-align: center;
 }
@@ -232,9 +232,9 @@ html {
     color: rgb(9, 9, 9);
 }
 
-.plot-subtitle {
+.plot-sub {
     font-size: 1.3em !important;
-    margin: 1rem;
+    margin: 1em;
     text-align: center;
     line-height: 1.2em;
     font-weight: 200;
@@ -254,7 +254,7 @@ html {
 }
 
 .responsive-graphs {
-    margin-bottom: 2rem;
+    margin-bottom: 2em;
 }
 
 .card-title {
@@ -431,7 +431,7 @@ html {
 }
 
 .site-details {
-    font-size: 2rem;
+    font-size: 2em;
 }
 
 .rounded-border-1 {
@@ -439,7 +439,7 @@ html {
 }
 
 .change-section {
-    font-size: 1.5rem;
+    font-size: 1.5em;
     background-color: #f2f2f4;
     padding-top: 4%;
 }
@@ -485,7 +485,7 @@ html {
 }
 
 .more-alarms {
-    font-size: 2rem;
+    font-size: 2em;
     text-align: center;
 }
 
@@ -525,7 +525,7 @@ html {
 .custom-tab {
     background-color: #7f7f7f !important;
     /* border: 0px !important; */
-    font-size: 1.5rem !important;
+    font-size: 1.5em !important;
     color: white;
 }
 
@@ -537,13 +537,13 @@ html {
 
 .site-header {
     padding: 20px 25px !important;
-    font-size: 2rem !important;
+    font-size: 2em !important;
     background-color: #e9e9e9;
     color: black;
 }
 
 .site-header-line .card-body {
-    padding: 2rem 2rem !important;
+    padding: 2em 2em !important;
     background-color: aliceblue;
 }
 
@@ -667,7 +667,7 @@ count-box {
 
 @media (max-width: 1340px) {
     h1 {
-        font-size: 2rem !important;
+        font-size: 2em !important;
     }
 }
 

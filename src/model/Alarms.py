@@ -62,6 +62,7 @@ class Alarms(object):
 
           elif event in ['high packet loss',
                          'ASN path anomalies',
+                         'ASN path anomalies per site',
                          'destination cannot be reached from any',
                          'source cannot reach any',
                          'bandwidth decreased',
@@ -273,7 +274,7 @@ class Alarms(object):
   @staticmethod
   def replaceCol(colName, df, sep=','):
       dd = df.copy()
-      dd['temp'] = [sep.join(map(str, l)) for l in df[colName]]
+      dd['temp'] = [sep.join(map(str, list(set(l)))) for l in df[colName]]
       dd = dd.drop(columns=[colName]).rename(columns={'temp': colName})
       return dd
 
@@ -320,8 +321,18 @@ class Alarms(object):
                 'bandwidth decreased from/to multiple sites': ''}
 
         df = self.replaceCol('tag', df)
+        if 'as_source_to' and 'as_destination_from' in df.columns:
+            df['sites'] = df.apply(
+                                      lambda row: set(
+                                          (row['as_source_to'] if isinstance(row['as_source_to'], (list, tuple)) else []) +
+                                          (row['as_destination_from'] if isinstance(row['as_destination_from'], (list, tuple)) else [])
+                                      ),
+                                      axis=1
+                                  )
+            df = self.replaceCol('as_source_to', df, '\n')
+            df = self.replaceCol('as_destination_from', df, '\n')
         if 'sites' in df.columns:
-          df = self.replaceCol('sites', df, '\n')
+            df = self.replaceCol('sites', df, '\n')
         if 'diff' in df.columns:
             df = self.replaceCol('diff', df)
             df.rename(columns={'diff': 'ASN-diff'}, inplace=True)
@@ -347,11 +358,10 @@ class Alarms(object):
             df['from_src_loss'] = df[['src_sites', 'src_loss']].apply(lambda x: self.list2str(x, ''), axis=1)
             df.drop('src_loss', axis=1, inplace=True)
             df.drop('src_sites', axis=1, inplace=True)
-
-        if 'src_sites' in df.columns:
-            df = self.replaceCol('src_sites', df, '\n')
-        if 'dest_sites' in df.columns:
-            df = self.replaceCol('dest_sites', df, '\n')
+        format_sites_list = ['src_sites', 'dest_sites']
+        for col in format_sites_list:
+            if col in df.columns:
+                  df = self.replaceCol(col, df, '\n')
         if 'anomalies' in df.columns:
             df['anomalies'] = df['anomalies'].apply(lambda x: ', '.join(map(str, x)))
             df.rename(columns={'anomalies': 'new ASN(s)'}, inplace=True)
@@ -376,7 +386,7 @@ class Alarms(object):
         if 'avg_value' in df.columns:
             df['avg_value'] = df['avg_value'].apply(lambda x: f'{x}%')
         if 'alarm_id' in df.columns:
-          df['alarm_link'] = df['alarm_id']
+            df['alarm_link'] = df['alarm_id']
 
         if 'configurations' in df.columns:
             df = self.replaceCol('configurations', df, '\n')
@@ -386,21 +396,13 @@ class Alarms(object):
               additionalTable = True
             df = self.convertListOfDict('hosts_not_found', df, additionalTable)
             
-            # import re
-            # def extract_hosts(text):
-            #     return re.findall(r'(?:^|\n)\s*[^:]*:\s*([^\s]+)', text)
-            # df['hosts'] = df['hosts_not_found'].apply(lambda x: extract_hosts(x))
-            # print(df.iloc[0])
-            
+        drop_columns = {'complete packet loss': ['avg_value'], 'ASN path anomalies': ['asn_count'], 'ASN path anomalies per site': ['all_alarm_ids_src', 'all_alarm_ids_dest']}
 
-        if event == 'complete packet loss':
-          df.drop(columns=['avg_value'], inplace=True)
-        elif event == 'ASN path anomalies':
-          df.drop(columns=['asn_count'], inplace=True)
+        
 
         # TODO: create pages/visualizatios for the following events then remove the df.drop('alarm_link') below
-        if event not in ['unresolvable host']:
-          df = self.createAlarmURL(df, event, site_report)
+        if event != "unresolvable host":
+            df = self.createAlarmURL(df, event, site_report)
           
         if generate_button:
             self.createGraphButton(df)
@@ -410,82 +412,99 @@ class Alarms(object):
 
         # Reorder 'from' and 'to' columns to be the first two columns if they exist
         df = self.reorder_columns(df, ['from', 'to'])
+        if event in drop_columns:
+          df.drop(columns=drop_columns[event], inplace=True)
         if 'alarm_id' in df.columns:
             df.drop('alarm_id', axis=1, inplace=True)
         return df
     except Exception as e:
+
         print('Exception ------- ', event)
+        print(df.info())
         print(df.head())
         print(e, traceback.format_exc())
 
 
-  @staticmethod
+  
   # Create dynamically the URLs leading to a page for a specific alarm
-  def createAlarmURL(df, event, site_report=False):
-    event_page_map = {
-        'ASN path anomalies': 'anomalous_paths/',
-        'firewall issue': 'loss-delay/',
-        'complete packet loss': 'loss-delay/',
-        'bandwidth decreased from/to multiple sites': 'loss-delay/',
-        'high packet loss on multiple links': 'loss-delay/',
-        'high packet loss': 'loss-delay/',
-        'hosts not found': 'hosts_not_found/'
-    }
-    if event.startswith('bandwidth'):
-        page = 'throughput/'
-    elif event in event_page_map:
-        page = event_page_map.get(event, '')
-    # else:
-    #     print("Event page in ps-dash was not found.")
-    #     return KeyError
-    if not site_report:
-    # create clickable cells leading to alarm pages
-      if 'alarm_link' in df.columns:
-          url = f'{request.host_url}{page}'
-          df['alarm_link'] = df['alarm_link'].apply(
-            lambda id: f"<a class='btn btn-secondary' role='button' href='{url}{id}' target='_blank'>VIEW IN A NEW TAB</a>" if id else '-')
-      
-      if event == 'ASN path anomalies':
-            df['alarm_link'] = df.apply(
-              lambda row: f"<a class='btn btn-secondary' role='button' href='{request.host_url}anomalous_paths/src_netsite={row['src_netsite']}&dest_netsite={row['dest_netsite']}&dt={row['to']}' target='_blank'>VIEW IN A NEW TAB</a>" if row['src_netsite'] and row['dest_netsite'] else '-', axis=1)
-        
-      if event == "hosts not found":
-            df['alarm_link'] = df.apply(
-              lambda row: f"<a class='btn btn-secondary' role='button' href='{request.host_url}hosts_not_found/{row['site']}' target='_blank'>VIEW IN A NEW TAB</a>" if row['site'] else '-', axis=1)
-    else:
-        
-        if event == 'ASN path anomalies':
-            df['alarm_link'] = df.apply(
-                lambda row: dbc.Button(
-                    "VIEW DETAILS",
-                    id={'type': 'path-anomaly-btn', 'index': f"{row['src_netsite']}*{row['dest_netsite']}*{row['to']}"},
-                    className="btn btn-secondary",
-                    n_clicks=0
-                ) if row['src_netsite'] and row['dest_netsite'] else '-',
-                axis=1
-            )
 
-        elif event == "hosts not found":
-            df['alarm_link'] = df.apply(
-                lambda row: dbc.Button(
-                    "VIEW DETAILS",
-                    id={'type': 'hosts-not-found-btn', 'index': f"{row['site']}, {row['alarm_id']}"},
-                    className="btn btn-secondary",
-                    n_clicks=0
-                ) if row['site'] else '-',
-                axis=1
-            )  
-        else:
-          if 'alarm_link' in df.columns:
-              df['alarm_link'] = df['alarm_link'].apply(
-                  lambda id: dbc.Button(
+  
+
+  @staticmethod
+  def createAlarmURL(df, event, site_report=False):
+      def generate_url(row, event, page, site_report):
+          host_url = request.host_url
+          if site_report:
+              if 'ASN path anomalies' in event:
+                  if event == 'ASN path anomalies per site':
+                      idx = f"{row['site']}*{row['to']}*{row['alarm_id']}" if row['site'] and row['alarm_id'] else '-'
+                      button = '-site'
+                  else:
+                      idx = f"{row['src_netsite']}*{row['dest_netsite']}*{row['to']}" if row['src_netsite'] and row['dest_netsite'] else '-'
+                      button = ''
+                  return dbc.Button(
                       "VIEW DETAILS",
-                      id={'type': 'alarm-link-btn', 'index': f"{id}, {event}"},
+                      id={'type': 'path-anomaly-btn'+button, 'index': idx},
                       className="btn btn-secondary",
                       n_clicks=0
-                  ) if id else '-'
-              )
-    return df
+                  ) if idx!='-' else '-'
+            
+              elif event == 'hosts not found':
+                  return dbc.Button(
+                      "VIEW DETAILS",
+                      id={'type': 'hosts-not-found-btn', 'index': f"{row['site']}, {row['alarm_id']}"},
+                      className="btn btn-secondary",
+                      n_clicks=0
+                  ) if row['site'] else '-'
+
+              elif 'alarm_link' in row and row['alarm_link']:
+                  return dbc.Button(
+                      "VIEW DETAILS",
+                      id={'type': 'alarm-link-btn', 'index': f"{row['alarm_link']}, {event}"},
+                      className="btn btn-secondary",
+                      n_clicks=0
+                  )
+              else:
+                  return '-'
+
+          else:
+              if 'ASN path anomalies' in event:
+                  if event == 'ASN path anomalies per site':
+                      details = f'site={row['site']}&date={row['to']}&id={row['alarm_id']}' if row['site'] and row['alarm_id'] else '-'
+                  else:
+                      details = f'src_netsite={row['src_netsite']}&dest_netsite={row['dest_netsite']}&dt={row['to']}' if row['src_netsite'] and row['dest_netsite'] else '-'               
+                  return (
+                      f"<a class='btn btn-secondary' role='button' href='{host_url}{page}{details}' target='_blank'>VIEW IN A NEW TAB</a>"
+                      if details!='-' else '-'
+                  )
+
+              elif event == 'hosts not found':
+                  return (
+                      f"<a class='btn btn-secondary' role='button' href='{host_url}{page}{row['site']}' target='_blank'>VIEW IN A NEW TAB</a>"
+                      if row['site'] else '-'
+                  )
+
+              elif 'alarm_link' in row and row['alarm_link']:
+                  return (
+                      f"<a class='btn btn-secondary' role='button' href='{host_url}{page}{row['alarm_link']}' target='_blank'>VIEW IN A NEW TAB</a>"
+                  )
+              else:
+                  return '-'
+      
+      page_map = {
+          'ASN path anomalies': 'anomalous_paths/',
+          'ASN path anomalies per site': 'anomalous_paths/',
+          'firewall issue': 'loss-delay/',
+          'complete packet loss': 'loss-delay/',
+          'bandwidth decreased from/to multiple sites': 'loss-delay/',
+          'high packet loss on multiple links': 'loss-delay/',
+          'high packet loss': 'loss-delay/',
+          'hosts not found': 'hosts_not_found/'
+      }
+
+      page = 'throughput/' if event.startswith('bandwidth') else page_map.get(event, '')
+      df['alarm_link'] = df.apply(lambda row: generate_url(row, event, page, site_report), axis=1)
+      return df
   
   @staticmethod
   def createGraphButton(df):
@@ -509,10 +528,14 @@ class Alarms(object):
     description = qrs.getCategory(alarm['event'])['template']
     description = description.split('More')[0]
     words = description.split()
+    print(words)
+    print(description)
 
     try:
       for k, v in alarm['source'].items():
-          field = '%{'+k+'}' if not k == 'avg_value' else 'p{'+k+'}'
+          field = '%{'+k+'}' if not k == 'avg_value' else '%{'+k+'}.'
+          print(k, v)
+          print(field)
           if k == 'dest_loss':
             field = '{dest_loss}'
           elif k == 'src_loss':

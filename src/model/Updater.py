@@ -207,6 +207,9 @@ class ParquetUpdater(object):
         self.groupAlarms(pivotFrames)
 
         for event,df in pivotFrames.items():
+            if event == 'ASN path anomalies per site':
+                print(df.info())
+                # df['all_alarm_ids_src'] = df['all_alarm_ids_src'].eval()
             filename = self.alarms.eventCF(event)
             fdf = frames[event]
             if len(fdf)>0:
@@ -215,7 +218,7 @@ class ParquetUpdater(object):
 
     @timer
     def storeASNPathChanged(self):
-        dateFrom, dateTo = hp.defaultTimeRange(days=2)
+        dateFrom, dateTo = hp.defaultTimeRange(days=3)
         df = qrs.queryPathAnomaliesDetails(dateFrom, dateTo)
         self.pq.writeToFile(df, f"parquet/asn_path_changes.parquet")
 
