@@ -156,10 +156,7 @@ def layout(q=None, **other_unknown_query_strings):
                 dest_site_fields = ['sites', 'cannotBeReachedFrom', 'to_dest_loss', 'from_src_loss', 'dest_netsite', 'dest_site', 'src_site', 'src_netsite']  # ordered by priority if multiple exist
                 destination_sites = []
                 for field in dest_site_fields:
-                    # if frame == "high packet loss on multiple links":
-                    #     print('high packet loss on multiple links')
-                    #     print(alarm.keys())
-                    if field in alarm:
+                    if field in alarm.keys():
                         destination_sites = destination_sites + [html.Div(item) for item in alarm[field].split('\n')]
                 new_row['Involved Site(s)'] = destination_sites
                 site_alarms = pd.concat([site_alarms, pd.DataFrame([new_row])], ignore_index=True)
