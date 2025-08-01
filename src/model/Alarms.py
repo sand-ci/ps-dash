@@ -322,18 +322,19 @@ class Alarms(object):
 
         df = self.replaceCol('tag', df)
         if ('as_source_to' and 'as_destination_from' in df.columns) and ('sites' not in df.columns):
+          
+            df = self.replaceCol('as_source_to', df, '\n')
+            df = self.replaceCol('as_destination_from', df, '\n')
             try:
               df['sites'] = df.apply(
                                         lambda row: set(
-                                            (row['as_source_to'].tolist() + row['as_destination_from'].tolist())
+                                            (row['as_source_to'].split('\n') + row['as_destination_from'].split('\n'))
                                         ),
                                         axis=1
                                     )
             except Exception as e:
               print(e)
               print("Problems with merging sources and destinations for Involved site(s) on a report page for the ASN anomalies per site alarm.")
-            df = self.replaceCol('as_source_to', df, '\n')
-            df = self.replaceCol('as_destination_from', df, '\n')
             print(df.head(5))
         if 'sites' in df.columns:
             df = self.replaceCol('sites', df, '\n')

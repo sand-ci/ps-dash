@@ -542,7 +542,7 @@ def layout(q=None, **other_unknown_query_strings):
                                                                                 ),
                                                                                 html.Div(
                                                                                     id="dynamic-content-container",
-                                                                                    className="p-2"
+                                                                                    className=""
                                                                                 )
                                                                             ]
                                                                         )
@@ -563,7 +563,7 @@ def layout(q=None, **other_unknown_query_strings):
                         html.Div(id="dummy-output", style={"display": "none"}),
                         html.Div(
                                 id="site-status-explanation",
-                                className="boxwithshadow p-0 mt-3",
+                                className="boxwithshadow p-0",
                                 children=[
                                     # 
                                 ]
@@ -575,7 +575,7 @@ def layout(q=None, **other_unknown_query_strings):
         ], className="ml-1 mt-0 mr-0 mb-1"),
     
        
-    ], className="scroll-container ml-1 mt-1 mr-0 mb-1")
+    ], className="mt-1")
     
 def full_range_dates_df(all_dates, column, df):
     """
