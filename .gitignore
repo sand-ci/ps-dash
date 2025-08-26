@@ -142,3 +142,10 @@ venv/
 dev
 creds.key
 ps-dash.code-workspace
+cric.json
+cric_extract_OPN.py
+cric_api.py
+invalid_ips_perfsonar.json
+valid_ips_perfsonar_tested.json
+cric_ips.json
+connectivity.py
