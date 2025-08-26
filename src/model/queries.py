@@ -233,6 +233,8 @@ def queryAlarms(dateFrom, dateTo):
                     'high packet loss',
                     'complete packet loss',
                     'high packet loss on multiple links',
+                    'high delay from/to multiple sites',
+                    'high one-way delay',
                     'firewall issue',
                     'ASN path anomalies',
                     'ASN path anomalies per site',
@@ -258,7 +260,7 @@ def queryAlarms(dateFrom, dateTo):
                             }
                         }
                     },
-{
+                  {
                         "term": {
                             "category": {
                                 "value": "Networking",
@@ -414,8 +416,8 @@ def getSubcategories():
 			 'source cannot reach any', 'firewall issue', 'complete packet loss',
                        	 'unresolvable host', 'hosts not found'],
 
-  'Network': 		 ['bandwidth decreased from/to multiple sites',
-                          'ASN path anomalies','ASN path anomalies per site'],
+  'Network': 		 ['bandwidth decreased from/to multiple sites', "high delay from/to multiple sites",
+                          'high one/way delay', 'high one-way delay', 'ASN path anomalies','ASN path anomalies per site'],
 
   'Other': 		 ['bandwidth increased from/to multiple sites', 'bandwidth increased', 'bandwidth decreased',
                           'high packet loss', 'high packet loss on multiple links']

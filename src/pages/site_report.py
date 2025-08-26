@@ -165,7 +165,7 @@ def layout(q=None, **other_unknown_query_strings):
                     'Details': alarm.get('alarm_link', None),  # Added Details if available
                     'cnt': alarm.get('total_paths_anomalies', 1)
                 }
-                dest_site_fields = ['sites', 'cannotBeReachedFrom', 'to_dest_loss', 'from_src_loss', 'dest_netsite', 'dest_site', 'src_site', 'src_netsite']  # ordered by priority if multiple exist
+                dest_site_fields = ['sites', 'cannotBeReachedFrom', 'to_dest_loss', 'from_src_loss', 'src_sites', 'dest_sites', 'dest_netsite', 'dest_site', 'src_site', 'src_netsite']  # ordered by priority if multiple exist
                 destination_sites = []
                 for field in dest_site_fields:
                     if field in alarm.keys():
@@ -1205,11 +1205,7 @@ def update_dynamic_content(site, alarm_clicks, path_clicks, path_clicks_2, hosts
                 else:
                     print(f"id: {id}, event: {event}")
                     alarm_cont = qrs.getAlarm(id)
-                    if event in ["complete packet loss", "high packet loss", "high packet loss on multiple links", "firewall issue"]:
-                        
-                        # print('URL query:', id)
-                        # print()
-                        # print('Alarm content:', alarm_cont)
+                    if event in ["complete packet loss", "high packet loss", "high packet loss on multiple links", "firewall issue", "high delay from/to multiple sites", "high one/way delay", "high one-way delay"]:
                         alarmsInst = Alarms()
                         alrmContent = alarm_cont['source']
                         event = alarm_cont['event']
@@ -1219,7 +1215,7 @@ def update_dynamic_content(site, alarm_clicks, path_clicks, path_clicks_2, hosts
                                     dbc.Row([
                                         html.P(alarmsInst.buildSummary(alarm_cont), className='subtitle'),
                                     ], justify="start"),
-                                    ])
+                                    ], className='m-2 p-2')
                         kibana_row = html.Div(children=[summary, loss_delay_kibana(alrmContent, event)])
                         return kibana_row, event, alrmContent, visibility
                         

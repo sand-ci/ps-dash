@@ -4,7 +4,7 @@ Module with the extracted functions from different pages that can be reused and 
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-
+import hashlib
 import pandas as pd
 
 import model.queries as qrs
@@ -21,11 +21,12 @@ from utils.parquet import Parquet
 from elasticsearch.helpers import scan
 import dash_bootstrap_components as dbc
 
+
 ####################################################
                 #pages/home.py
 ####################################################
 
-def buildMap(mapDf):
+def buildMap(mapDf, connectivity=False, grouped=False):
     # usually test and production sites are at the same location,
     # so we add some noise to the coordinates to make them visible
     mapDf['lat'] = mapDf['lat'].astype(float) + np.random.normal(scale=0.01, size=len(mapDf))
@@ -87,8 +88,26 @@ def buildMap(mapDf):
         title = 'Status of all sites in the past 48 hours',
         template='plotly_white'
     )
+    if connectivity:
+        print("connectivity")
+        mapDf = mapDf.set_index('site')[['lat','lon']]
+        line_traces = add_connectivity_status(grouped, mapDf)
+        # print(line_traces)
+        for trace in line_traces:
+            fig.add_trace(trace)
+        fig.update_layout(
+            mapbox=dict(
+                center=dict(lat=46.0, lon=8.0),  # set your default center
+                zoom=2.2  # lower = more zoomed out, higher = more zoomed in
+            ),
+            title=f"T1 Sites - Traceroute perfSONAR tests",
+            margin=dict(l=0, r=0, t=0, b=0),
+            showlegend=False
+            )
 
     return fig
+
+
 
 def defineStatus(data, key_value, count_value):
     # remove the path changed between sites event because sites tend to show big numbers for this event
@@ -524,49 +543,6 @@ def asnAnomaliesGroupedAlarmVisualisation(alarm, site, src_alarms, dest_alarms, 
                             }) for asn in asn_list
                         ])
                     ], style={'marginTop': '20px'})
-
-    
-    # ##################### matrix graph #######################
-    # print("site_list_dest")
-    # print(sites_list_dest)
-    # print("site_list_src")
-    # print(sites_list_src)
-    # src_pairs = set(sites_list_dest)
-    # dest_pairs = set(sites_list_src)
-
-    # # Step 2: Find symmetric pairs
-    # symmetric_pairs = src_pairs & dest_pairs
-
-    # # Step 3: Get all unique sites involved
-    # all_sites = list(set(sites_list_dest+sites_list_src))
-    # print("symmetric_pairs")
-    # print(symmetric_pairs)
-    # print("all_sites")
-    # print(all_sites)
-    
-    # matrix = pd.DataFrame(
-    #                         [[1 if s in symmetric_pairs and s != site else 0 for s in all_sites]],
-    #                         index=[site],
-    #                         columns=all_sites
-    #                     )
-    
-    # fig2 = px.imshow(
-    #     matrix,
-    #     x=matrix.columns,
-    #     y=matrix.index,
-    #     color_continuous_scale="YlOrRd",
-    #     title=f"Symmetric Anomalies"
-    # )
-    # fig2.update_traces(xgap=1)
-    # fig2.update_layout(
-    #     plot_bgcolor='rgba(0,0,0,0)',
-    #     paper_bgcolor='rgba(0,0,0,0)',
-    #     height=150,
-    #     margin=dict(t=40, b=40, l=40, r=40)
-    # )
-
-    # fig2.show()
-    # ##########################################################
 
     return_component = html.Div([
             dbc.Row([
@@ -1319,4 +1295,135 @@ def getRawDataFromES(src, dest, ipv6, dateFrom, dateTo):
       return df
 
     else: print(f'No IPs found for the selected sites {src} and {dest} {ipv6}')
+
+######################################################
+# map which visualises OPN site connectivity from ps_trace data
+##################################################### 
+
+def get_color(row):
+    """Return a colour based on traceroute status."""
+    dest_reached = row.get('destination_reached', False)
+    path_complete = row.get('path_complete', False)
+    if not dest_reached and not path_complete:
+        return 'red'
+    elif path_complete and not dest_reached:
+        return 'yellow'
+    else:
+        return 'green'
     
+def quad_bezier_points(p0, p1, p2, n=60):
+    """Return n points along a quadratic Bezier curve defined by p0, p1, p2 (each [lon, lat])."""
+    t = np.linspace(0, 1, n)
+    one_minus_t = 1 - t
+    pts = (one_minus_t[:, None]**2) * p0 + 2 * (one_minus_t[:, None] * t[:, None]) * p1 + (t[:, None]**2) * p2
+    return pts[:, 0], pts[:, 1]  # lons, lats
+
+def control_point_for_arc(lon0, lat0, lon1, lat1, curvature=0.20):
+    """
+    Control point offset from midpoint, perpendicular to the segment.
+    curvature>0 bows one way, <0 the other. Magnitude ~ percent of segment length.
+    """
+    vx, vy = (lon1 - lon0), (lat1 - lat0)
+    seg_len = np.hypot(vx, vy)
+    if seg_len == 0:
+        return lon0, lat0
+    # unit perpendicular (rotate by +90°)
+    px, py = (-vy / seg_len, vx / seg_len)
+    mx, my = (lon0 + lon1) / 2.0, (lat0 + lat1) / 2.0
+    ox, oy = curvature * seg_len * px, curvature * seg_len * py
+    return mx + ox, my + oy
+
+def curvature_for_pair(src, dst, lon0, lat0, lon1, lat1, base=0.22, flip_ratio=0.5, bias=0.0):
+    """
+    Decide curvature sign deterministically for a pair. 
+    - base: absolute curvature magnitude
+    - flip_ratio in [0,1]: fraction of links that should flip sign
+    - bias in [-1,1]: nudges more arcs downward (<0) or upward (>0)
+    """
+    # Start from geometric preference so long east-west-ish links lean consistently
+    base_sign = 1.0 if lon0 < lon1 else -1.0
+
+    # Stable hash in [0,1)
+    hkey = f"{src}|{dst}"
+    hv = int(hashlib.sha1(hkey.encode()).hexdigest(), 16)
+    u = (hv % 10_000_000) / 10_000_000.0
+
+    # Apply bias: shift the threshold for flipping
+    threshold = np.clip(flip_ratio + bias, 0.0, 1.0)
+
+    # Flip if u < threshold (so threshold=0.5 ≈ half flip)
+    sign = base_sign if u >= threshold else -base_sign
+    return sign * base
+
+def make_arc_trace(lat0, lon0, lat1, lon1, color='gray', hovertext='',
+                   src=None, dst=None, base_curv=0.22, flip_ratio=0.5, bias=0.0, n_points=70):
+    """
+    Curved Scattermapbox line between two points using a quadratic Bezier.
+    src/dst strings are used only to make the curvature flip deterministic.
+    """
+    curv = curvature_for_pair(src or "", dst or "", lon0, lat0, lon1, lat1,
+                              base=base_curv, flip_ratio=flip_ratio, bias=bias)
+    cx, cy = control_point_for_arc(lon0, lat0, lon1, lat1, curvature=curv)
+    lons, lats = quad_bezier_points(
+        np.array([lon0, lat0]),
+        np.array([cx,   cy]),
+        np.array([lon1, lat1]),
+        n=n_points
+    )
+    return go.Scattermapbox(
+        lon=lons.tolist(),
+        lat=lats.tolist(),
+        mode='lines',
+        line=dict(color=color, width=2),
+        hoverinfo='text',
+        hovertext=hovertext,
+        showlegend=False
+    )
+
+    
+def add_connectivity_status(df, coords_df):
+    line_traces = []
+    print("in add_connectivity_status...")
+    # print(df)
+    # print(coords_df)
+   # Create arced line traces for each traceroute
+    line_traces = []
+    for _, row in df.iterrows():
+        src = row.get('src_netsite')
+        dst = row.get('dest_netsite')
+        if not src or not dst or src == dst:
+            continue
+        try:
+            lat0, lon0 = coords_df.loc[src, ['lat', 'lon']]
+            lat1, lon1 = coords_df.loc[dst, ['lat', 'lon']]
+            if pd.isna(lat0) or pd.isna(lon0) or pd.isna(lat1) or pd.isna(lon1):
+                continue
+        except KeyError:
+            continue
+
+        colour = get_color(row)
+        hovertext = (
+            f"Source: {src}<br>"
+            f"Destination: {dst}<br>"
+            f"Destination reached: {row.get('destination_reached')}<br>"
+            f"Destination reached stats: {row.get('destination_reached_stats')}<br>"
+            f"Path complete: {row.get('path_complete')}<br>"
+            f"Path complete stats: {row.get('path_complete_stats')}"
+        )
+
+        # Tune these two knobs if you want more/less “smiles”
+        FLIP_RATIO = 0.50   # ≈ half of the links flip sign
+        BIAS       = 0.00   # try -0.15 to bias more arcs downward globally
+
+        trace = make_arc_trace(
+            lat0=lat0, lon0=lon0, lat1=lat1, lon1=lon1,
+            color=colour, hovertext=hovertext,
+            src=src, dst=dst,           # ensures deterministic curvature per pair
+            base_curv=0.22,             # curvature magnitude
+            flip_ratio=FLIP_RATIO,      # fraction to flip
+            bias=BIAS,                  # global nudge (negative -> more “down”)
+            n_points=70
+        )
+        line_traces.append(trace)
+        line_traces.append(trace)
+    return line_traces

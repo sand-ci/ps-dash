@@ -241,19 +241,18 @@ def obtainFieldNames(dateFrom):
     return {'src': 'src_netsite', 'dest': 'dest_netsite'}
   else:
     return {'src': 'src_site', 'dest': 'dest_site'}
-  
+
+
 def loss_delay_kibana(alarmContent, event):
     query = ''
     if 'src' in alarmContent.keys() and 'dest' in alarmContent.keys():
-      query = f'src:{alarmContent["src"]} and dest:{alarmContent["dest"]}'
+        query = f'src:{alarmContent["src"]} and dest:{alarmContent["dest"]}'
     if 'src_host' in alarmContent.keys() and 'dest_host' in alarmContent.keys():
-      query = f'src_host:{alarmContent["src_host"]} and dest_host:{alarmContent["dest_host"]}'
+        query = f'src_host:{alarmContent["src_host"]} and dest_host:{alarmContent["dest_host"]}'
     elif 'host' in alarmContent.keys() and event == 'high packet loss on multiple links':
-      query = f'src_host: {alarmContent["host"]} or dest_host: {alarmContent["host"]}'
+        query = f'src_host: {alarmContent["host"]} or dest_host: {alarmContent["host"]}'
     elif 'host' in alarmContent.keys():
-      query = f'dest_host: {alarmContent["host"]}'
-
-
+        query = f'dest_host: {alarmContent["host"]}'
     dates = hp.getPriorNhPeriod(alarmContent['to'], daysBefore=3, midPoint=False)
     timeRange = f"(from:'{dates[0]}',to:'{dates[1]}')"
     fieldName = obtainFieldNames(dates[0]) 
@@ -261,37 +260,65 @@ def loss_delay_kibana(alarmContent, event):
     pq = Parquet()
     metaDf = pq.readFile('parquet/raw/metaDf.parquet')
 
-    alarmsInst = Alarms()
-    url = f'https://atlas-kibana.mwt2.org:5601/s/networking/app/dashboards?auth_provider_hint=anonymous1#/view/e015c210-65e2-11ed-afcf-d91dad577662?embed=true&_g=(filters%3A!()%2CrefreshInterval%3A(pause%3A!t%2Cvalue%3A0)%2Ctime%3A{timeRange})&show-query-input=true&show-time-filter=true&_a=(query:(language:kuery,query:\'{query}\'))'
+    # Default (generic) link
+    url = (
+        "https://atlas-kibana.mwt2.org:5601/s/networking/app/dashboards"
+        "?auth_provider_hint=anonymous1#/view/e015c210-65e2-11ed-afcf-d91dad577662"
+        f"?embed=true&_g=(filters:!(),refreshInterval:(pause:!t,value:0),time:{timeRange})"
+        f"&show-query-input=true&show-time-filter=true&_a=(query:(language:kuery,query:'{query}'))"
+    )
+    special_urls = {'high packet loss on multiple links': ["https://atlas-kibana.mwt2.org:5601/s/networking/app/dashboards?auth_provider_hint=anonymous1#/view/ee5a6310-8c40-11ed-8156-b9b28813464d", "https://atlas-kibana.mwt2.org:5601/s/networking/app/dashboards?auth_provider_hint=anonymous1#/view/920cd1f0-8c41-11ed-8156-b9b28813464d", "host", "host"],
+                    'high delay from/to multiple sites': ["https://atlas-kibana.mwt2.org:5601/s/networking/app/dashboards?auth_provider_hint=anonymous1#/view/ecf72311-a68f-4882-bbd3-e9ceb5f20c9f", "https://atlas-kibana.mwt2.org:5601/s/networking/app/dashboards?auth_provider_hint=anonymous1#/view/faa80c6e-b12d-4772-a187-056b79f5e1f0", 'netsite', 'site'],
+                    'high one-way delay': ["https://atlas-kibana.mwt2.org:5601/s/networking/app/dashboards?auth_provider_hint=anonymous1#/view/faa80c6e-b12d-4772-a187-056b79f5e1f0", 'netsite', 'site']
+                  }
     
     kibanaIframe = []
-    if event == 'high packet loss on multiple links':
-      if len(alarmContent["dest_sites"])>0:
-        original_names = metaDf[metaDf['netsite'].isin(alarmContent["dest_sites"])]['netsite'].unique()
-        dest_sites = str(list(s for s in set(original_names))).replace('\'', '"').replace('[','').replace(']','').replace(',', ' OR')
-        query = f'src_host: {alarmContent["host"]} and {fieldName["dest"]}:({dest_sites})'
-        url = f'https://atlas-kibana.mwt2.org:5601/s/networking/app/dashboards?auth_provider_hint=anonymous1#/view/ee5a6310-8c40-11ed-8156-b9b28813464d?embed=true&_g=(filters%3A!()%2CrefreshInterval%3A(pause%3A!t%2Cvalue%3A0)%2Ctime%3A{timeRange})&show-query-input=true&show-time-filter=true&hide-filter-bar=true&_a=(query:(language:kuery,query:\'{query}\'))'
-        # print('\n \n',url)
-        kibanaIframe.append(dbc.Row([
-            dbc.Row(html.H3(f"Issues from {alarmContent['site']}")),
-            dbc.Row(html.Iframe(src=url, style={"height": "600px"}))
-          ], className="boxwithshadow pair-details g-0 mb-1 p-3"))
-        
-      if len(alarmContent["src_sites"]) > 0:
-        original_names = metaDf[metaDf['netsite'].isin(alarmContent["src_sites"])]['netsite'].unique()
-        src_sites = str(list(s for s in set(original_names))).replace('\'', '"').replace('[','').replace(']','').replace(',', ' OR')
-        query = f'dest_host: {alarmContent["host"]} and {fieldName["src"]}:({src_sites})'
-        url = f'https://atlas-kibana.mwt2.org:5601/s/networking/app/dashboards?auth_provider_hint=anonymous1#/view/920cd1f0-8c41-11ed-8156-b9b28813464d?embed=true&_g=(filters%3A!()%2CrefreshInterval%3A(pause%3A!t%2Cvalue%3A0)%2Ctime%3A{timeRange})&show-query-input=true&show-time-filter=true&_a=(query:(language:kuery,query:\'{query}\'))'
-        # print('\n \n',url)
-        kibanaIframe.append(dbc.Row([
-            dbc.Row(html.H3(f"Issues to {alarmContent['site']}")),
-            dbc.Row(html.Iframe(src=url, style={"height": "600px"}))
-          ], className="boxwithshadow pair-details g-0 mb-1 p-3"))
+
+    if event in special_urls:
+        url_base = f"?embed=true&_g=(filters:!(),refreshInterval:(pause:!t,value:0),time:{timeRange})&show-query-input=true&show-time-filter=true"
+        if len(alarmContent.get("dest_sites", [])) > 0:
+            original_names = metaDf[metaDf['netsite'].isin(alarmContent["dest_sites"])]['netsite'].unique()
+            dest_sites = str(list(s for s in set(original_names))).replace("'", '"').replace('[','').replace(']','').replace(',', ' OR')
+            query = f'src_{special_urls[event][2]}: {alarmContent[special_urls[event][3]]} and {fieldName["dest"]}:({dest_sites})'
+            query = f"&_a=(query:(language:kuery,query:'{query}'))"
+            url = f"{special_urls[event][0]}{url_base}{query}"
+            kibanaIframe.append(
+                dbc.Row([
+                    dbc.Row(html.H3(f"Issues from {alarmContent['site']}")),
+                    dbc.Row(html.Iframe(src=url, style={"height": "600px"}))
+                ], className="boxwithshadow pair-details g-0 mb-1 p-3")
+            )
+
+        if len(alarmContent.get("src_sites", [])) > 0:
+            original_names = metaDf[metaDf['netsite'].isin(alarmContent["src_sites"])]['netsite'].unique()
+            src_sites = str(list(s for s in set(original_names))).replace("'", '"').replace('[','').replace(']','').replace(',', ' OR')
+            query = f'dest_{special_urls[event][2]}: {alarmContent[special_urls[event][3]]} and {fieldName["src"]}:({src_sites})'
+            query = f"&_a=(query:(language:kuery,query:'{query}'))"
+            url = f"{special_urls[event][1]}{url_base}{query}"
+            
+            kibanaIframe.append(
+                dbc.Row([
+                    dbc.Row(html.H3(f"Issues to {alarmContent['site']}")),
+                    dbc.Row(html.Iframe(src=url, style={"height": "600px"}))
+                ], className="boxwithshadow pair-details g-0 mb-1 p-3")
+            )
+        if event == "high one-way delay":
+            query = f"&_a=(query:(language:kuery,query:'{query}'))"
+            url = f"{special_urls[event][0]}{url_base}{query}"
+            kibanaIframe.append(
+                dbc.Row([
+                    dbc.Row(html.H3(f"Issues between {alarmContent['src_site']} and {alarmContent['dest_site']}")),
+                    dbc.Row(html.Iframe(src=url, style={"height": "600px"}))
+                ], className="boxwithshadow pair-details g-0 mb-1 p-3")
+            )
     else:
-      kibanaIframe = dbc.Row([html.Iframe(src=url, style={"height": "1000px"})], className="boxwithshadow pair-details g-0")
+        kibanaIframe = dbc.Row(
+            [html.Iframe(src=url, style={"height": "1000px"})],
+            className="boxwithshadow pair-details g-0"
+        )
 
     return dbc.Row(kibanaIframe, style={"padding": "0.5% 1.5%"}, className='g-0 p-3')
-  
+
 ###############################################
             #throughput.py
 ###############################################
