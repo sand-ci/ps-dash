@@ -83,18 +83,6 @@ def total_number_of_alarms(sitesDf):
             ], className='w-100 status-box gx-4', align="center", justify='center'),
         ], className='boxwithshadowhidden g-0 mb-1', style={"background-color": "#ffffff"})]
 
-
-    # html_elements.append(dbc.Col([
-    #     dbc.Row(children=total_status, justify="center", align="center", className='h-100')],
-    #     className='status-box boxwithshadow col-md-auto', md=6, xs=12))
-
-    # # add the total number of alarms to the html
-    # for k,v in sitesDf.sum(numeric_only=True).to_dict().items():
-    #     html_elements.append(dbc.Col([
-    #         html.H3(f'Total number of {k} alarms', className='status-title'),
-    #         html.H1(f'{v}', className='status-number'),
-    #     ], className='status-box boxwithshadow', md=2, xs=3))
-
     # add the highest number of alarms based on site name to the html
     country_code = get_country_code(sitesDf[sitesDf['site']==highest_site]['country'].values[0])
     html_elements.append(
@@ -336,10 +324,7 @@ def update_output(n_clicks, start_date, end_date, sites, all, events, allevents,
         scntdf = pd.DataFrame()
         for e, df in pivotFrames.items():
             if len(df) > 0:
-                if e != 'unresolvable host': # the tag is hostname for unresolvable hosts
-                    df = df[df['tag'] != ''].groupby('tag')[['id']].count().reset_index().rename(columns={'id': 'cnt', 'tag': 'site'})
-                else: df = df[df['site'] != ''].groupby('site')[['id']].count().reset_index().rename(columns={'id': 'cnt'})
-                
+                df = df[df['tag'] != ''].groupby('tag')[['id']].count().reset_index().rename(columns={'id': 'cnt', 'tag': 'site'})
                 df['event'] = e
                 scntdf = pd.concat([scntdf, df])
 

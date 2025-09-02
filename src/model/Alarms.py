@@ -12,14 +12,51 @@ from utils.helpers import timer
 import model.queries as qrs
 from utils.parquet import Parquet
 import dash_bootstrap_components as dbc
+import re
+from typing import List, Any, Dict
 
 import urllib3
 urllib3.disable_warnings()
+
+PLACEHOLDER_RE = re.compile(r'%\{([^}]+)\}')
+
+def substitute_tokens(words: List[str], alarm: Dict[str, Any]) -> List[str]:
+    """
+    Replace every '%{key}' substring inside each token with alarm['source'][key].
+    - If alarm['source'][key] is a list/tuple/set, it is joined by ', '.
+    - If a key is missing, the placeholder is left as-is.
+    Returns a new list with substitutions applied.
+    """
+    source = alarm.get('source', {}) or {}
+
+    def _replace(m: re.Match) -> str:
+        key = m.group(1)
+        if key not in source:
+            return m.group(0)  # keep the original %{key}
+        val = source[key]
+        if val is None:
+            return ' - '
+        if isinstance(val, (list, tuple, set)):
+            if len(val) == 0:
+                return ' - '
+            return " | ".join(map(str, val))
+        return str(val)
+
+    out = []
+    for token in words:
+        if "%{" in token:
+            out.append(PLACEHOLDER_RE.sub(_replace, token))
+        else:
+            out.append(token)
+    return out
+
 
 class Alarms(object):
 
   @staticmethod
   def list2rows(df):
+      if 'max_delay_p95' in df.columns:
+        df['tag'] = df['tags']
       s = df.apply(lambda x: pd.Series(x['tag']), axis=1).stack().reset_index(level=1, drop=True)
       s.name = 'tag'
       df = df.drop('tag', axis=1).join(s)
@@ -51,6 +88,9 @@ class Alarms(object):
                                      listSites='sites',
                                      listedNewName='src_site')
             df['tag'] = df['site']
+            
+          elif event in ['high delay from/to multiple sites', 'unresolvable host']:
+            df['tag'] = df['site']
 
           elif event in ['high packet loss on multiple links', 'bandwidth increased from/to multiple sites', 'bandwidth decreased from/to multiple sites']:
             df = self.oneInBothWaysUnfold(df)
@@ -69,7 +109,7 @@ class Alarms(object):
                          'bandwidth increased',
                          'complete packet loss',
                          'hosts not found',
-                         'unresolvable host']:
+                         'high one-way delay']:
             df = self.list2rows(df)
 
           pivotFrames[event] = df
@@ -321,16 +361,21 @@ class Alarms(object):
                 'bandwidth decreased from/to multiple sites': ''}
 
         df = self.replaceCol('tag', df)
-        if 'as_source_to' and 'as_destination_from' in df.columns:
-            df['sites'] = df.apply(
-                                      lambda row: set(
-                                          (row['as_source_to'] if isinstance(row['as_source_to'], (list, tuple)) else []) +
-                                          (row['as_destination_from'] if isinstance(row['as_destination_from'], (list, tuple)) else [])
-                                      ),
-                                      axis=1
-                                  )
+        if ('as_source_to' and 'as_destination_from' in df.columns) and ('sites' not in df.columns):
+          
             df = self.replaceCol('as_source_to', df, '\n')
             df = self.replaceCol('as_destination_from', df, '\n')
+            try:
+              df['sites'] = df.apply(
+                                        lambda row: set(
+                                            (row['as_source_to'].split('\n') + row['as_destination_from'].split('\n'))
+                                        ),
+                                        axis=1
+                                    )
+            except Exception as e:
+              print(e)
+              print("Problems with merging sources and destinations for Involved site(s) on a report page for the ASN anomalies per site alarm.")
+            print(df.head(5))
         if 'sites' in df.columns:
             df = self.replaceCol('sites', df, '\n')
         if 'diff' in df.columns:
@@ -396,7 +441,8 @@ class Alarms(object):
               additionalTable = True
             df = self.convertListOfDict('hosts_not_found', df, additionalTable)
             
-        drop_columns = {'complete packet loss': ['avg_value'], 'ASN path anomalies': ['asn_count'], 'ASN path anomalies per site': ['all_alarm_ids_src', 'all_alarm_ids_dest']}
+        drop_columns = {'complete packet loss': ['avg_value'], 'ASN path anomalies': ['asn_count'], 'ASN path anomalies per site': ['all_alarm_ids_src', 'all_alarm_ids_dest'],
+                        'high delay from/to multiple sites': ['alarm_type', 'body', 'tags'], 'high one/way delay': ['alarm_type', 'body', 'tags'], 'high one-way delay': ['alarm_type', 'body', 'tags']}
 
         
 
@@ -499,6 +545,9 @@ class Alarms(object):
           'bandwidth decreased from/to multiple sites': 'loss-delay/',
           'high packet loss on multiple links': 'loss-delay/',
           'high packet loss': 'loss-delay/',
+          'high delay from/to multiple sites': 'loss-delay/',
+          'high one/way delay': 'loss-delay/',
+          'high one-way delay': 'loss-delay/',
           'hosts not found': 'hosts_not_found/'
       }
 
@@ -525,47 +574,25 @@ class Alarms(object):
   @timer
   # The code uses the description from ES and replaces the variables with the values
   def buildSummary(alarm):
+    event = alarm['event']
+    if event == 'high delay from/to multiple sites':
+          alarm['source']['affected_src_sites'] = alarm['source']['src_sites']
+          alarm['source']['affected_dest_sites'] = alarm['source']['dest_sites']
     description = qrs.getCategory(alarm['event'])['template']
     description = description.split('More')[0]
     words = description.split()
-    print(words)
-    print(description)
+        
+    # print(words)
+    # print(description)
 
     try:
-      for k, v in alarm['source'].items():
-          field = '%{'+k+'}' if not k == 'avg_value' else '%{'+k+'}.'
-          print(k, v)
-          print(field)
-          if k == 'dest_loss':
-            field = '{dest_loss}'
-          elif k == 'src_loss':
-            field = '{src_loss}'
-          if k == '%change':
-            field = '%{%change}%'
-          if k == 'change':
-            field = '%{change}%'
-
-          if field in words or field+',' in words or field+'.' in words or field+';' in words:
-            if isinstance(v, list):
-              if len(v) == 0:
-                v = ' - '
-              else:
-                v = '  |  '.join(str(l) for l in v)
-              v = "\n" + v
-
-            if k == 'avg_value':
-              v = str(v)+'%'
-            elif k == '%change':
-              v = str(v)+'%'
-            elif k == 'change':
-              v = str(v)+'%'
-            
-            if v is None:
-              v = ' - '
-
-            description = description.replace(field, str(v))
+        description = substitute_tokens(words, alarm)
+        # print("DESCRIPTION")
+        description = " ".join(description)
+        # print(description)
 
     except Exception as e:
       print(e)
+      print("buildSummary() failed to process the description...")
 
     return description

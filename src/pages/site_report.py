@@ -53,19 +53,31 @@ alarmsInst = Alarms()
 
 def layout(q=None, **other_unknown_query_strings):
     # global site
-    site = q
-    
-    if q is not None:
-        print(f"Site name: {q}")
-    else:
-        return html.Div(className="boxwithshadowhidden", children=[
-                        # header line with site name
-                        html.H3("\tSITE-NAME", className="card header-line p-1",  
-                                style={"background-color": "#00245a", "color": "white", "font-size": "25px"}),
-                        html.H4("The site name is missing. It is impossible to generate a report on the site.", style={"padding-top": "3%", "padding-left": "3%"}),
-                        ]
-                        )
     pq = Parquet()
+    site = q
+    alarmCnt = pq.readFile('parquet/alarmsGrouped.parquet')
+    alarmCnt = alarmCnt[alarmCnt['site'] == site]
+    if q is not None:
+        metaData = qrs.getSiteMetadata(q)
+        print(metaData)
+        if (metaData is None) and alarmCnt.empty:
+            return html.Div(
+                        className="boxwithshadow",
+                        style={
+                            'padding': '20px',
+                            'text-align': 'center',
+                            'margin': '10px 0'
+                        },
+                        children=[
+                            html.Div(
+                                html.I(className="fa fa-times-circle",
+                                    style={'color': 'red', 'font-size': '48px'}),
+                                style={'margin-bottom': '15px'}
+                            ),
+                            html.H4("No Data Found", style={'margin-bottom': '10px'}),
+                            html.P(f"The site name {q} is missing in meta data. It is impossible to generate a report on the site.")
+                        ]
+                    )
     
     now = datetime.now()
     current_hour = pd.Timestamp.now().hour
@@ -153,38 +165,16 @@ def layout(q=None, **other_unknown_query_strings):
                     'Details': alarm.get('alarm_link', None),  # Added Details if available
                     'cnt': alarm.get('total_paths_anomalies', 1)
                 }
-                dest_site_fields = ['sites', 'cannotBeReachedFrom', 'to_dest_loss', 'from_src_loss', 'dest_netsite', 'dest_site', 'src_site', 'src_netsite']  # ordered by priority if multiple exist
+                dest_site_fields = ['sites', 'cannotBeReachedFrom', 'to_dest_loss', 'from_src_loss', 'src_sites', 'dest_sites', 'dest_netsite', 'dest_site', 'src_site', 'src_netsite']  # ordered by priority if multiple exist
                 destination_sites = []
                 for field in dest_site_fields:
-                    # if frame == "high packet loss on multiple links":
-                    #     print('high packet loss on multiple links')
-                    #     print(alarm.keys())
-                    if field in alarm:
+                    if field in alarm.keys():
                         destination_sites = destination_sites + [html.Div(item) for item in alarm[field].split('\n')]
                 new_row['Involved Site(s)'] = destination_sites
                 site_alarms = pd.concat([site_alarms, pd.DataFrame([new_row])], ignore_index=True)
 
     print(f"Total alarms collected: {site_alarms_num}")
-
-    if site_alarms_num == 0:
-        return html.Div(
-            className="boxwithshadow",
-            style={
-                'padding': '20px',
-                'text-align': 'center',
-                'margin': '10px 0'
-            },
-            children=[
-                html.Div(
-                    html.I(className="fas fa-check-circle", 
-                        style={'color': 'green', 'font-size': '48px'}),
-                    style={'margin-bottom': '15px'}
-                ),
-                html.H4("No Alarms Detected", style={'margin-bottom': '10px'}),
-                html.P(f"There were no alarms during the last 7 days at {q}")
-            ]
-        )
-    # extract meta data like CPU, country and hosts
+     # extract meta data like CPU, country and hosts
     meta_df = qrs.getMetaData()
     meta_df['host_ip'] = meta_df.apply(
         lambda row: (row['host'], 'ipv6' if row['ipv6'] else 'ipv4'),
@@ -201,6 +191,180 @@ def layout(q=None, **other_unknown_query_strings):
         cpus, cpu_cores = site_meta_data.iloc[0]['cpus'], site_meta_data.iloc[0]['cpu_cores']
     else:
         cpus, cpu_cores = None, None
+    if site_alarms_num == 0:
+        return html.Div([
+                dbc.Col([
+                    
+                    
+                    html.Div(
+                        className="boxwithshadow",
+                        style={
+                            'padding': '20px',
+                            'width': "99%",
+                            'justify-self': 'center',
+                            'margin-top': '15px',
+                            'margin-bottom': '15px',
+                            },
+                        children=[
+                                dbc.Col([
+                                        html.H3(f"{q} Daily Status", style={"padding-left": "3%", "padding-top": "3%", 'margin-bottom': '0px',"background-color": "#ffffff"}),
+                                        html.Div(
+                                            dcc.Graph(
+                                                id="site-status-alarms",
+                                                figure=create_status_chart_explained(site_alarms, start_date, end_date, full_dates),
+                                                config={'displayModeBar': False},
+                                                style={
+                                                    'width': '100%',
+                                                    'height': '100px'
+                                                }
+                                            ), style={'margin-top': '0px',"background-color": "#ffffff"}
+                                        ),
+                                        dcc.Store(id='site-statuses', data={}),
+                                        dbc.Modal(
+                                            [
+                                                dbc.ModalHeader(dbc.ModalTitle("How was the status determined?")),
+                                                dbc.ModalBody(id="how-status-modal-body-report"),
+                                                dbc.ModalFooter(
+                                                    dbc.Button("Close", id="close-how-status-modal-report", className="ml-auto", n_clicks=0)
+                                                ),
+                                            ],
+                                            id="how-status-modal-report",
+                                            size="lg",
+                                            is_open=False,
+                                        )
+                                ])
+                                
+                        ]
+                    ),
+                    html.Div(
+                        style={
+                            'width': "99%",
+                            'justify-self': 'center',
+                            'margin-bottom': '10px',
+                            },
+                        children=[
+                                dbc.Row([   
+                                    dbc.Col(
+                                        html.Div(
+                                            className="boxwithshadow page-cont p-2 h-100",
+                                            children=[
+                                                html.H3(f"Number of Alarms", style={"color": "white", "padding-left": "5%", "padding-top": "5%"}),
+                                                html.H1(
+                                                    '0',
+                                                    style={
+                                                        "color": "white", 
+                                                        "font-size": "1000%",
+                                                        "display": "flex",          # Enables Flexbox
+                                                        "justify-content": "center", # Centers horizontally
+                                                        "align-items": "center",     # Centers vertically
+                                                        "height": "100%",            # Takes full available height
+                                                        "margin": "0",               # Removes default margins
+                                                        "padding-bottom": "20px"    # Optional: Adjusts spacing
+                                                    }
+                                                )
+                                            ],
+                                            style={
+                                                "background-color": "#00245a",
+                                                "display": "flex",              # Flexbox for the container
+                                                "flex-direction": "column",     # Stacks children vertically
+                                            }
+                                        ),
+                                        width=3
+                                    ),
+                            dbc.Col(html.Div(
+                                    className="boxwithshadow page-cont p-2 h-100",
+                                    style={
+                                        "padding": "20px",
+                                        'text-align': 'center',
+                                        "display": "flex",              # Flexbox for the container
+                                        "flex-direction": "column",     # Stacks children vertically
+                                        'justify-content': 'center'
+                                    },
+                                    children=[
+                                        html.Div(
+                                            html.I(className="fas fa-check-circle", 
+                                                style={'color': 'green', 'font-size': '48px'}),
+                                            style={'margin-bottom': '15px'}
+                                        ),
+                                        html.H4("No Alarms Detected", style={'margin-bottom': '10px'}),
+                                        html.P(f"There were no alarms during the last 7 days at {q}")
+                                    ]
+                            ), width=5),
+                            # metadata card
+                            dbc.Col(
+                                html.Div(className="boxwithshadow page-cont p-2 h-100", style={"background-color": "#ffffff", "align-content":"center", 'justify-items':'stretch'}, children=[
+                                    # html.H3("Summary", style={"padding-top": "5%", "padding-left": "5%"}),
+                                    dbc.Row(
+                                        [
+                                        dbc.Col(
+                                            html.Div(
+                                                [   
+                                                    html.H4(f"Country: \t{country}", style={"padding-left": "10%", "pading-top": "5"}),
+                                                    html.H4(f"CPUs: \t{cpus}", style={"padding-left": "10%", "pading-top": "5"}),
+                                                    html.H4(f"CPU Cores: \t{cpu_cores}", style={"padding-left": "10%", "pading-top": "5"}),
+                                                    ],
+                                                 style={"height": "100%", "display": "flex", "flex-direction": "column"}
+                                                ),
+                                                    width=6,
+                                                    style={
+                                                        "border-right": "1px solid #ddd",  # Thin vertical line
+                                                        "padding-right": "20px",
+                                                        "padding-top": "20px",
+                                                        "align-content":"center"
+                                                        
+                                                    }
+                                        ),
+                                        dbc.Col([
+                                            html.H4(f"{site} hosts:", style={"padding-left": "10%", "padding-top": "20px"}),
+                                            html.Div([
+                                                
+                                                html.Ul(
+                                                    [
+                                                        html.Li(
+                                                            [
+                                                                html.Span(f"{host} ", className="font-weight-bold"),
+                                                                html.Span(
+                                                                    f"({ip_ver})",
+                                                                    className="badge badge-pill badge-success" if ip_ver == "ipv6" 
+                                                                    else "badge badge-pill badge-primary"
+                                                                )
+                                                            ],
+                                                            className=""
+                                                        )
+                                                        for host, ip_ver in hosts_ip  
+                                                    ],
+                                                    className="list-unstyled", style={"padding-top": "5%"},
+                                            )
+                                            ], style={
+                                                            'height': '200px', 
+                                                            'overflow-y': 'auto',  # Enable vertical scrolling
+                                                            'width': '100%', # Thin vertical line
+                                                            "padding-right": "20px",
+                                                            "padding-left": "10%",
+                                                            "justify-self": "end"
+                                                        }
+                                            )
+                                        ], width=6)
+                                        
+                                    ], className="align-items-stretch",  # Makes columns equal height
+                                ),
+                                
+                            
+                            ]), width=4, style={"background-color": "#b9c4d4;", "height": "100%"})
+                        ], className="my-3", style={"height": "300px"})
+                        ]),
+                    
+                # general websites' measurements
+                html.Div(id='site-measurements',
+                        children=siteMeasurements(q, pq),
+                        style={
+                            'width': "99%",
+                            'justify-self': 'center',
+                            'margin-bottom': '10px',
+                            }),
+                                
+                ])
+        ])
         
     
     return html.Div(children = [
@@ -348,12 +512,17 @@ def layout(q=None, **other_unknown_query_strings):
                                         [
                                         dbc.Col(
                                             html.Div(
-                                                [
+                                                [   
                                                     html.H4(f"Country: \t{country}", style={"padding-left": "10%", "pading-top": "5"}),
                                                     html.H4(f"CPUs: \t{cpus}", style={"padding-left": "10%", "pading-top": "5"}),
-                                                    html.H4(f"CPU Cores: \t{cpu_cores}", style={"padding-left": "10%", "pading-top": "5"})
+                                                    html.H4(f"CPU Cores: \t{cpu_cores}", style={"padding-left": "10%", "pading-top": "5"}),
+                                                    dbc.Col([dbc.Button(
+                                                                html.H4("View Measurements →"),
+                                                                id="view-measurements-btn",
+                                                                color="link"
+                                                            )], style={"padding-left": "7%"})
                                                     ],
-                                                        style={"height": "100%", "display": "flex", "flex-direction": "column"}
+                                                    style={"height": "100%", "display": "flex", "flex-direction": "column"}
                                                 ),
                                                     width=6,
                                                     style={
@@ -398,17 +567,7 @@ def layout(q=None, **other_unknown_query_strings):
                                         
                                     ], className="align-items-stretch",  # Makes columns equal height
                                 ),
-                                dbc.Button(
-                                            "View Measurements →",
-                                            id="view-measurements-btn",
-                                            color="link",
-                                            style={
-                                                # "margin-left": "80px",
-                                                "margin-top": "1%",
-                                                "width": "100%",
-                                                # "border-radius": "5px"
-                                            }
-                                        )
+                                
                             
                             ]), width=4, style={"background-color": "#b9c4d4;", "height": "100%"})
                         ], className="my-3 pl-1", style={"height": "300px"}),
@@ -545,7 +704,7 @@ def layout(q=None, **other_unknown_query_strings):
                                                                                 ),
                                                                                 html.Div(
                                                                                     id="dynamic-content-container",
-                                                                                    className="p-2"
+                                                                                    className=""
                                                                                 )
                                                                             ]
                                                                         )
@@ -566,7 +725,7 @@ def layout(q=None, **other_unknown_query_strings):
                         html.Div(id="dummy-output", style={"display": "none"}),
                         html.Div(
                                 id="site-status-explanation",
-                                className="boxwithshadow p-0 mt-3",
+                                className="boxwithshadow p-0",
                                 children=[
                                     # 
                                 ]
@@ -578,7 +737,7 @@ def layout(q=None, **other_unknown_query_strings):
         ], className="ml-1 mt-0 mr-0 mb-1"),
     
        
-    ], className="scroll-container ml-1 mt-1 mr-0 mb-1")
+    ], className="mt-1")
     
 def full_range_dates_df(all_dates, column, df):
     """
@@ -674,6 +833,45 @@ def create_status_chart_explained(graphData, fromDay, toDay, full_range_dates):
     global statuses
     fromDay = pd.to_datetime(fromDay)
     toDay = pd.to_datetime(toDay)
+    if graphData.empty:
+        # Use the last 7 days from full_range_dates or generate last 7 days from toDay
+        if full_range_dates is not None and len(full_range_dates) >= 7:
+            days = sorted(pd.to_datetime(full_range_dates[-7:]))
+        else:
+            days = [toDay - pd.Timedelta(days=i) for i in reversed(range(7))]
+        
+        # Format days as strings for hovertext
+        day_labels = [d.strftime('%d %b') for d in days]
+        
+        # Create figure with one horizontal bar of length 7 (one segment per day)
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=[1]*7,  # Equal width segments
+            y=['Status']*7,
+            marker_color='green',
+            orientation='h',
+            hoverinfo='text',
+            hovertext=[f"Day: {label}<br>Status: ok" for label in day_labels],
+            showlegend=False
+        ))
+        
+        # Update layout for a clean single bar chart
+        fig.update_layout(
+            barmode='stack',
+            height=150,
+            margin=dict(l=40, r=20, t=20, b=20),
+            yaxis=dict(showticklabels=True, tickfont=dict(size=12)),
+            xaxis=dict(
+                tickvals=list(range(7)),
+                ticktext=day_labels,
+                title='Last 7 Days',
+                showgrid=False,
+                zeroline=False
+            ),
+            plot_bgcolor='rgba(0,0,0,0)'
+        )
+        return fig
+    
     fig = make_subplots(
         rows=2, 
         cols=1, 
@@ -681,6 +879,7 @@ def create_status_chart_explained(graphData, fromDay, toDay, full_range_dates):
         vertical_spacing=0.15,
         row_heights=[0.2, 0.8]  # 20% for status bar, 80% for alarms
     )
+
     # graphData = graphData[(pd.to_datetime(graphData['to']).dt.date >= fromDay.date()) & (pd.to_datetime(graphData['to']).dt.date <= toDay.date())]
     # 
     red_status, yellow_status, grey_status, graphData = defineStatus(graphData, "alarm name", ['to', 'alarm name'])
@@ -1006,11 +1205,7 @@ def update_dynamic_content(site, alarm_clicks, path_clicks, path_clicks_2, hosts
                 else:
                     print(f"id: {id}, event: {event}")
                     alarm_cont = qrs.getAlarm(id)
-                    if event in ["complete packet loss", "high packet loss", "high packet loss on multiple links", "firewall issue"]:
-                        
-                        # print('URL query:', id)
-                        # print()
-                        # print('Alarm content:', alarm_cont)
+                    if event in ["complete packet loss", "high packet loss", "high packet loss on multiple links", "firewall issue", "high delay from/to multiple sites", "high one/way delay", "high one-way delay"]:
                         alarmsInst = Alarms()
                         alrmContent = alarm_cont['source']
                         event = alarm_cont['event']
@@ -1020,7 +1215,7 @@ def update_dynamic_content(site, alarm_clicks, path_clicks, path_clicks_2, hosts
                                     dbc.Row([
                                         html.P(alarmsInst.buildSummary(alarm_cont), className='subtitle'),
                                     ], justify="start"),
-                                    ])
+                                    ], className='m-2 p-2')
                         kibana_row = html.Div(children=[summary, loss_delay_kibana(alrmContent, event)])
                         return kibana_row, event, alrmContent, visibility
                         
