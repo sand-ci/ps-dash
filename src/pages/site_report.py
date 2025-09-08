@@ -127,25 +127,25 @@ def layout(q=None, **other_unknown_query_strings):
             # drop time
             site_df['to'] = site_df['to'].dt.normalize()  # or .dt.floor('D')
             site_df['to'] = site_df['to'].dt.strftime('%Y-%m-%d')
-            if frame == "hosts not found":
-                site_df['hosts'] = None
-                site_df['hosts list'] = None
-                for i, row in site_df.iterrows():
-                    s = set()
-                    hosts_list = row['hosts_not_found'].values()
-                    for item in hosts_list:
-                        if item is not None:
-                            if isinstance(item, np.ndarray):  # Handle numpy arrays
-                                s.update(tuple(item))  # Convert to tuple first
-                            elif isinstance(item, (list, set, tuple)):
-                                s.update(item)
-                            else:
-                                s.add(item)
-                    hosts_list = s
-                    # print("HOSTS LIST")
-                    # print(hosts_list)
-                    site_df.at[i, 'hosts list'] = hosts_list
-                    site_df.at[i, 'hosts'] = hosts_list
+            # if frame == "hosts not found":
+            #     site_df['hosts'] = None
+            #     site_df['hosts list'] = None
+            #     for i, row in site_df.iterrows():
+            #         s = set()
+            #         hosts_list = row['hosts_not_found'].values()
+            #         for item in hosts_list:
+            #             if item is not None:
+            #                 if isinstance(item, np.ndarray):  # Handle numpy arrays
+            #                     s.update(tuple(item))  # Convert to tuple first
+            #                 elif isinstance(item, (list, set, tuple)):
+            #                     s.update(item)
+            #                 else:
+            #                     s.add(item)
+            #         hosts_list = s
+            #         # print("HOSTS LIST")
+            #         # print(hosts_list)
+            #         site_df.at[i, 'hosts list'] = hosts_list
+            #         site_df.at[i, 'hosts'] = hosts_list
             site_df = alarmsInst.formatDfValues(site_df, frame, False, True)
             if 'hosts' in site_df.columns:
                 site_df['hosts'] = site_df['hosts'].apply(lambda x: html.Div([html.Div(item) for item in x.split('\n')]) if isinstance(x, str) else x)
@@ -1174,12 +1174,12 @@ def update_dynamic_content(site, alarm_clicks, path_clicks, path_clicks_2, hosts
                 visibility = {'visibility': 'visible'}
                 
                 #host not found visualisation
-                if event == 'hosts not found':
-                    histData = createDictionaryWithHistoricalData(pd_df)
-                    site_name, id = button_id['index'].split(', ')
-                    fig, test_types, hosts, site = create_heatmap(pd_df, site, fromDay.replace("T", " ").replace(".000Z", ""), toDay.replace("T", " ").replace(".000Z", ""))
-                    alarm = qrs.getAlarm(id)['source']
-                    return dcc.Graph(figure=fig, className="p-3"), event, alarm, visibility
+                # if event == 'hosts not found':
+                #     histData = createDictionaryWithHistoricalData(pd_df)
+                #     site_name, id = button_id['index'].split(', ')
+                #     fig, test_types, hosts, site = create_heatmap(pd_df, site, fromDay.replace("T", " ").replace(".000Z", ""), toDay.replace("T", " ").replace(".000Z", ""))
+                #     alarm = qrs.getAlarm(id)['source']
+                #     return dcc.Graph(figure=fig, className="p-3"), event, alarm, visibility
 
                 #ASN anomalies visualisation
                 if 'ASN path anomalies' in event:

@@ -21,8 +21,9 @@ from ml.packet_loss_train_model import packet_loss_train_model
 import os
 from datetime import datetime, timedelta
 import psconfig.api
-
-
+import logging
+import requests
+import json
 @timer
 class ParquetUpdater(object):
     
@@ -170,34 +171,115 @@ class ParquetUpdater(object):
 
     @timer
     def psConfigData(self):
-        mesh_url = "https://psconfig.aglt2.org/pub/config"
-        mesh_config = psconfig.api.PSConfig(mesh_url)
-        all_hosts = mesh_config.get_all_hosts()
-        host_test_type = pd.DataFrame({
-                                        'host': list(all_hosts),
-                                        'owd': False,
-                                        'trace': False,
-                                        'throughput': False
-                                        })
-        def checkTestsForHost(host, mesh_conf):
-            """
-            Classifies the host as belonging to one of
-            the three test groups (latency, trace and throughput).
-            """
-            try:
-                types = mesh_conf.get_test_types(host)
-            except Exception:
-                return False, False
-            latency = any(test in ['latency', 'latencybg'] for test in types)
-            trace = 'trace' in types
-            throughput = any(test in ['throughput', 'rtt'] for test in types) # as rtt is now in ps_throughput
-            return host, latency, trace, throughput
+        log = logging.getLogger(__name__)
         
-        host_test_type = host_test_type['host'].apply(
-            lambda host: pd.Series(checkTestsForHost(host, mesh_config))
-        )
-        host_test_type.columns = ['host', 'owd', 'trace', 'throughput']
-        self.pq.writeToFile(host_test_type, f"{self.location}raw/psConfigData.parquet")
+        def request(url, hostcert=None, hostkey=None, verify=False):
+            log.debug('Retrieving {}'.format(url))
+            if hostcert and hostkey:
+                req = requests.get(url, verify=verify, timeout=120, cert=(hostcert, hostkey))
+            else:
+                req = requests.get(url, timeout=120, verify=verify)
+            req.raise_for_status()
+            return req.content
+        
+        def extract_host_info(config):
+            hosts = config.get("hosts", {})
+            groups = config.get("groups", {})
+            tasks = config.get("tasks", {})
+            tests = config.get("tests", {})
+            schedules = config.get("schedules", {})
+            # print(schedules)
+            # Map each group to its test type
+            group_type_map = {}
+            test_schedule_map = {}
+            for task_name, task_info in tasks.items():
+                group_name = task_info.get("group")
+                if group_name:
+                    test_type = tests.get(group_name).get("type")
+                    group_type_map[group_name] = test_type
+                schedule = task_info.get("schedule")
+                test_schedule_map[group_name] = schedules.get(schedule, None)
+            # print(test_schedule_map)
+            # For each host, find groups it belongs to
+            # groups have list of addresses with names
+            # Check which groups contain this host
+            host_rows = []
+            # print(groups)
+            for host in hosts.keys():
+                participating_groups = []
+                participating_types = []
+                participating_schedules = []
+                participating_tests = []
+
+                for group_name, group_info in groups.items():
+                    addr_list = group_info.get("addresses", [])
+                    # check if host is in this group's addresses
+                    if any(addr.get("name") == host for addr in addr_list):
+                        participating_groups.append(group_name)
+                        # get type of test associated with group
+                        test_type = group_type_map.get(group_name, None)
+                        if test_type:
+                            participating_types.append(test_type)
+                        # get schedule(s) from tests that belong to this group
+                        # find tests whose group matches group_name
+                        for task_name, task_info in tasks.items():
+                            if task_info.get("group") == group_name:
+                                schedule = test_schedule_map.get(task_name, {})
+                                participating_schedules.append(schedule)
+                                participating_tests.append(group_name)
+                extract_cric_site = False
+                row = {
+                    "Host": host,
+                    # "Site": queryNetsiteForHost(host),
+                    "Groups": participating_groups,
+                    "Types": participating_types,
+                    "Schedules": participating_schedules,
+                    "Test Count": len(set(participating_tests))
+                }
+                host_rows.append(row)
+            #     print(row)
+            # print("\n\n\n")
+            return host_rows
+        
+        
+        url = "https://psconfig.aglt2.org/pub/config"
+        req = request(url)
+        config_st = json.loads(req)
+        # mesh_url = "https://psconfig.aglt2.org/pub/config"
+        # mesh_config = psconfig.api.PSConfig(mesh_url)
+        # all_hosts = mesh_config.get_all_hosts()
+        configs_df = pd.DataFrame() 
+        for e in config_st:
+            # print(e)
+            mesh_url = e['include'][0]
+            mesh_r = request(mesh_url)
+
+            
+            mesh_config = json.loads(mesh_r)
+            host_info_list = extract_host_info(mesh_config)  # list of dicts
+            current_df = pd.DataFrame(host_info_list)
+            configs_df = pd.concat([configs_df, current_df], ignore_index=True)
+            
+        self.pq.writeToFile(configs_df, f"{self.location}raw/psConfigData.parquet")
+        # def checkTestsForHost(host, mesh_conf):
+        #     """
+        #     Classifies the host as belonging to one of
+        #     the three test groups (latency, trace and throughput).
+        #     """
+        #     try:
+        #         types = mesh_conf.get_test_types(host)
+        #     except Exception:
+        #         return False, False
+        #     latency = any(test in ['latency', 'latencybg'] for test in types)
+        #     trace = 'trace' in types
+        #     throughput = any(test in ['throughput', 'rtt'] for test in types) # as rtt is now in ps_throughput
+        #     return host, latency, trace, throughput
+        
+        # host_test_type = host_test_type['host'].apply(
+        #     lambda host: pd.Series(checkTestsForHost(host, mesh_config))
+        # )
+        # host_test_type.columns = ['host', 'owd', 'trace', 'throughput']
+        # self.pq.writeToFile(host_test_type, f"{self.location}raw/psConfigData.parquet")
         
     @timer
     def storeAlarms(self):

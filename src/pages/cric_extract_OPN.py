@@ -15,7 +15,7 @@ def extract_addresses_cric():
     body = data["body"]
 
     # Find the index positions for the columns we need
-    site_index = header.index("NetSite")
+    site_index = header.index("NetworkRoute")
     subnets_index = header.index("Subnets")
     lhcopn_limit_index = header.index("LHCOPN limit")
 
@@ -36,7 +36,7 @@ def extract_addresses_cric():
 # print(extract_addresses_cric().keys())
 
 T1_NETSITES = [
-    "BNL-ATLAS-LHCOPNE", "USCMS-FNAL-WC1-LHCOPNE", "RAL-LCG2",
+    "BNL-ATLAS-LHCOPNE", "USCMS-FNAL-WC1-LHCOPNE", "RAL-LCG2-LHCOPN",
     "RRC-KI-T1-LHCOPNE", "JINR-T1-LHCOPNE", "NCBJ-LHCOPN",
     "NLT1-SARA-LHCOPNE", "INFN-T1-LHCOPNE", "NDGF-T1-LHCOPNE",
     "KR-KISTI-GSDC-1-LHCOPNE", "IN2P3-CC-LHCOPNE", "pic-LHCOPNE",
@@ -44,12 +44,12 @@ T1_NETSITES = [
 ]
 
 
-cric_elastic_mapping = {'CERN-PROD-LHCOPNE': 'CH-CERN', 'BNL-ATLAS-LHCOPNE': 'US-BNL', 
-                        'INFN-T1-LHCOPNE': 'IT-INFN-CNAF', 'USCMS-FNAL-WC1-LHCOPNE': 'US-CMS', 
-                        'FZK-LCG2-LHCOPNE': 'DE-KIT', 'IN2P3-CC-LHCOPNE': 'FR-IN2P3', 'RAL-LCG2': 'UK-RAL', 
-                        'JINR-T1-LHCOPNE': 'RU-JINR-T1', 'PIC-LHCOPNE': 'ES-PIC', 'RRC-KI-T1-LHCOPNE': 'RU-RRC-KI-T1', 
-                        'NLT1-SARA-LHCOPNE': 'NL-NLT1-SARA', 'TRIUMF-LCG2-LHCOPNE': 'CA-TRIUMF', 'NDGF-T1-LHCOPNE': 'EU-NDGF', 
-                        'KR-KISTI-GSDC-1-LHCOPNE': 'KR-KISTI', 'NCBJ-LHCOPN': 'PL-NCBJ-CIS', 'TW-ASGC': 'TW-ASGC'}
+cric_elastic_mapping = {'CERN-PROD-LHCOPNE': 'CERN-PROD-LHCOPNE', 'BNL-ATLAS-LHCOPNE': 'BNL-ATLAS-LHCOPNE', 
+                        'INFN-T1-LHCOPNE': 'INFN-T1-LHCOPNE', 'USCMS-FNAL-WC1-LHCOPNE': 'USCMS-FNAL-WC1-LHCOPNE', 
+                        'FZK-LCG2-LHCOPNE': 'FZK-LCG2-LHCOPNE', 'IN2P3-CC-LHCOPNE': 'IN2P3-CC-LHCOPNE', 'RAL-LCG2-LHCOPN': 'RAL-LCG2-LHCOPN', 
+                        'JINR-T1-LHCOPNE': 'JINR-T1-LHCOPNE', 'PIC-LHCOPNE': 'pic-LHCOPNE', 'RRC-KI-T1-LHCOPNE': 'RRC-KI-T1-LHCOPNE', 
+                        'NLT1-SARA-LHCOPNE': 'NLT1-SARA-LHCOPNE', 'TRIUMF-LCG2-LHCOPNE': 'TRIUMF-LCG2-LHCOPNE', 'NDGF-T1-LHCOPNE': 'NDGF-T1-LHCOPNE', 
+                        'KR-KISTI-GSDC-1-LHCOPNE': 'KR-KISTI-GSDC-1-LHCOPNE', 'NCBJ-LHCOPN': 'NCBJ-LHCOPN', 'TW-ASGC': 'Taiwan-LCG2-LHCOPNE'}
 
 def query_records(date_from_str, date_to_str, allowed_sites=None):
     if allowed_sites is None:
@@ -95,6 +95,8 @@ def query_records(date_from_str, date_to_str, allowed_sites=None):
             extracted.append({
                 'src_netsite': (item['_source'].get('src_netsite')).upper(),
                 'dest_netsite': (item['_source'].get('dest_netsite')).upper(),
+                'src_host': item['_source'].get('src_host'),
+                'dest_host': item['_source'].get('dest_host'),
                 'destination_reached': item['_source'].get('destination_reached'),
                 'path_complete': item['_source'].get('path_complete'),
                 'src_ipvs': src_ipvs,
@@ -171,7 +173,7 @@ def query_valid_trace_data(hours):
     # Collect per-site IPs
     invalid_ips_by_site = defaultdict(set)
     valid_ips_by_site = defaultdict(set)
-
+    uscms_in = False
     for record in traceroute_records:
         srcs = record.get('src_ipvs', [])
         dsts = record.get('dst_ipvs', [])
@@ -179,6 +181,8 @@ def query_valid_trace_data(hours):
         # Map ps_trace NetSite -> CRIC key, then fetch that site's subnets
         src_site = record['src_netsite']
         dst_site = record['dest_netsite']
+        if src_site == 'USCMS-FNAL-WC1-LHCOPNE' or dst_site == 'USCMS-FNAL-WC1-LHCOPNE':    
+            uscms_in = True
         src_site_key = cric_elastic_mapping.get(src_site)
         dst_site_key = cric_elastic_mapping.get(dst_site)
 
@@ -215,5 +219,6 @@ def query_valid_trace_data(hours):
     print(valid_ips_perfsonar_tested)
     print(f"Before filtering: {len(traceroute_records)}")
     print(f"After filtering: {len(valid_traceroutes)}")
+    print("USCMS was in traceroute_records: ", uscms_in)
 
     return valid_traceroutes

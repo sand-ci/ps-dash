@@ -6,12 +6,11 @@ from dash import html
 import dash_loading_spinners
 from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output, State
-
 from model.Updater import ParquetUpdater
 
 
 # cache the data in /parquet.
-ParquetUpdater()
+# ParquetUpdater()
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css',
                         "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css",
@@ -102,7 +101,7 @@ app.layout = html.Div(children=[
                             [
                                dbc.NavItem(dbc.NavLink("SITES OVERVIEW", href="/",
                                                        id='sites-tab', class_name="nav-item-cls")),
-                               dbc.NavItem(dbc.NavLink("PERFSONAR DATA", href="/network-testing",
+                               dbc.NavItem(dbc.NavLink("PERFSONAR ANALYTICS", href="/network-testing",
                                                        id='perfsonar-tab', class_name="nav-item-cls")),
                                 dbc.NavItem(dbc.NavLink("EXPLORE PATHS", href="/explore-paths/all",
                                                         id='paths-tab', class_name="nav-item-cls"

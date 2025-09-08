@@ -149,7 +149,7 @@ from collections import defaultdict
 import json
 
 
-def query_valid_trace_data(hours):
+def query_valid_trace_data(hours, cric_filter=True):
     """
     As some tests are run on not perfsonar hosts we are getting wrong image about trace data. 
     This function extracts data only for OPN/T1 sites from Elasticsearch,
@@ -164,6 +164,9 @@ def query_valid_trace_data(hours):
     date_from_str = date_from.strftime(hp.DATE_FORMAT)
 
     traceroute_records = query_records(date_from_str, date_to_str, allowed_sites=T1_NETSITES)
+    
+    if not cric_filter:
+        return traceroute_records
     cric_T1_networks = extract_addresses_cric()
 
     valid_traceroutes = []
@@ -171,7 +174,7 @@ def query_valid_trace_data(hours):
     # Collect per-site IPs
     invalid_ips_by_site = defaultdict(set)
     valid_ips_by_site = defaultdict(set)
-
+    uscms_in = False
     for record in traceroute_records:
         srcs = record.get('src_ipvs', [])
         dsts = record.get('dst_ipvs', [])
@@ -179,6 +182,9 @@ def query_valid_trace_data(hours):
         # Map ps_trace NetSite -> CRIC key, then fetch that site's subnets
         src_site = record['src_netsite']
         dst_site = record['dest_netsite']
+        if src_site == 'USCMS-FNAL-WC1-LHCOPNE' or dst_site == 'USCMS-FNAL-WC1-LHCOPNE':    
+            uscms_in = True
+
         src_site_key = cric_elastic_mapping.get(src_site)
         dst_site_key = cric_elastic_mapping.get(dst_site)
 
@@ -215,8 +221,9 @@ def query_valid_trace_data(hours):
     print(valid_ips_perfsonar_tested)
     print(f"Before filtering: {len(traceroute_records)}")
     print(f"After filtering: {len(valid_traceroutes)}")
-
+    print("USCMS was in traceroute_records: ", uscms_in)
     return valid_traceroutes
+
 cric_ips = extract_addresses_cric()
 with open('cric_ips.json', 'w') as f:
         json.dump(cric_ips, f, indent=2)

@@ -108,7 +108,7 @@ class Alarms(object):
                          'bandwidth decreased',
                          'bandwidth increased',
                          'complete packet loss',
-                         'hosts not found',
+                        #  'hosts not found',
                          'high one-way delay']:
             df = self.list2rows(df)
 
@@ -435,11 +435,11 @@ class Alarms(object):
 
         if 'configurations' in df.columns:
             df = self.replaceCol('configurations', df, '\n')
-        if 'hosts_not_found' in df.columns or event == 'hosts not found':
-            additionalTable = False
-            if 'hosts_not_found' not in df.columns:
-              additionalTable = True
-            df = self.convertListOfDict('hosts_not_found', df, additionalTable)
+        # if 'hosts_not_found' in df.columns or event == 'hosts not found':
+        #     additionalTable = False
+        #     if 'hosts_not_found' not in df.columns:
+        #       additionalTable = True
+        #     df = self.convertListOfDict('hosts_not_found', df, additionalTable)
             
         drop_columns = {'complete packet loss': ['avg_value'], 'ASN path anomalies': ['asn_count'], 'ASN path anomalies per site': ['all_alarm_ids_src', 'all_alarm_ids_dest'],
                         'high delay from/to multiple sites': ['alarm_type', 'body', 'tags'], 'high one/way delay': ['alarm_type', 'body', 'tags'], 'high one-way delay': ['alarm_type', 'body', 'tags']}
@@ -495,13 +495,13 @@ class Alarms(object):
                       n_clicks=0
                   ) if idx!='-' else '-'
             
-              elif event == 'hosts not found':
-                  return dbc.Button(
-                      "VIEW DETAILS",
-                      id={'type': 'hosts-not-found-btn', 'index': f"{row['site']}, {row['alarm_id']}"},
-                      className="btn btn-secondary",
-                      n_clicks=0
-                  ) if row['site'] else '-'
+              # elif event == 'hosts not found':
+              #     return dbc.Button(
+              #         "VIEW DETAILS",
+              #         id={'type': 'hosts-not-found-btn', 'index': f"{row['site']}, {row['alarm_id']}"},
+              #         className="btn btn-secondary",
+              #         n_clicks=0
+              #     ) if row['site'] else '-'
 
               elif 'alarm_link' in row and row['alarm_link']:
                   return dbc.Button(
@@ -524,11 +524,11 @@ class Alarms(object):
                       if details!='-' else '-'
                   )
 
-              elif event == 'hosts not found':
-                  return (
-                      f"<a class='btn btn-secondary' role='button' href='{host_url}{page}{row['site']}' target='_blank'>VIEW IN A NEW TAB</a>"
-                      if row['site'] else '-'
-                  )
+              # elif event == 'hosts not found':
+              #     return (
+              #         f"<a class='btn btn-secondary' role='button' href='{host_url}{page}{row['site']}' target='_blank'>VIEW IN A NEW TAB</a>"
+              #         if row['site'] else '-'
+              #     )
 
               elif 'alarm_link' in row and row['alarm_link']:
                   return (
@@ -548,7 +548,7 @@ class Alarms(object):
           'high delay from/to multiple sites': 'loss-delay/',
           'high one/way delay': 'loss-delay/',
           'high one-way delay': 'loss-delay/',
-          'hosts not found': 'hosts_not_found/'
+          # 'hosts not found': 'hosts_not_found/'
       }
 
       page = 'throughput/' if event.startswith('bandwidth') else page_map.get(event, '')

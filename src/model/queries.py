@@ -1,6 +1,6 @@
 import traceback
 from elasticsearch.helpers import scan
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import pandas as pd
 from dateutil.parser import parse
 
@@ -241,7 +241,7 @@ def queryAlarms(dateFrom, dateTo):
                     'destination cannot be reached from any',
                     'destination cannot be reached from multiple',
                     'source cannot reach any',
-                    'hosts not found',
+                    # 'hosts not found',
                     'unresolvable host',
                     'bandwidth decreased',
                     'bandwidth increased',
@@ -414,7 +414,8 @@ def getSubcategories():
   'Infrastructure': 	['bad owd measurements','large clock correction',
 	 		 'destination cannot be reached from multiple', 'destination cannot be reached from any',
 			 'source cannot reach any', 'firewall issue', 'complete packet loss',
-                       	 'unresolvable host', 'hosts not found'],
+      #  'hosts not found',
+                       	 'unresolvable host'],
 
   'Network': 		 ['bandwidth decreased from/to multiple sites', "high delay from/to multiple sites",
                           'high one/way delay', 'high one-way delay', 'ASN path anomalies','ASN path anomalies per site'],
@@ -787,3 +788,43 @@ def queryUnreachableDestination(alarm_name, site, dateTo):
   except Exception as e:
     print('Exception:', e)
     print(traceback.format_exc())
+
+def hostFoundInES(host, lookback_days, indeces):
+    """
+    Checks whether host was found in Elasticsearch in the last lookback_days days in ps_trace, ps_throughout or ps_owd indeces.
+    Returns True if found, False otherwise.
+    """
+    since = (datetime.now(timezone.utc) - timedelta(days=lookback_days)).isoformat()
+    for idx in indeces:
+        q = {
+            "size": 1,
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"range": {"@timestamp": {"gte": since}}},
+                        {"bool": {
+                            "should": [
+                                {"term": {"src_host": host}},
+                                {"term": {"dest_host": host}},
+                                {"term": {"src": host}},
+                                {"term": {"dest": host}},
+                                {"term": {"host": host}}
+                            ],
+                            "minimum_should_match": 1
+                        }}
+                    ]
+                }
+            },
+            "sort": [{"@timestamp": "desc"}]
+        }
+        try:
+            res = hp.es.search(index=idx, body=q)
+            hits = res.get("hits", {}).get("hits", [])
+            if len(hits) > 0:
+                return True
+        except Exception as e:
+            print("Host: ", host)
+            print("Exception in Elasticsearch query?")
+            print(e)
+            pass
+    return False
