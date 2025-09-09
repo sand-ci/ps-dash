@@ -792,7 +792,7 @@ def queryUnreachableDestination(alarm_name, site, dateTo):
 def hostFoundInES(host, lookback_days, indeces):
     """
     Checks whether host was found in Elasticsearch in the last lookback_days days in ps_trace, ps_throughout or ps_owd indeces.
-    Returns True if found, False otherwise.
+    Returns True if found and rcsite + netsite name if available, False otherwise.
     """
     since = (datetime.now(timezone.utc) - timedelta(days=lookback_days)).isoformat()
     for idx in indeces:
@@ -821,10 +821,16 @@ def hostFoundInES(host, lookback_days, indeces):
             res = hp.es.search(index=idx, body=q)
             hits = res.get("hits", {}).get("hits", [])
             if len(hits) > 0:
-                return True
+                inf = hits[0]['_source']
+                if host in [inf['src_host'], inf['src']]:
+                    return (True, inf['src_netsite'], inf['src_rcsite'])
+                elif host in [inf['dest_host'], inf['dest']]:
+                    return (True, inf['dest_netsite'], inf['dest_rcsite'])
+                else:
+                    return (True, "-", "-")
         except Exception as e:
             print("Host: ", host)
             print("Exception in Elasticsearch query?")
             print(e)
             pass
-    return False
+    return (False, "-", "-")

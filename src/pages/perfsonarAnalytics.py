@@ -21,12 +21,20 @@ from pages.cric_extract_OPN import query_valid_trace_data
 
 import utils.helpers as hp
 from utils.parquet import Parquet
+from utils.hosts_audit import audit
 from utils.utils import buildMap, generateStatusTable, get_color
 from dash import dash_table as dt
+import numpy as np
+import plotly.express as px
 
-import psconfig.api
-import requests
 import urllib3
+import asyncio, socket, ssl
+from contextlib import suppress
+import aiohttp
+import model.queries as qrs
+from pathlib import Path
+from datetime import datetime, timezone, timedelta
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 dash.register_page(
@@ -35,6 +43,8 @@ dash.register_page(
     title='Network testing',
     description="",
 )
+AUDIT_PARQUET = Path("parquet/audited_hosts.parquet")
+AUDIT_TTL = timedelta(hours=24)
 T1_NETSITES = [
     "BNL-ATLAS-LHCOPNE", "USCMS-FNAL-WC1-LHCOPNE", "RAL-LCG2-LHCOPN",
     "RRC-KI-T1-LHCOPNE", "JINR-T1-LHCOPNE", "NCBJ-LHCOPN",
@@ -42,6 +52,18 @@ T1_NETSITES = [
     "KR-KISTI-GSDC-1-LHCOPNE", "IN2P3-CC-LHCOPNE", "PIC-LHCOPNE",
     "FZK-LCG2-LHCOPNE", "CERN-PROD-LHCOPNE", "TRIUMF-LCG2-LHCOPNE", 'TW-ASGC'
 ]
+
+PORT = 443
+CONNECT_TIMEOUT = 3
+HTTP_TIMEOUT = aiohttp.ClientTimeout(total=5)
+RETRIES = 3
+BACKOFF = [0, 5, 15]
+STATUSES = ["ACTIVE_HTTP", "ACTIVE_TCP_ONLY", "UNREACHABLE_CANDIDATE", "RETIRED_DNS"]
+ES_INDICES = ["ps_trace", "ps_throughput", "ps_owd"]
+LOOKBACK_DAYS = 30
+AUDITED_HOSTS = []
+
+
 def readParquetPsConfig(pq):
     """
     The function reads parquet file that is updated every 24 \
@@ -57,6 +79,22 @@ def readParquetPsConfig(pq):
     except Exception as err:
         print(err)
         print(f"Problems with reading the file {parquet_path}")
+
+def readParquetCRIC(pq):
+    """
+    The function reads parquet file that is updated every 24 \
+    hours with the data about perfSONARs from CRIC.
+    """
+    parquet_path = 'parquet/raw/CRICData.parquet'
+    try: 
+        print("Reading the parquet file with CRIC data...")
+        lst = pq.readFile(parquet_path)['host'].tolist()
+        print(f"CRIC data from parquet file: {lst}")
+        return lst
+    except Exception as err:
+        print(err)
+        print(f"Problems with reading the file {parquet_path}")
+
 
 def layout(**other_unknown_query_strings):
     HOURS = 2 
@@ -116,30 +154,20 @@ def layout(**other_unknown_query_strings):
     all_hosts_in_configs = mesh_config['Host'].unique()
     print(f"All hosts in psConfig: {len(all_hosts_in_configs)}\n")
     
-    # print(" --- getting PerfSonars from WLCG CRIC ---")
-    # all_cric_perfsonar_hosts = []
-    # r = requests.get(
-    #     'https://wlcg-cric.cern.ch/api/core/service/query/?json&state=ACTIVE&type=PerfSonar',
-    #     verify=False
-    # )
-    # res = r.json()
-    # for _key, val in res.items():
-    #     if not val['endpoint']:
-    #         print('no hostname? should not happen:', val)
-    #         continue
-    #     p = val['endpoint']
-    #     all_cric_perfsonar_hosts.append(p)
-    # print(f"All perfSONAR hosts in CRIC: {len(all_cric_perfsonar_hosts)}\n")
+    
+    print(" --- getting PerfSonars from WLCG CRIC ---")
+    all_cric_perfsonar_hosts = readParquetCRIC(pq)
+    print(f"All perfSONAR hosts in CRIC: {len(all_cric_perfsonar_hosts)}\n")
 
-    # print(" --- audit of all hosts from psConfigAdmin ---")
-    # result = await hosts_audit(all_hosts_in_configs, all_cric_perfsonar_hosts)
-    # grouped_result = group_by_status(result)
-
+    
     # UI
     return html.Div(children=[
+        
         html.Div(children=[
             # Title
             dcc.Store(id="valid-data", data=traceroutes_dict),
+            dcc.Store(id="config_hosts", data=all_hosts_in_configs),
+            dcc.Store(id="cric_hosts", data=all_cric_perfsonar_hosts),
             html.H1(id="network-testing-title",
                             children=f"T1/OPN Disconnections — Last {HOURS} Hours pc_trace Tests"
                 f"({date_from.strftime('%Y-%m-%d %H:%M')} to {date_to.strftime('%Y-%m-%d %H:%M')} UTC)",
@@ -293,9 +321,235 @@ html.Div(children=[
             style_header={"fontWeight": "600"},
         ),
     ], className="mb-4")
-    ], className="p-1 site boxwithshadow page-cont m-3")
+    ], className="p-1 site boxwithshadow page-cont m-3"),
 
-    ])
+    html.Div(children=[
+        dbc.Row([dbc.Col([dbc.Row(html.H2("pSConfig Web Admin Hosts Audit", className="mt-2")),
+                          html.Div(id="last-audit", className="text-secondary small mb-2")]),
+                 dbc.Col(
+                        html.Div([
+                            dbc.ButtonGroup([
+                                dbc.Button("Audit", id="audit-btn", className="me-2", n_clicks=0),
+                                dbc.Button("Open PWA ↗", href="https://psconfig.opensciencegrid.org/#!/configs/58f74a4df5139f0021ac29d6", className="me-2", target="_blank", color="secondary"),
+                            ])
+                        ]),
+                        md=4, className="d-flex align-items-center justify-content-md-end mt-2 mt-md-0"
+                    )
+                ]),
+        dcc.Store(id="audit-data"),
+        # ---------- Filters ----------
+        dbc.Row([
+            dbc.Col([
+                html.Label("Status", className="small text-muted"),
+                dcc.Dropdown(id="f-status", options=[], value=None, multi=True, placeholder="All")
+            ], md=4),
+            dbc.Col([
+                html.Label("In CRIC", className="small text-muted"),
+                dcc.Dropdown(
+                    id="f-incric",
+                    options=[{"label":"Yes","value":True}, {"label":"No","value":False}],
+                    value=None, multi=True, placeholder="All"
+                )
+            ], md=4),
+            dbc.Col([
+                html.Label("Found in ES (30d)", className="small text-muted"),
+                dcc.Dropdown(
+                    id="f-found",
+                    options=[{"label":"Yes","value":True}, {"label":"No","value":False}],
+                    value=None, multi=True, placeholder="All"
+                )
+            ], md=4),
+        ], className="mb-2"),
+        
+        # ---------- Charts ----------
+        dbc.Row([
+            dbc.Col(dcc.Graph(id="donut-status"), md=6),
+            dbc.Col(dcc.Graph(id="bar-status"), md=6),
+        ], className="mb-2"),
+
+        # ---------- Table ----------
+        dbc.Row([
+            dcc.Loading(
+                id="loading-audit",
+                type="default",
+                color="#00245A",
+                children=[
+                    # container Div for the table
+                    dbc.Row(
+                        dbc.Col(
+                            html.Div(id="audit-table"),  # <-- stays a Div
+                            width=12
+                        )
+                    )
+                ]
+            )
+        ]),
+    ], className="p-1 site boxwithshadow page-cont m-3")
+ ])
+    
+
+def _is_fresh(p: Path, ttl: timedelta) -> bool:
+    if not p.exists():
+        return False
+    mtime = datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc)
+    return (datetime.now(timezone.utc) - mtime) < ttl
+
+@dash.callback(
+    Output("audit-data", "data"),
+    Output("last-audit", "children"),
+    Input("audit-btn", "n_clicks"),
+    State("config_hosts", "data"),
+    State("cric_hosts", "data"),
+    prevent_initial_call=True
+)
+def run_audit(n, config_hosts, cric_hosts):
+    # Load cache if fresh
+    if _is_fresh(AUDIT_PARQUET, AUDIT_TTL):
+        df = pd.read_parquet(AUDIT_PARQUET)
+        ts = datetime.fromtimestamp(AUDIT_PARQUET.stat().st_mtime, tz=timezone.utc)
+        return df.to_dict("records"), f"Using cached audit from {ts:%Y-%m-%d %H:%M:%S} UTC"
+
+    # Otherwise compute and cache
+    audited = asyncio.run(audit(config_hosts, cric_hosts))  # <-- your coroutine
+    df = pd.DataFrame(audited)
+    AUDIT_PARQUET.parent.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(AUDIT_PARQUET, index=False)
+    ts = datetime.now(timezone.utc)
+    return df.to_dict("records"), f"Audited at {ts:%Y-%m-%d %H:%M:%S} UTC"
+
+# pretty mapping for the donut
+STATUS_PRETTY = {
+    "ACTIVE_HTTP": "Active HTTP",
+    "ACTIVE_TCP_ONLY": "Active TCP only",
+    "UNREACHABLE_CANDIDATE": "Unreachable",
+    "RETIRED_DNS": "Retired DNS",
+}
+
+# donut colors (3 greens + red + grey for anything else)
+STATUS_COLORS = {
+    "Active HTTP":      "#0B8043",  # deep green
+    "Active TCP only":  "#34A853",  # green
+    "Unreachable":      "#A8D5B8",  # pale green
+    "Retired DNS":      "#D93025",  # red
+    "Other":            "#9E9E9E",  # grey
+}
+
+@dash.callback(
+    Output("audit-table", "children"),
+    Output("donut-status", "figure"),
+    Output("bar-status", "figure"),
+    Output("f-status", "options"),
+    Input("audit-data", "data"),
+    Input("f-status", "value"),
+    Input("f-incric", "value"),
+    Input("f-found", "value"),
+)
+def render_audit(data, f_status, f_incric, f_found):
+    # Empty state
+    if not data:
+        empty_fig = px.scatter(title="No data yet — click Audit")
+        return html.Div(dt.DataTable(data=[], columns=[])), empty_fig, empty_fig, []
+
+    df = pd.DataFrame(data).copy()
+
+    # Ensure expected columns exist/types
+    for c in ["status", "in_cric", "found_in_ES"]:
+        if c not in df.columns:
+            df[c] = np.nan
+    # Normalize boolean-ish
+    if df["in_cric"].dtype != bool:
+        df["in_cric"] = df["in_cric"].astype(bool, errors="ignore")
+    if df["found_in_ES"].dtype != bool:
+        df["found_in_ES"] = df["found_in_ES"].astype(bool, errors="ignore")
+
+    # Build status options dynamically
+    all_statuses = sorted(df["status"].dropna().astype(str).unique().tolist())
+    status_opts = [{"label": s, "value": s} for s in all_statuses]
+
+    # Apply filters (None => no filtering)
+    fdf = df.copy()
+    if f_status:
+        fdf = fdf[fdf["status"].astype(str).isin(f_status)]
+    if f_incric:
+        fdf = fdf[fdf["in_cric"].isin(f_incric)]
+    if f_found:
+        fdf = fdf[fdf["found_in_ES"].isin(f_found)]
+
+    # ---------- Table (reacts to filters) ----------
+    tdf = fdf.copy()
+    # display-friendly booleans
+    tdf["in_cric"] = np.where(tdf["in_cric"], "Yes", "No")
+    tdf["found_in_ES"] = np.where(tdf["found_in_ES"], "Yes", "No")
+    # keep a consistent column order if available
+    display_cols = [c for c in ["host","netsite","status","in_cric","found_in_ES","suggestion"] if c in tdf.columns]
+    table = dt.DataTable(
+        data=tdf[display_cols].to_dict("records"),
+        columns=[{"name": c.replace("_"," ").title(), "id": c} for c in display_cols],
+        sort_action="native",
+        filter_action="native",  # you still get native table filtering
+        page_size=20,
+        style_table={"overflowX": "auto"},
+        style_cell={"fontFamily": "Inter, system-ui", "fontSize": 13, "padding": "6px"},
+        style_header={"fontWeight": "600"},
+        style_data_conditional=[
+            {"if": {"filter_query": "{suggestion} = 'Delete from psConfig & CRIC'"},
+             "backgroundColor": "rgba(255,0,0,0.08)"},
+            {"if": {"filter_query": "{suggestion} = 'Delete from psConfig'"},
+             "backgroundColor": "rgba(255,128,0,0.08)"},
+            {"if": {"filter_query": "{suggestion} = 'Add to CRIC'"},
+             "backgroundColor": "rgba(0,128,255,0.08)"},
+            {"if": {"filter_query": "{suggestion} contains 'Investigate'"},
+             "backgroundColor": "rgba(255,215,0,0.10)"},
+        ],
+    )
+
+    # ---------- Donut (reacts to filters) ----------
+    gdf = fdf.copy()
+    # map to pretty groups; unknowns -> "Other"
+    gdf["status_group"] = (
+        gdf["status"].map(STATUS_PRETTY).fillna("Other")
+    )
+
+    donut_counts = gdf.groupby("status_group").size().reset_index(name="count")
+    # ensure consistent color order
+    donut_counts["color_key"] = donut_counts["status_group"].map(lambda s: STATUS_COLORS.get(s, STATUS_COLORS["Other"]))
+    fig_donut = px.pie(
+        donut_counts, names="status_group", values="count",
+        hole=0.55, title="Hosts by Status"
+    )
+    # apply custom colors
+    fig_donut.update_traces(marker=dict(colors=[STATUS_COLORS.get(s, STATUS_COLORS["Other"])
+                                                for s in donut_counts["status_group"]]),
+                            textposition="inside")
+    fig_donut.update_layout(showlegend=True)
+
+    # ---------- Grouped Bar (reacts to filters) ----------
+    # Build tidy counts for two metrics: In CRIC and Found in ES
+    bar_incric = (
+        gdf.groupby(["status_group","in_cric"]).size().reset_index(name="count")
+        .assign(metric="In CRIC",
+                flag=lambda d: d["in_cric"].map({True:"Yes", False:"No"}))
+        .drop(columns=["in_cric"])
+    )
+    bar_found = (
+        gdf.groupby(["status_group","found_in_ES"]).size().reset_index(name="count")
+        .assign(metric="Found in ES",
+                flag=lambda d: d["found_in_ES"].map({True:"Yes", False:"No"}))
+        .drop(columns=["found_in_ES"])
+    )
+    bar_df = pd.concat([bar_incric, bar_found], ignore_index=True)
+    bar_df["series"] = bar_df["metric"] + ": " + bar_df["flag"]
+
+    fig_bar = px.bar(
+        bar_df, x="status_group", y="count", color="series",
+        barmode="group", title="Host Found In CRIC & ES"
+    )
+    fig_bar.update_layout(xaxis={'categoryorder': 'total descending'})
+
+    return table, fig_donut, fig_bar, status_opts
+
+
+
 
 @dash.callback(
     [
@@ -562,3 +816,4 @@ def compute_connectivity_summaries(grouped_df: pd.DataFrame, sites: list[str]):
     summary_df["all_red_dest_flag"] = summary_df["all_red_dest_flag"].astype(str)
     print(f"type: {summary_df.dtypes}")
     return summary_df, missing_expanded_df
+

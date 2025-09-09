@@ -215,10 +215,9 @@ def query_valid_trace_data(hours):
     with open('valid_ips_perfsonar_tested.json', 'w') as f:
         json.dump(valid_ips_perfsonar_tested, f, indent=2)
 
-    print(invalid_traceroutes)
-    print(valid_ips_perfsonar_tested)
+    # print(invalid_traceroutes)
+    # print(valid_ips_perfsonar_tested)
     print(f"Before filtering: {len(traceroute_records)}")
     print(f"After filtering: {len(valid_traceroutes)}")
-    print("USCMS was in traceroute_records: ", uscms_in)
 
     return valid_traceroutes

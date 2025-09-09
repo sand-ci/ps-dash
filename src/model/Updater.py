@@ -45,6 +45,7 @@ class ParquetUpdater(object):
                 # self.storeThroughputDataAndModel()
                 # self.storePacketLossDataAndModel()
                 self.psConfigData()
+                self.storeCRICData()
 
             # Set the schedulers
             Scheduler(60*60*12, self.storeMetaData)
@@ -52,6 +53,7 @@ class ParquetUpdater(object):
 
             Scheduler(60*30, self.storeAlarms)
             Scheduler(60*60*12, self.storeASNPathChanged)
+            Scheduler(60*60*24, self.storeCRICData)
             Scheduler(60*60*24, self.psConfigData)
 
 
@@ -168,6 +170,24 @@ class ParquetUpdater(object):
     def storeMetaData(self):
         metaDf = qrs.getMetaData()
         self.pq.writeToFile(metaDf, f"{self.location}raw/metaDf.parquet")
+        
+    @timer
+    def storeCRICData(self):
+        all_hosts = []
+        r = requests.get(
+            'https://wlcg-cric.cern.ch/api/core/service/query/?json&state=ACTIVE&type=PerfSonar',
+            verify=False
+        )
+        res = r.json()
+        for _key, val in res.items():
+            if not val['endpoint']:
+                print('no hostname? should not happen:', val)
+                continue
+            p = val['endpoint']
+            all_hosts.append(p)
+        df = pd.DataFrame(all_hosts, columns=['host'])
+        self.pq.writeToFile(df, f"{self.location}raw/CRICData.parquet")
+        
 
     @timer
     def psConfigData(self):
