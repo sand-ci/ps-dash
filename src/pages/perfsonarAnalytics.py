@@ -7,9 +7,7 @@
 #TODO: aggregation of records(I'm not aggregating, the query is bad but represents what I want to do)
 #TODO: make a switch between latency, traceroute, packetloss?
 #TODO: visualise meshes of testing 
-#TODO: create it as perfSONAR toolkits status analytics page
 #TODO: query once per 2 hours, don't query every time the picture is updated
-#TODO: map size depending on a screen size
 
 import dash
 from dash import dcc, html
@@ -89,7 +87,7 @@ def readParquetCRIC(pq):
     try: 
         print("Reading the parquet file with CRIC data...")
         lst = pq.readFile(parquet_path)['host'].tolist()
-        print(f"CRIC data from parquet file: {lst}")
+        # print(f"CRIC data from parquet file: {lst}")
         return lst
     except Exception as err:
         print(err)
@@ -153,7 +151,7 @@ def layout(**other_unknown_query_strings):
     mesh_config = readParquetPsConfig(pq)
     all_hosts_in_configs = mesh_config['Host'].unique()
     print(f"All hosts in psConfig: {len(all_hosts_in_configs)}\n")
-    
+    print(mesh_config.head(10))
     
     print(" --- getting PerfSonars from WLCG CRIC ---")
     all_cric_perfsonar_hosts = readParquetCRIC(pq)
@@ -226,7 +224,7 @@ html.Div(children=[
             html.Div("Note: every T1 site should have traceroute tests with every other T1 site.", className="mb-1"),
             html.Ul([
                 html.Li("Priority 1 — Missing connections: no test observed in this role (as source / as destination)."),
-                html.Li("Priority 2 — All tested connections are RED in a role: likely pS misconfiguration at the site."),
+                html.Li("Priority 2 — All tested connections are RED in a role: likely perfSONAR toolkit misconfiguration at the site."),
                 html.Li("Priority 3 — YELLOW connections: destination never reached but path complete (possible firewall/ICMP filtering)."),
             ], className="mb-0")
         ],
@@ -236,7 +234,7 @@ html.Div(children=[
 
     # ---------- Per-site combined (src + dest) ----------
     html.Div([
-        html.H5("Per-site ranking (worst first)", className="mt-2"),
+        html.H5("Connectivity ranking", className="mt-2"),
         dt.DataTable(
             id="connectivity-table",
             columns=[
@@ -293,20 +291,26 @@ html.Div(children=[
         },
         # 🔴 Strong highlight when all connections are red (as destination)
         {
-            "if": {
-                "filter_query": "{all_red_dest_flag} = 'True'",
-                "column_id": "all_red_dest_flag"
+            'if': {
+                'filter_query': "{all_red_dest_flag} = 'True'",
             },
-            "backgroundColor": "#ff000077",
-            "color": "white"
+            'backgroundColor': "#ff000077",
+            'color': 'white'
         },
+        # {
+        #     "if": {'all_red_dest_flag': 'True'},
+            
+        #     "backgroundColor": "#ff000077",
+        #     "color": "white"
+            
+        # },
     ],
 )
     ], className="mb-3"),
 
     # ---------- Exactly which connections are missing (role-aware) ----------
     html.Div([
-        html.H5("Exactly which connections are missing (role-aware)", className="mt-2"),
+        html.H5("Missing connections", className="mt-2"),
         dt.DataTable(
             id="missing-table",
             columns=[
@@ -342,7 +346,12 @@ html.Div(children=[
             dbc.Col([
                 html.Label("Status", className="small text-muted"),
                 dcc.Dropdown(id="f-status", options=[], value=None, multi=True, placeholder="All")
-            ], md=4),
+            ], md=3),
+            dbc.Col([
+                html.Label("Netsite", className="small text-muted"),
+                dcc.Dropdown(
+                    id="f-netsite", options=[], value=None, multi=True, placeholder="All")
+            ], md=3),
             dbc.Col([
                 html.Label("In CRIC", className="small text-muted"),
                 dcc.Dropdown(
@@ -350,7 +359,7 @@ html.Div(children=[
                     options=[{"label":"Yes","value":True}, {"label":"No","value":False}],
                     value=None, multi=True, placeholder="All"
                 )
-            ], md=4),
+            ], md=3),
             dbc.Col([
                 html.Label("Found in ES (30d)", className="small text-muted"),
                 dcc.Dropdown(
@@ -358,7 +367,7 @@ html.Div(children=[
                     options=[{"label":"Yes","value":True}, {"label":"No","value":False}],
                     value=None, multi=True, placeholder="All"
                 )
-            ], md=4),
+            ], md=3),
         ], className="mb-2"),
         
         # ---------- Charts ----------
@@ -400,7 +409,7 @@ def _is_fresh(p: Path, ttl: timedelta) -> bool:
     Input("audit-btn", "n_clicks"),
     State("config_hosts", "data"),
     State("cric_hosts", "data"),
-    prevent_initial_call=True
+    prevent_initial_call=False
 )
 def run_audit(n, config_hosts, cric_hosts):
     # Load cache if fresh
@@ -439,12 +448,14 @@ STATUS_COLORS = {
     Output("donut-status", "figure"),
     Output("bar-status", "figure"),
     Output("f-status", "options"),
+    Output("f-netsite", "options"),
     Input("audit-data", "data"),
     Input("f-status", "value"),
     Input("f-incric", "value"),
     Input("f-found", "value"),
+    Input("f-netsite", "value"),
 )
-def render_audit(data, f_status, f_incric, f_found):
+def render_audit(data, f_status, f_incric, f_found, f_netsite):
     # Empty state
     if not data:
         empty_fig = px.scatter(title="No data yet — click Audit")
@@ -465,6 +476,9 @@ def render_audit(data, f_status, f_incric, f_found):
     # Build status options dynamically
     all_statuses = sorted(df["status"].dropna().astype(str).unique().tolist())
     status_opts = [{"label": s, "value": s} for s in all_statuses]
+    
+    all_netsites = sorted(df["netsite"].dropna().astype(str).unique().tolist())
+    netstite_opts = [{"label": s, "value": s} for s in all_netsites]
 
     # Apply filters (None => no filtering)
     fdf = df.copy()
@@ -474,6 +488,8 @@ def render_audit(data, f_status, f_incric, f_found):
         fdf = fdf[fdf["in_cric"].isin(f_incric)]
     if f_found:
         fdf = fdf[fdf["found_in_ES"].isin(f_found)]
+    if f_netsite:
+        fdf = fdf[fdf["netsite"].astype(str).isin(f_netsite)]
 
     # ---------- Table (reacts to filters) ----------
     tdf = fdf.copy()
@@ -538,15 +554,36 @@ def render_audit(data, f_status, f_incric, f_found):
         .drop(columns=["found_in_ES"])
     )
     bar_df = pd.concat([bar_incric, bar_found], ignore_index=True)
-    bar_df["series"] = bar_df["metric"] + ": " + bar_df["flag"]
+    bar_df["series"] = bar_df["metric"] + ": " + bar_df["flag"].astype(str)
+    print(bar_df["series"].unique())
+    palette = {
+        "In CRIC: Yes":  "#98df8a",
+        "In CRIC: No": "#D46057",
+        "Found in ES: Yes":    "#34A853",
+        "Found in ES: No":   "#D93025",
+    }
 
+    # better: specify explicit rgba strings
+    # palette = {
+    #     f"in_cric: True":  "rgba(44,160,44,1)",
+    #     f"in_cric: False": "rgba(44,160,44,0.35)",
+    #     f"in_es: True":    "rgba(31,119,180,1)",
+    #     f"in_es: False":   "rgba(31,119,180,0.35)",
+    # }
+    order = list(palette.keys())
     fig_bar = px.bar(
-        bar_df, x="status_group", y="count", color="series",
-        barmode="group", title="Host Found In CRIC & ES"
+        bar_df,
+        x="status_group",
+        y="count",
+        color="series",
+        barmode="group",
+        title="Host Found In CRIC & ES",
+        category_orders={"series": order},
+        color_discrete_map=palette
     )
     fig_bar.update_layout(xaxis={'categoryorder': 'total descending'})
 
-    return table, fig_donut, fig_bar, status_opts
+    return table, fig_donut, fig_bar, status_opts, netstite_opts
 
 
 
@@ -622,11 +659,11 @@ def update_map(search_btn, select_all_btn, clear_btn, selected_sites, tw, df, su
     df = pd.DataFrame(df)
 
     if selected_sites:
-        print('df')
-        print(df)
+        # print('df')
+        # print(df)
         df = df[df["src_netsite"].isin(selected_sites) | df["dest_netsite"].isin(selected_sites)]
-        print('df')
-        print(df)
+        # print('df')
+        # print(df)
 
     if df.empty or not selected_sites:
         empty_grouped = pd.DataFrame(columns=[
@@ -646,7 +683,7 @@ def update_map(search_btn, select_all_btn, clear_btn, selected_sites, tw, df, su
     summary_df, missing_df = pd.DataFrame(summary_df), pd.DataFrame(missing_df)
     
     print("in callback sumarry_df: ")
-    print(summary_df)
+    # print(summary_df)
     return (
         buildMap(sites_status, True, df),
         list(set(T1_NETSITES) - set(selected_sites)),
@@ -693,8 +730,8 @@ def compute_connectivity_summaries(grouped_df: pd.DataFrame, sites: list[str]):
                   site, role ('as_src' | 'as_dest'), missing_with (comma-separated peers)
     """
     print("in compute_connectivity_summaries_directed...")
-    print(grouped_df)
-    print(sites)
+    # print(grouped_df)
+    # print(sites)
 
     # Fallback severity if not provided globally: lower = worse
     sev_default = {'red': 0, 'yellow': 1, 'green': 2}
@@ -814,6 +851,6 @@ def compute_connectivity_summaries(grouped_df: pd.DataFrame, sites: list[str]):
     missing_expanded_df = pd.DataFrame(missing_rows).sort_values(["site","role"], kind="stable")
     summary_df["all_red_src_flag"]  = summary_df["all_red_src_flag"].astype(str)
     summary_df["all_red_dest_flag"] = summary_df["all_red_dest_flag"].astype(str)
-    print(f"type: {summary_df.dtypes}")
+    # print(f"type: {summary_df.dtypes}")
     return summary_df, missing_expanded_df
 
