@@ -193,7 +193,30 @@ class ParquetUpdater(object):
             p = val['endpoint']
             all_hosts.append(p)
         df = pd.DataFrame(all_hosts, columns=['host'])
-        self.pq.writeToFile(df, f"{self.location}raw/CRICData.parquet")
+        self.pq.writeToFile(df, f"{self.location}raw/CRICDataHosts.parquet")
+        
+        cric_opn_rcsites = {"CERN-PROD":'CERN-PROD-LHCOPNE', "BNL-ATLAS":'BNL-ATLAS-LHCOPNE', "INFN-T1":'INFN-T1-LHCOPNE',
+                    "USCMS-FNAL-WC1":'USCMS-FNAL-WC1-LHCOPNE', "FZK-LCG2":'FZK-LCG2-LHCOPNE', "IN2P3-CC":'IN2P3-CC-LHCOPNE', "RAL-LCG2":'RAL-LCG2-LHCOPN', 
+                    "JINR-T1":'JINR-T1-LHCOPNE', "pic":'PIC-LHCOPNE', "SARA-MATRIX":'NLT1-SARA-LHCOPNE',
+                    "TRIUMF-LCG2":'TRIUMF-LCG2-LHCOPNE', "NDGF-T1":'NDGF-T1-LHCOPNE', "KR-KISTI-GSDC-01":'KR-KISTI-GSDC-1-LHCOPNE',
+                    "NCBJ-CIS":'NCBJ-LHCOPN'}
+        subnets = []
+        r = requests.get(
+        'https://wlcg-cric.cern.ch/api/core/rcsite/query/list/?json', verify=False).json()
+        for site in cric_opn_rcsites.keys():
+            try:
+                for netroute in r[site]['netroutes'].values():
+                    if netroute['lhcone_bandwidth_limit'] > 0:   
+                        content = netroute['networks']
+                        subnets.append([cric_opn_rcsites[site], content.get('ipv4', []) + content.get('ipv6', [])])
+                        
+            except Exception as e:
+                print(e)
+                print(f'While writing CRICDataOPNSubnets.parquet subnet for {site} was not found.\n')
+        df2 = pd.DataFrame(subnets, columns=['site', 'subnets'])
+        df2 = df2.groupby('site').agg('sum').reset_index()
+        self.pq.writeToFile(df2, f"{self.location}raw/CRICDataOPNSubnets.parquet")
+        
         
 
     @timer

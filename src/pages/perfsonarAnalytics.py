@@ -62,7 +62,6 @@ ES_INDICES = ["ps_trace", "ps_throughput", "ps_owd"]
 LOOKBACK_DAYS = 30
 AUDITED_HOSTS = []
 
-
 def readParquetPsConfig(pq):
     """
     The function reads parquet file that is updated every 24 \
@@ -84,11 +83,10 @@ def readParquetCRIC(pq):
     The function reads parquet file that is updated every 24 \
     hours with the data about perfSONARs from CRIC.
     """
-    parquet_path = 'parquet/raw/CRICData.parquet'
+    parquet_path = 'parquet/raw/CRICDataHosts.parquet'
     try: 
         print("Reading the parquet file with CRIC data...")
         lst = pq.readFile(parquet_path)['host'].tolist()
-        # print(f"CRIC data from parquet file: {lst}")
         return lst
     except Exception as err:
         print(err)
@@ -125,10 +123,10 @@ def layout(**other_unknown_query_strings):
     _, sites_status = generateStatusTable(alarm_cnt)
 
     # initial data
-    traceroute_records = query_valid_trace_data(hours=4)
+    traceroute_records = query_valid_trace_data(hours=4, parquet=pq)
     records_df = pd.DataFrame(traceroute_records)
     
-    print(records_df[records_df['dest_netsite'] == 'USCMS-FNAL-WC1-LHCOPNE'])
+    # print(records_df[records_df['dest_netsite'] == 'USCMS-FNAL-WC1-LHCOPNE'])
     print(set(list(records_df['dest_netsite'].unique()) + list(records_df['src_netsite'].unique())))
     if not records_df.empty:
         def pct(series):
