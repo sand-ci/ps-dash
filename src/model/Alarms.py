@@ -65,7 +65,6 @@ class Alarms(object):
 
   def unpackAlarms(self, alarmsData):
     frames, pivotFrames = {}, {}
-    
     try:
       for event, alarms in alarmsData.items():
         if len(alarms)>0:
@@ -89,7 +88,7 @@ class Alarms(object):
                                      listedNewName='src_site')
             df['tag'] = df['site']
             
-          elif event in ['high delay from/to multiple sites', 'unresolvable host']:
+          elif event == 'high delay from/to multiple sites':
             df['tag'] = df['site']
 
           elif event in ['high packet loss on multiple links', 'bandwidth increased from/to multiple sites', 'bandwidth decreased from/to multiple sites']:
@@ -99,7 +98,7 @@ class Alarms(object):
             df['site'] = df['tag'].apply(lambda x: x[1] if len(x) > 1 else x[0])
             df['tag'] = df['site']
             df = df.round(3)
-
+# {'alarm_type': 'multi-site high delay', 'site': 'TECHNION-HEP', 'src_sites': ['FMPhI-UNIBA', 'IEPSAS-Kosice', 'NET2-LHCONE', 'NLT1-SARA-LHCOPNE', 'UKI-SCOTGRID-ECDF', 'UKI-SOUTHGRID-OX-HEP', 'DESY-ZN-LHCONE', 'FR-GRIF_LPNHE', 'IN2P3-CC-LHCOPNE', 'IN2P3-LAPP-LHCONE', 'pic-LHCOPNE', 'praguelcg2-LHCONE', 'MWT2_UC', 'FZK-LCG2-LHCOPNE', 'UKI-LT2-QMUL'], 'dest_sites': [], 'avg_severity_multiplier': 1.9, 'max_delay_p95': 124.73, 'total_affected_pairs': 15, 'alarm_id': '46c1562a9a841a82c29475bc005b7161ba2ec80b95776facb7fc68de', 'from': '2025-07-24 16:50:47.000Z', 'to': '2025-07-25 16:50:47.000Z', 'body': 'Site TECHNION-HEP shows high delay to/from 15 destinations', 'tags': ['TECHNION-HEP'], 'tag': ['TECHNION-HEP']},
           elif event in ['high packet loss',
                          'ASN path anomalies',
                          'ASN path anomalies per site',
@@ -113,7 +112,6 @@ class Alarms(object):
             df = self.list2rows(df)
 
           pivotFrames[event] = df
-
       return [frames, pivotFrames]
 
     except Exception as e:
@@ -220,6 +218,10 @@ class Alarms(object):
 
             df = pq.readFile(f)
             df['to'] = pd.to_datetime(df['to'], utc=True)
+            if 'site' in df.columns:
+              df['site'] = df['site'].str.upper()
+            if 'tag' in df.columns:
+              df['tag'] = df['tag'].str.upper()
             modification_time = os.path.getmtime(f)
 
             # Calculate the time difference in seconds
@@ -359,6 +361,9 @@ class Alarms(object):
     try:
         sign = {'bandwidth increased from/to multiple sites': '+',
                 'bandwidth decreased from/to multiple sites': ''}
+        
+        if 'site' in df.columns:
+          df['site'] = df['site'].str.upper()
 
         df = self.replaceCol('tag', df)
         if ('as_source_to' and 'as_destination_from' in df.columns) and ('sites' not in df.columns):

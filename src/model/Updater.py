@@ -84,13 +84,20 @@ class ParquetUpdater(object):
                 # thus we want to which approx. when the alarms was created,
                 # to be between dateFrom and dateTo
                 df['to'] = pd.to_datetime(df['to'], utc=True)
-                sdf = df[(df['tag'] == site) & (df['to'] >= dateFrom) & (df['to'] <= dateTo)]
-                
+                sdf = df[(df['tag'].str.upper() == site.upper()) & (df['to'] >= dateFrom) & (df['to'] <= dateTo)]
+                # print('e: ', e)
+                # if e == 'high delay from/to multiple sites':
+                #     print(sdf)
                 if len(sdf) > 0:
                     # sdf['id'].unique() returns the number of unique alarms for the given site
                     # those are the documents generated and stored in ES. They can be found in frames folder
                     # While pivotFrames expands the alarms to the level of individual sites
-                    entry = {"event": e, "site": site, 'cnt':  len(sdf['id'].unique()),
+                    if e == 'ASN path anomalies per site':
+                        cnt =sum(sdf['total_paths_anomalies'].tolist())
+                    
+                    else:
+                        cnt = len(sdf['id'].unique())
+                    entry = {"event": e, "site": site, 'cnt':  cnt,
                             "lat": lat, "lon": lon}
                 else:
                     entry = {"event": e, "site": site, 'cnt': 0,

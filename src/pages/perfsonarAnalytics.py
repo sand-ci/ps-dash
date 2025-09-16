@@ -32,6 +32,7 @@ import aiohttp
 import model.queries as qrs
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
+from itertools import combinations
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -45,10 +46,10 @@ AUDIT_PARQUET = Path("parquet/audited_hosts.parquet")
 AUDIT_TTL = timedelta(hours=24)
 T1_NETSITES = [
     "BNL-ATLAS-LHCOPNE", "USCMS-FNAL-WC1-LHCOPNE", "RAL-LCG2-LHCOPN",
-    "RRC-KI-T1-LHCOPNE", "JINR-T1-LHCOPNE", "NCBJ-LHCOPN",
+    "JINR-T1-LHCOPNE", "NCBJ-LHCOPN",
     "NLT1-SARA-LHCOPNE", "INFN-T1-LHCOPNE", "NDGF-T1-LHCOPNE",
     "KR-KISTI-GSDC-1-LHCOPNE", "IN2P3-CC-LHCOPNE", "PIC-LHCOPNE",
-    "FZK-LCG2-LHCOPNE", "CERN-PROD-LHCOPNE", "TRIUMF-LCG2-LHCOPNE", 'TW-ASGC'
+    "FZK-LCG2-LHCOPNE", "CERN-PROD-LHCOPNE", "TRIUMF-LCG2-LHCOPNE"
 ]
 
 PORT = 443
@@ -93,6 +94,24 @@ def readParquetCRIC(pq):
         print(err)
         print(f"Problems with reading the file {parquet_path}")
 
+def extract_groups_and_hosts(mesh_config, site=False, host=False):
+    """
+    Return:
+      groups: list[str] (aligned with mesh_config["Groups"])
+      members_by_group: dict[group_name] -> list[str hostnames]
+      host_to_site: dict[host] -> netsite (or rcsite)
+    """
+    grouped = {}
+    if site:
+        unique_test_groups = (mesh_config[mesh_config['Site'] == site])["Groups"].unique()
+    else:
+        unique_test_groups = (mesh_config[mesh_config['Host'] == host])["Groups"].unique()
+    for g in unique_test_groups:
+        grouped[g] = []
+    for i, row in mesh_config.iterrows():
+        if row["Group"] in unique_test_groups:
+            grouped[row["Group"]].append((row["Site"], row["Host"]))
+    return grouped
 
 def layout(**other_unknown_query_strings):
     HOURS = 2 
@@ -153,6 +172,10 @@ def layout(**other_unknown_query_strings):
     print(f"All hosts in psConfig: {len(all_hosts_in_configs)}\n")
     print(mesh_config.head(10))
     
+    # configurations = extract_groups_and_hosts(mesh_config, "PIC-LHCOPNE")
+    # netsites = sorted(set(mesh_config["Site"].tolist()))
+    # hosts = sorted(set(mesh_config["Host"].tolist()))
+    
     print(" --- getting PerfSonars from WLCG CRIC ---")
     all_cric_perfsonar_hosts = readParquetCRIC(pq)
     print(f"All perfSONAR hosts in CRIC: {len(all_cric_perfsonar_hosts)}\n")
@@ -160,11 +183,11 @@ def layout(**other_unknown_query_strings):
     
     # UI
     return html.Div(children=[
-        
         html.Div(children=[
             # Title
             dcc.Store(id="valid-data", data=traceroutes_dict),
             dcc.Store(id="config_hosts", data=all_hosts_in_configs),
+            dcc.Store(id="configs", data=mesh_config.to_dict()),
             dcc.Store(id="cric_hosts", data=all_cric_perfsonar_hosts),
             html.H1(id="network-testing-title",
                             children=f"T1/OPN Disconnections — Last {HOURS} Hours pc_trace Tests"
@@ -307,6 +330,52 @@ html.Div(children=[
     ],
 )
     ], className="mb-3"),
+    # html.Div(
+    #     className="boxwithshadow page-cont p-3",
+    #     children=[
+    #         dbc.Row([
+    #             dbc.Col(html.H4("Trace Coverage Matrices (last 30 days)"), md=8),
+    #             dbc.Col(
+    #                 dbc.Button("Clear selection", id="btn-clear-matrix", size="sm", color="secondary"),
+    #                 md=4, className="d-flex justify-content-md-end align-items-center mt-2 mt-md-0"
+    #             ),
+    #         ], className="mb-2"),
+
+    #         dbc.Row([
+    #             dbc.Col([
+    #                 html.Label("Filter by Netsite", className="fw-semibold"),
+    #                 dcc.Dropdown(
+    #                     id="dd-netsite",
+    #                     # options=[{"label": s, "value": s} for s in netsites],
+    #                     placeholder="Select a netsite…",
+    #                     value=None,
+    #                     clearable=True,
+    #                 ),
+    #             ], md=6),
+    #             dbc.Col([
+    #                 html.Label("Filter by Host", className="fw-semibold"),
+    #                 dcc.Dropdown(
+    #                     id="dd-host",
+    #                     # options=[{"label": h, "value": h} for h in hosts],
+    #                     placeholder="Select a host…",
+    #                     value=None,
+    #                     clearable=True,
+    #                 ),
+    #             ], md=6),
+    #         ], className="mb-3"),
+
+    #         # dcc.Store(id="store-members-by-group", data=members_by_group),
+    #         # dcc.Store(id="store-host-to-site", data=host_to_site),
+    #         dcc.Store(id="store-groups", data=mesh_config["Groups"]),
+    #         dcc.Store(id="store-types", data=mesh_config["Types"]),
+
+    #         dcc.Loading(
+    #             id="loading-matrices",
+    #             type="default",
+    #             children=html.Div(id="heatmap-matrices")
+    #         ),
+    #     ],
+    # ),
 
     # ---------- Exactly which connections are missing (role-aware) ----------
     html.Div([
@@ -330,17 +399,41 @@ html.Div(children=[
     html.Div(children=[
         dbc.Row([dbc.Col([dbc.Row(html.H2("pSConfig Web Admin Hosts Audit", className="mt-2")),
                           html.Div(id="last-audit", className="text-secondary small mb-2")]),
-                 dbc.Col(
-                        html.Div([
-                            dbc.ButtonGroup([
-                                dbc.Button("Audit", id="audit-btn", className="me-2", n_clicks=0),
-                                dbc.Button("Open PWA ↗", href="https://psconfig.opensciencegrid.org/#!/configs/58f74a4df5139f0021ac29d6", className="me-2", target="_blank", color="secondary"),
-                            ])
-                        ]),
-                        md=4, className="d-flex align-items-center justify-content-md-end mt-2 mt-md-0"
-                    )
+                 
+                #  dbc.Col(
+                #         html.Div([
+                #             dbc.ButtonGroup([
+                #                 dbc.Button("Audit", id="audit-btn", className="me-2", n_clicks=0),
+                #                 dbc.Button("Open PWA ↗", href="https://psconfig.opensciencegrid.org/#!/configs/58f74a4df5139f0021ac29d6", className="me-2", target="_blank", color="secondary"),
+                #             ])
+                #         ]),
+                #         md=4, className="d-flex align-items-center justify-content-md-end mt-2 mt-md-0"
+                #     )
+                dbc.Row([
+    dbc.Col(
+        dcc.Loading(
+            id="audit-loader",
+            type="default",
+            color="#00245A",
+            children=html.Div(id="last-audit", className="text-secondary small mb-2")
+        ),
+        md=8
+    ),
+    dbc.Col(
+        html.Div(
+            dbc.ButtonGroup([
+                dbc.Button("Audit", id="audit-btn", className="me-2", n_clicks=0),
+                dbc.Button("Open PWA ↗", href="https://psconfig.opensciencegrid.org/#!/configs/58f74a4df5139f0021ac29d6",
+                           className="me-2", target="_blank", color="secondary"),
+            ])
+        ),
+        md=4, className="d-flex align-items-center justify-content-md-end mt-2 mt-md-0"
+    ),
+]),
+dcc.Store(id="audit-data")
                 ]),
-        dcc.Store(id="audit-data"),
+        # dcc.Store(id="audit-data"),
+        # dcc.Store(id="config-data"),
         # ---------- Filters ----------
         dbc.Row([
             dbc.Col([
@@ -372,8 +465,24 @@ html.Div(children=[
         
         # ---------- Charts ----------
         dbc.Row([
-            dbc.Col(dcc.Graph(id="donut-status"), md=6),
-            dbc.Col(dcc.Graph(id="bar-status"), md=6),
+            dbc.Col(
+                dcc.Loading(
+                    id="load-donut",
+                    type="default",  # "default" | "cube" | "circle" | "dot"
+                    color="#00245A",
+                    children=dcc.Graph(id="donut-status")
+                ),
+                md=6
+            ),
+            dbc.Col(
+                dcc.Loading(
+                    id="load-bar",
+                    type="default",
+                    color="#00245A",
+                    children=dcc.Graph(id="bar-status")
+                ),
+                md=6
+            ),
         ], className="mb-2"),
 
         # ---------- Table ----------
@@ -382,15 +491,7 @@ html.Div(children=[
                 id="loading-audit",
                 type="default",
                 color="#00245A",
-                children=[
-                    # container Div for the table
-                    dbc.Row(
-                        dbc.Col(
-                            html.Div(id="audit-table"),  # <-- stays a Div
-                            width=12
-                        )
-                    )
-                ]
+                children=html.Div(id="audit-table")  # keep this as a single container
             )
         ]),
     ], className="p-1 site boxwithshadow page-cont m-3")
@@ -412,7 +513,6 @@ def _is_fresh(p: Path, ttl: timedelta) -> bool:
     prevent_initial_call=False
 )
 def run_audit(n, config_hosts, cric_hosts):
-    # Load cache if fresh
     if _is_fresh(AUDIT_PARQUET, AUDIT_TTL):
         df = pd.read_parquet(AUDIT_PARQUET)
         ts = datetime.fromtimestamp(AUDIT_PARQUET.stat().st_mtime, tz=timezone.utc)
@@ -426,20 +526,39 @@ def run_audit(n, config_hosts, cric_hosts):
     ts = datetime.now(timezone.utc)
     return df.to_dict("records"), f"Audited at {ts:%Y-%m-%d %H:%M:%S} UTC"
 
+# dash.callback(
+#     Output("config-data", "children"),
+#     Input("audit-data", "data"),
+#     Input("config-data", "data"),
+#     prevent_initial_call=False
+# )
+# def config_data(audit_df,  confid_df):
+#     # Load cache if fresh
+#     if len(audit_df) < 1 or len(confid_df) < 1:
+#         return "One of datasets is empty."
+#     audit_df = pd.DataFrame(audit_df)
+#     print("audit_df")
+#     print(audit_df)
+#     config_df = pd.DataFrame(config_df)
+#     print("\nconfig_df")
+#     print(config_df)
+#     return {}
+
 # pretty mapping for the donut
+
 STATUS_PRETTY = {
-    "ACTIVE_HTTP": "Active HTTP",
-    "ACTIVE_TCP_ONLY": "Active TCP only",
-    "UNREACHABLE_CANDIDATE": "Unreachable",
-    "RETIRED_DNS": "Retired DNS",
+    "ACTIVE_HTTP": "Active HTTP — reachable; toolkit/API responds",
+    "ACTIVE_TCP_ONLY": "Active TCP only — host up; web check fails; some TCP ports respond",
+    "UNREACHABLE_CANDIDATE": "Unreachable — DNS OK; nothing answers; likely down/firewalled",
+    "RETIRED_DNS": "Retired DNS — DNS missing/invalid; entry is stale",
 }
 
 # donut colors (3 greens + red + grey for anything else)
 STATUS_COLORS = {
-    "Active HTTP":      "#0B8043",  # deep green
-    "Active TCP only":  "#34A853",  # green
-    "Unreachable":      "#A8D5B8",  # pale green
-    "Retired DNS":      "#D93025",  # red
+    "Active HTTP — reachable; toolkit/API responds":      "#0B8043",  # deep green
+    "Active TCP only — host up; web check fails; some TCP ports respond":  "#34A853",  # green
+    "Unreachable — DNS OK; nothing answers; likely down/firewalled":      "#A8D5B8",  # pale green
+    "Retired DNS — DNS missing/invalid; entry is stale":      "#D93025",  # red
     "Other":            "#9E9E9E",  # grey
 }
 
@@ -459,7 +578,7 @@ def render_audit(data, f_status, f_incric, f_found, f_netsite):
     # Empty state
     if not data:
         empty_fig = px.scatter(title="No data yet — click Audit")
-        return html.Div(dt.DataTable(data=[], columns=[])), empty_fig, empty_fig, []
+        return html.Div(dt.DataTable(data=[], columns=[])), empty_fig, empty_fig, [], []
 
     df = pd.DataFrame(data).copy()
 
@@ -467,7 +586,7 @@ def render_audit(data, f_status, f_incric, f_found, f_netsite):
     for c in ["status", "in_cric", "found_in_ES"]:
         if c not in df.columns:
             df[c] = np.nan
-    # Normalize boolean-ish
+    # Normalize boolean-
     if df["in_cric"].dtype != bool:
         df["in_cric"] = df["in_cric"].astype(bool, errors="ignore")
     if df["found_in_ES"].dtype != bool:
@@ -542,13 +661,13 @@ def render_audit(data, f_status, f_incric, f_found, f_netsite):
     # ---------- Grouped Bar (reacts to filters) ----------
     # Build tidy counts for two metrics: In CRIC and Found in ES
     bar_incric = (
-        gdf.groupby(["status_group","in_cric"]).size().reset_index(name="count")
+        gdf.groupby(["status","in_cric"]).size().reset_index(name="count")
         .assign(metric="In CRIC",
                 flag=lambda d: d["in_cric"].map({True:"Yes", False:"No"}))
         .drop(columns=["in_cric"])
     )
     bar_found = (
-        gdf.groupby(["status_group","found_in_ES"]).size().reset_index(name="count")
+        gdf.groupby(["status","found_in_ES"]).size().reset_index(name="count")
         .assign(metric="Found in ES",
                 flag=lambda d: d["found_in_ES"].map({True:"Yes", False:"No"}))
         .drop(columns=["found_in_ES"])
@@ -562,18 +681,10 @@ def render_audit(data, f_status, f_incric, f_found, f_netsite):
         "Found in ES: Yes":    "#34A853",
         "Found in ES: No":   "#D93025",
     }
-
-    # better: specify explicit rgba strings
-    # palette = {
-    #     f"in_cric: True":  "rgba(44,160,44,1)",
-    #     f"in_cric: False": "rgba(44,160,44,0.35)",
-    #     f"in_es: True":    "rgba(31,119,180,1)",
-    #     f"in_es: False":   "rgba(31,119,180,0.35)",
-    # }
     order = list(palette.keys())
     fig_bar = px.bar(
         bar_df,
-        x="status_group",
+        x="status",
         y="count",
         color="series",
         barmode="group",

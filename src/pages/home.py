@@ -59,7 +59,10 @@ def total_number_of_alarms(sitesDf):
     for s, icon in status.items():
         if icon not in status_count:
             status_count[icon] = 0
-
+    status_explanations = {'critical': "'bandwidth decreased from/to multiple sites' observed",
+                           'warning': "'ASN path anomalies per site (to several destination or from several sources)'\nor 'high delay from/to multiple sites'\nor 'high packet loss on multiple links' observed",
+                           'ok': "no alarms",
+                           'unknown': "other alarms"}
     html_elements = [dbc.Col([
             dbc.Row(
                     html.H1('Status of all sites in the past 48 hours', 
@@ -74,7 +77,15 @@ def total_number_of_alarms(sitesDf):
                                 html.H4(f'{icon}', className='card-title'),
                                 html.H3(f'{s}', className='card-title'),
                                 html.H3(f'{status_count[icon]}', className='card-text'),
-                            ]
+                                # Tooltip target below must match the id of the CardBody
+                                dbc.Tooltip(
+                                    f"{status_explanations[s]}",
+                                    target=f"cardbody-{s}",
+                                    placement="top",
+                                    style={"fontSize":"1.5em"}
+                                )
+                            ],
+                            id=f"cardbody-{s}",  # give each CardBody a unique id
                         ),
                         className='mb-3',
                     ),
@@ -115,6 +126,10 @@ def layout(**other_unknown_query_strings):
     dateFrom, dateTo = hp.defaultTimeRange(2)
     now = hp.defaultTimeRange(days=2, datesOnly=True)
     alarmCnt = pq.readFile('parquet/alarmsGrouped.parquet')
+    # if 'tag' in alarmCnt.columns:
+    #     alarmCnt['tag'] = alarmCnt['tag'].str.upper()
+    # if 'site' in alarmCnt.columns:
+    #     alarmCnt['site'] = alarmCnt['site'].str.upper()
     statusTable, sitesDf = generate_status_table(alarmCnt)
     print("Period:", dateFrom," - ", dateTo)
     print(f'Number of alarms: {len(alarmCnt)}')
@@ -320,6 +335,9 @@ def update_output(n_clicks, start_date, end_date, sites, all, events, allevents,
         scntdf = pd.DataFrame()
         for e, df in pivotFrames.items():
             if len(df) > 0:
+                df['tag'] = df['tag'].str.upper()
+                if 'site' in df.columns:
+                    df['site'] = df['site'].str.upper()
                 df = df[df['tag'] != ''].groupby('tag')[['id']].count().reset_index().rename(columns={'id': 'cnt', 'tag': 'site'})
                 df['event'] = e
                 scntdf = pd.concat([scntdf, df])
@@ -352,8 +370,10 @@ def update_output(n_clicks, start_date, end_date, sites, all, events, allevents,
         for event in sorted(events):
             df = pivotFrames[event]
             if 'site' in df.columns:
+                # df['site'] = df['site'].str.upper()
                 df = df[df['site'].isin(sitesState)] if sitesState is not None and len(sitesState) > 0 else df
             elif 'tag' in df.columns:
+                # df['tag'] = df['tag'].str.upper()
                 df = df[df['tag'].isin(sitesState)] if sitesState is not None and len(sitesState) > 0 else df
 
             if len(df) > 0:
@@ -473,7 +493,7 @@ def generate_tables(frame, unpacked, event, alarmsInst):
     # Replace NaN or empty values with valid defaults
     dfr = dfr.fillna("")  # Replace NaN with an empty string for all columns
     dfr = dfr.astype({col: str for col in dfr.select_dtypes(include=['object', 'category']).columns})  # Ensure all object columns are strings
-    drop_columns = {"ASN path anomalies per site": ['sites'], 'unresolvable host': ['alarm_link'], 'destination cannot be reached from any': ['alarm_link'], 'destination cannot be reached from multiple': ['alarm_link'], 'source cannot reach any': ['alarm_link']}
+    drop_columns = {"ASN path anomalies per site": ['sites'], 'destination cannot be reached from any': ['alarm_link'], 'destination cannot be reached from multiple': ['alarm_link'], 'source cannot reach any': ['alarm_link']}
     if event in drop_columns:
         dfr.drop(columns=drop_columns[event], inplace=True)
     dfr.sort_values('to', ascending=False, inplace=True)

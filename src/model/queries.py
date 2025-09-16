@@ -241,8 +241,6 @@ def queryAlarms(dateFrom, dateTo):
                     'destination cannot be reached from any',
                     'destination cannot be reached from multiple',
                     'source cannot reach any',
-                    # 'hosts not found',
-                    'unresolvable host',
                     'bandwidth decreased',
                     'bandwidth increased',
                     'bandwidth increased from/to multiple sites',
@@ -292,7 +290,7 @@ def queryAlarms(dateFrom, dateTo):
           desc = item['_source']['source']
           if 'tags' in item['_source'].keys():
             tags = item['_source']['tags']
-            desc['tag'] = tags
+            desc['tag'] = [t.upper() for t in tags]
 
           if 'to' not in desc.keys():
             desc['to'] = pd.to_datetime(item['_source']['created_at'], unit='ms', utc=True)
@@ -413,9 +411,7 @@ def getSubcategories():
   description = {
   'Infrastructure': 	['bad owd measurements','large clock correction',
 	 		 'destination cannot be reached from multiple', 'destination cannot be reached from any',
-			 'source cannot reach any', 'firewall issue', 'complete packet loss',
-      #  'hosts not found',
-                       	 'unresolvable host'],
+			 'source cannot reach any', 'firewall issue', 'complete packet loss'],
 
   'Network': 		 ['bandwidth decreased from/to multiple sites', "high delay from/to multiple sites",
                           'high one/way delay', 'high one-way delay', 'ASN path anomalies','ASN path anomalies per site'],

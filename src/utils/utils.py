@@ -136,12 +136,13 @@ def createDictionaryWithHistoricalData(dframe):
     return site_dict
 
 def generateStatusTable(alarmCnt):
-
+    print("In generateStatusTable...")
+    print(alarmCnt[alarmCnt['site'] == 'UFLORIDA-HPC-LHCONE'])
     red_sites = alarmCnt[(alarmCnt['event']=='bandwidth decreased from/to multiple sites')
             & (alarmCnt['cnt']>0)]['site'].unique().tolist()
 
-    yellow_sites = alarmCnt[(alarmCnt['event'].isin(['ASN path anomalies']))
-                    & (alarmCnt['cnt']>0)]['site'].unique().tolist()
+    yellow_sites = alarmCnt[((alarmCnt['event'].isin(['high delay from/to multiple sites', 'high packet loss on multiple links']))
+                    & (alarmCnt['cnt']>0)) | (alarmCnt['event'].isin(['ASN path anomalies per site']) & (alarmCnt['cnt']>1))]['site'].unique().tolist()
 
     grey_sites = alarmCnt[(alarmCnt['event'].isin(['firewall issue', 'source cannot reach any', 'complete packet loss']))
                     & (alarmCnt['cnt']>0)]['site'].unique().tolist()
@@ -287,7 +288,7 @@ def explainStatuses():
   {
     'status category': 'Global',
       'resulted status': '🟡',
-      'considered alarm types': '\n'.join(['path changed']),
+      'considered alarm types': ',\n'.join(['ASN path anomalies per site (more than 1 pair)', 'high delay from/to multiple sites', 'high packet loss on multiple links']),
       'trigger': 'any type has > 0 alarms'
   },
   {

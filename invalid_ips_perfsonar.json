@@ -1,12 +1,12 @@
 {
+  "TRIUMF-LCG2-LHCOPNE": [
+    "206.12.9.97",
+    "206.12.9.98"
+  ],
   "TW-ASGC": [
     "140.109.224.101",
     "140.109.224.102",
     "2001:c08:ffff:ffff:ffff:ffff:fffa:865",
     "2001:c08:ffff:ffff:ffff:ffff:fffa:866"
-  ],
-  "TRIUMF-LCG2-LHCOPNE": [
-    "206.12.9.97",
-    "206.12.9.98"
   ]
 }
