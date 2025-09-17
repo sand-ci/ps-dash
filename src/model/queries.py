@@ -818,12 +818,11 @@ def hostFoundInES(host, lookback_days, indeces):
             hits = res.get("hits", {}).get("hits", [])
             if len(hits) > 0:
                 inf = hits[0]['_source']
-                if host in [inf['src_host'], inf['src']]:
+                if (host in [inf['src_host'], inf['src']]) and ('src_netsite' in inf.keys()):
                     return (True, inf['src_netsite'], inf['src_rcsite'])
-                elif host in [inf['dest_host'], inf['dest']]:
+                if host in [inf['dest_host'], inf['dest']] and ('dest_netsite' in inf.keys()):
                     return (True, inf['dest_netsite'], inf['dest_rcsite'])
-                else:
-                    return (True, "-", "-")
+                return (True, "-", "-")
         except Exception as e:
             print("Host: ", host)
             print("Exception in Elasticsearch query?")

@@ -12,6 +12,10 @@ import model.queries as qrs
 from model.Alarms import Alarms
 from utils.parquet import Parquet
 from utils.helpers import timer
+import time
+import dash_loading_spinners
+from dash.exceptions import PreventUpdate
+
 
 
 def title(q=None):
@@ -123,7 +127,18 @@ def layout(q=None, **other_unknown_query_strings):
         sitesDropdownData, asnsDropdownData = get_dropdown_data(asn_anomalies, pivotFrames)
 
 
-        return dbc.Row([
+        return html.Div(children=[
+            html.Div(
+                id="div-loading-paths",
+                children=[
+                    dash_loading_spinners.Pacman(
+                        fullscreen=True, 
+                        id="loading-paths-page"
+                    )
+                ]
+            ),
+            
+            html.Div(id='explore-path-div', children=[dbc.Row([
                 dcc.Store(id='date-from', data=period_to_display[0]),
                 dcc.Store(id='date-to', data=period_to_display[1]),
                 dbc.Row([
@@ -204,6 +219,8 @@ def layout(q=None, **other_unknown_query_strings):
                 html.Br(),
                 html.Br(),
             ], className=' main-cont', align="center", style={"padding": "0.5% 1.5%"})
+            ])
+        ])
     else:
         return dbc.Row([
                     dbc.Col([
@@ -228,6 +245,21 @@ def load_initial_data(selected_keys, asn_anomalies):
     fig = get_parallel_cat_fig([], [], dateFrom, dateTo)
     return [dataTables, fig]
 
+@dash.callback(
+    Output("div-loading-paths", "children"),
+    [
+        Input("explore-path-div", "loading_state")
+    ],
+    [
+        State("div-loading-paths", "children"),
+    ]
+)
+def hide_loading_after_startup(loading_state, children):
+    if children:
+        time.sleep(1)
+        return None
+
+    raise PreventUpdate
 
 @dash.callback(
     Output('asn-sankey', 'figure'),

@@ -1,13 +1,10 @@
-#DONE: change bows (up and down) DONE
-#DONE: add title that this are T1 sites last 2 hours
-#DONE: increase map, buttons for increasing the map
-#DONE: initial loading
-#DONE: change loading widget
+#TODO: automatically update traceroute data @timer?
+#TODO: move Audit to Updater() ?
+#TODO: elasticsearch function: netsite not found but was host still found?
 
-#TODO: aggregation of records(I'm not aggregating, the query is bad but represents what I want to do)
+
+#TODO: aggregation of records(I'm not aggregating, the query isn't optimal but represents what I want to do)
 #TODO: make a switch between latency, traceroute, packetloss?
-#TODO: visualise meshes of testing 
-#TODO: query once per 2 hours, don't query every time the picture is updated
 
 import dash
 from dash import dcc, html
@@ -15,7 +12,8 @@ import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, State
 import pandas as pd
 from datetime import datetime, timedelta
-from pages.cric_extract_OPN import query_valid_trace_data
+from dash.exceptions import PreventUpdate
+import time
 
 import utils.helpers as hp
 from utils.parquet import Parquet
@@ -33,6 +31,8 @@ import model.queries as qrs
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from itertools import combinations
+from ipaddress import ip_address, ip_network
+from collections import defaultdict
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -78,7 +78,7 @@ def readParquetPsConfig(pq):
         print(err)
         print(f"Problems with reading the file {parquet_path}")
 
-def readParquetCRIC(pq):
+def readParquetHostsCRIC(pq):
     """
     The function reads parquet file that is updated every 24 \
     hours with the data about perfSONARs from CRIC.
@@ -91,6 +91,90 @@ def readParquetCRIC(pq):
     except Exception as err:
         print(err)
         print(f"Problems with reading the file {parquet_path}")
+        
+def readParquetSubnetsCRIC(pq):
+    parquet_path = 'parquet/raw/CRICDataOPNSubnets.parquet'
+    try: 
+        print("Reading the parquet file with CRIC OPN subnets data...")
+        df = pq.readFile(parquet_path)
+        return df
+    except Exception as err:
+        print(err)
+        print(f"Problems with reading the file {parquet_path}")
+
+
+T1_NETSITES = [
+    "BNL-ATLAS-LHCOPNE", "USCMS-FNAL-WC1-LHCOPNE", "RAL-LCG2-LHCOPN",
+    "JINR-T1-LHCOPNE", "NCBJ-LHCOPN",
+    "NLT1-SARA-LHCOPNE", "INFN-T1-LHCOPNE", "NDGF-T1-LHCOPNE",
+    "KR-KISTI-GSDC-1-LHCOPNE", "IN2P3-CC-LHCOPNE", "pic-LHCOPNE",
+    "FZK-LCG2-LHCOPNE", "CERN-PROD-LHCOPNE", "TRIUMF-LCG2-LHCOPNE"
+]
+
+
+cric_elastic_mapping = {'CERN-PROD-LHCOPNE': 'CERN-PROD-LHCOPNE', 'BNL-ATLAS-LHCOPNE': 'BNL-ATLAS-LHCOPNE', 
+                        'INFN-T1-LHCOPNE': 'INFN-T1-LHCOPNE', 'USCMS-FNAL-WC1-LHCOPNE': 'USCMS-FNAL-WC1-LHCOPNE', 
+                        'FZK-LCG2-LHCOPNE': 'FZK-LCG2-LHCOPNE', 'IN2P3-CC-LHCOPNE': 'IN2P3-CC-LHCOPNE', 'RAL-LCG2-LHCOPN': 'RAL-LCG2-LHCOPN', 
+                        'JINR-T1-LHCOPNE': 'JINR-T1-LHCOPNE', 'PIC-LHCOPNE': 'pic-LHCOPNE', 'RRC-KI-T1-LHCOPNE': 'RRC-KI-T1-LHCOPNE', 
+                        'NLT1-SARA-LHCOPNE': 'NLT1-SARA-LHCOPNE', 'TRIUMF-LCG2-LHCOPNE': 'TRIUMF-LCG2-LHCOPNE', 'NDGF-T1-LHCOPNE': 'NDGF-T1-LHCOPNE', 
+                        'KR-KISTI-GSDC-1-LHCOPNE': 'KR-KISTI-GSDC-1-LHCOPNE', 'NCBJ-LHCOPN': 'NCBJ-LHCOPN'}
+
+
+def ip_in_any(ip, networks):
+    return any(ip_address(ip) in ip_network(net) for net in networks)
+
+
+def query_valid_trace_data(hours, parquet):
+    """
+    As some tests might run not on perfsonar hosts we are getting wrong image about trace data. 
+    This function extracts data only for OPN/T1 sites from Elasticsearch,
+    and filters the data to return tests for OPN ip addresses mentioned in CRIC.
+    Also writes:
+      - invalid_ips_perfsonar.json  -> {site: [IPs not in CRIC OPN ranges]}
+      - valid_ips_perfsonar_tested.json -> {site: [IPs that match CRIC OPN ranges]}
+    """
+    date_to = datetime.utcnow()
+    date_from = date_to - timedelta(hours=hours)
+    date_to_str = date_to.strftime(hp.DATE_FORMAT)
+    date_from_str = date_from.strftime(hp.DATE_FORMAT)
+
+    traceroute_records = qrs.queryOPNTraceroutes(date_from_str, date_to_str, T1_NETSITES)
+    cric_T1_networks = readParquetSubnetsCRIC(parquet)
+    cric_T1_networks = cric_T1_networks.set_index("site")["subnets"].to_dict()
+    valid_traceroutes = []
+
+    invalid_ips_by_site = defaultdict(set)
+    valid_ips_by_site = defaultdict(set)
+    for record in traceroute_records:
+        srcs = record.get('src_ipvs', [])
+        dsts = record.get('dst_ipvs', [])
+
+        src_site = record['src_netsite']
+        dst_site = record['dest_netsite']
+        src_site_key = cric_elastic_mapping.get(src_site).upper()
+        dst_site_key = cric_elastic_mapping.get(dst_site).upper()
+        
+        src_cric_info = cric_T1_networks.get(src_site_key, [])
+        dest_cric_info = cric_T1_networks.get(dst_site_key, [])
+
+        src_nonempty = [ip for ip in srcs if ip]
+        dst_nonempty = [ip for ip in dsts if ip]
+        opn_ips_srcs = [ip_in_any(ip, src_cric_info) for ip in src_nonempty]
+        opn_ips_dsts = [ip_in_any(ip, dest_cric_info) for ip in dst_nonempty]
+
+        # check whether ips from elasticsearch are in OPN subnets mentioned in CRIC
+        for ip, ok in zip(src_nonempty, opn_ips_srcs):
+            (valid_ips_by_site if ok else invalid_ips_by_site)[src_site].add(ip)
+        for ip, ok in zip(dst_nonempty, opn_ips_dsts):
+            (valid_ips_by_site if ok else invalid_ips_by_site)[dst_site].add(ip)
+
+        if any(opn_ips_srcs) and any(opn_ips_dsts):
+            valid_traceroutes.append(record)
+
+    print(f"Before filtering Elasticsearch traceroute records (according to CRIC): {len(traceroute_records)}")
+    print(f"After filtering: {len(valid_traceroutes)}")
+
+    return valid_traceroutes
 
 def extract_groups_and_hosts(mesh_config, site=False, host=False):
     """
@@ -126,7 +210,6 @@ def layout(**other_unknown_query_strings):
     traceroute_records = query_valid_trace_data(hours=4, parquet=pq)
     records_df = pd.DataFrame(traceroute_records)
     
-    # print(records_df[records_df['dest_netsite'] == 'USCMS-FNAL-WC1-LHCOPNE'])
     print(set(list(records_df['dest_netsite'].unique()) + list(records_df['src_netsite'].unique())))
     if not records_df.empty:
         def pct(series):
@@ -157,392 +240,288 @@ def layout(**other_unknown_query_strings):
     grouped["src_netsite"] = grouped["src_netsite"].apply(lambda s: s.upper())
     grouped["dest_netsite"] = grouped["dest_netsite"].apply(lambda s: s.upper())
     traceroutes_dict = grouped.to_dict('records')
-    # print("traceroutes_dict")
-    # print(grouped[grouped['dest_netsite'] == 'USCMS-FNAL-WC1-LHCOPNE'])
     summary_df, missing_df = compute_connectivity_summaries(grouped, T1_NETSITES)
-    
-    
-    
-    
     print(" --- getting hosts from psConfigAdmin ---")
     mesh_config = readParquetPsConfig(pq)
     all_hosts_in_configs = mesh_config['Host'].unique()
     print(f"All hosts in psConfig: {len(all_hosts_in_configs)}\n")
+    
     print(mesh_config.head(10))
-    
-    # configurations = extract_groups_and_hosts(mesh_config, "PIC-LHCOPNE")
-    # netsites = sorted(set(mesh_config["Site"].tolist()))
-    # hosts = sorted(set(mesh_config["Host"].tolist()))
-    
-    print(" --- getting PerfSonars from WLCG CRIC ---")
-    all_cric_perfsonar_hosts = readParquetCRIC(pq)
-    print(f"All perfSONAR hosts in CRIC: {len(all_cric_perfsonar_hosts)}\n")
 
-    
+    print(" --- getting PerfSonars from WLCG CRIC ---")
+    all_cric_perfsonar_hosts = readParquetHostsCRIC(pq)
+    print(f"All perfSONAR hosts in CRIC: {len(all_cric_perfsonar_hosts)}\n")
     # UI
     return html.Div(children=[
-        html.Div(children=[
-            # Title
-            dcc.Store(id="valid-data", data=traceroutes_dict),
-            dcc.Store(id="config_hosts", data=all_hosts_in_configs),
-            dcc.Store(id="configs", data=mesh_config.to_dict()),
-            dcc.Store(id="cric_hosts", data=all_cric_perfsonar_hosts),
-            html.H1(id="network-testing-title",
-                            children=f"T1/OPN Disconnections — Last {HOURS} Hours pc_trace Tests"
-                f"({date_from.strftime('%Y-%m-%d %H:%M')} to {date_to.strftime('%Y-%m-%d %H:%M')} UTC)",
-                            className="mt-3 mb-1"),
+        html.Div(id="div-configs", children=[
+            dcc.Store(id="traceroutes-grouped", data={}),
+            
+            html.Div(children=[
+                # Title
+                dcc.Store(id="valid-data", data=traceroutes_dict),
+                html.H1(id="network-testing-title",
+                                children=f"T1/OPN Disconnections — Last {HOURS} Hours pc_trace Tests"
+                    f"({date_from.strftime('%Y-%m-%d %H:%M')} to {date_to.strftime('%Y-%m-%d %H:%M')} UTC)",
+                                className="mt-3 mb-1"),
 
-            # Controls row
-            dcc.Loading(
-                        id="loading-map",
-                        type="default",
-                        color='#00245A',
-                        children=[
-                            dbc.Row([
-                                dbc.Col(
-                                    dcc.Dropdown(
-                                        multi=True,
-                                        id="t1-site-filter",
-                                        placeholder="Filter T1 sites…",
-                                        options= T1_NETSITES,
-                                        closeOnSelect=False
+                # Controls row
+                                dbc.Row([
+                                    dbc.Col(
+                                        dcc.Dropdown(
+                                            multi=True,
+                                            id="t1-site-filter",
+                                            placeholder="Filter T1 sites…",
+                                            options= T1_NETSITES,
+                                            closeOnSelect=False,
+                                            value=T1_NETSITES
+                                        ),
+                                        md=8
                                     ),
-                                    md=8
-                                ),
-                                dbc.Col(
-                                    html.Div([
-                                        dbc.Button("Search", id="btn-search", className="me-2", n_clicks=0),
-                                        dbc.Button("Select all", id="btn-select-all", className="me-2", n_clicks=0),
-                                        dbc.Button("Clear", id="btn-clear", color="secondary", n_clicks=0),
-                                    ]),
-                                    md=4, className="d-flex align-items-center justify-content-md-end mt-2 mt-md-0"
-                                )
-                            ], className="mb-2"),
-
-                            # Graph
-                            dbc.Row(
-                                dbc.Col(
-                                    dcc.Graph(id='traceroute-map', figure=buildMap(sites_status, True, grouped),
-                                            style={'height': '85vh'}),
-                                        width=12
+                                    dbc.Col(
+                                        html.Div([
+                                            dbc.Button("Search", id="btn-search", className="me-2", n_clicks=0),
+                                            dbc.Button("Select all", id="btn-select-all", className="me-2", n_clicks=0),
+                                            dbc.Button("Clear", id="btn-clear", color="secondary", n_clicks=0),
+                                        ]),
+                                        md=4, className="d-flex align-items-center justify-content-md-end mt-2 mt-md-0"
                                     )
-                            ),
+                                ], className="mb-2"),
 
-                            dcc.Store(id="time-window", data={
-                                "from": date_from_str, "to": date_to_str, "hours": HOURS
-                            }),
-                            dcc.Store(id="t1-selected", data=T1_NETSITES)
-                        ]
-                )
-        ], className="p-1 site boxwithshadow page-cont m-3"),
-        dcc.Store(id="connectivity-summary-initial", data=summary_df.to_dict("records")),
-dcc.Store(id="missing-summary-initial", data=missing_df.to_dict("records")),
-        # ---- Connectivity sanity check UI ----
-html.Div(children=[
-    html.H3("Connectivity check (T1 ↔ T1)", className="mt-2"),
-    dbc.Alert(
-        [
-            html.Div("Note: every T1 site should have traceroute tests with every other T1 site.", className="mb-1"),
-            html.Ul([
-                html.Li("Priority 1 — Missing connections: no test observed in this role (as source / as destination)."),
-                html.Li("Priority 2 — All tested connections are RED in a role: likely perfSONAR toolkit misconfiguration at the site."),
-                html.Li("Priority 3 — YELLOW connections: destination never reached but path complete (possible firewall/ICMP filtering)."),
-            ], className="mb-0")
-        ],
-        color="light",
-        className="mb-2"
-    ),
+                                # Graph
+                                dbc.Row(
+                                    dbc.Col(
+                                        dcc.Loading(
+                                            id="loading-map",
+                                            type="default",
+                                            color='#00245A',
+                                            children=[
+                                                    dcc.Graph(id='traceroute-map', figure=buildMap(sites_status, True, grouped),
+                                                            style={'height': '85vh'})
+                                                    ]
+                                        ),
+                                        width=12
+                                        )
+                                ),
 
-    # ---------- Per-site combined (src + dest) ----------
-    html.Div([
-        html.H5("Connectivity ranking", className="mt-2"),
-        dt.DataTable(
-            id="connectivity-table",
-            columns=[
-                {"name": "Site", "id": "site"},
-                # Source role
-                {"name": "Expected (src)", "id": "expected_src", "type": "numeric"},
-                {"name": "Missing (src)",  "id": "missing_src",  "type": "numeric"},
-                {"name": "Tested (src)",   "id": "tested_src",   "type": "numeric"},
-                {"name": "Green (src)",    "id": "green_src",    "type": "numeric"},
-                {"name": "Yellow (src)",   "id": "yellow_src",   "type": "numeric"},
-                {"name": "Red (src)",      "id": "red_src",      "type": "numeric"},
-                {"name": "All tested RED (src)", "id": "all_red_src_flag", "type": "text"},
-                # Destination role
-                {"name": "Expected (dest)", "id": "expected_dest", "type": "numeric"},
-                {"name": "Missing (dest)",  "id": "missing_dest",  "type": "numeric"},
-                {"name": "Tested (dest)",   "id": "tested_dest",   "type": "numeric"},
-                {"name": "Green (dest)",    "id": "green_dest",    "type": "numeric"},
-                {"name": "Yellow (dest)",   "id": "yellow_dest",   "type": "numeric"},
-                {"name": "Red (dest)",      "id": "red_dest",      "type": "numeric"},
-                {"name": "All tested RED (dest)", "id": "all_red_dest_flag", "type": "text"},
-            ],
-            data=summary_df.to_dict("records"),
-    sort_action="native",
-    page_size=16,
-    style_table={"overflowX": "auto"},
-    style_cell={"fontFamily": "Inter, system-ui", "fontSize": 13, "padding": "6px"},
-    style_header={"fontWeight": "600"},
-    style_data_conditional=[
-        # Light highlight when any missing in either role
-        {
-            'if': {
-                'filter_query': '{tested_src} = 0',
-                'column_id': 'tested_src'
-            },
-            'backgroundColor': '#5957579A',
-            'color': 'white'
-        }, 
-        {
-            'if': {
-                'filter_query': '{tested_dest} = 0',
-                'column_id': 'tested_dest'
-            },
-            'backgroundColor': "#5957579A",
-            'color': 'white'
-        },
-        # 🔴 Strong highlight when all connections are red (as source)
-        {
-            "if": {
-                "filter_query": "{all_red_src_flag} = 'True'",
-                "column_id": "all_red_src_flag"
-            },
-            "backgroundColor": "#ff000077",
-            "color": "white"
-        },
-        # 🔴 Strong highlight when all connections are red (as destination)
-        {
-            'if': {
-                'filter_query': "{all_red_dest_flag} = 'True'",
-            },
-            'backgroundColor': "#ff000077",
-            'color': 'white'
-        },
-        # {
-        #     "if": {'all_red_dest_flag': 'True'},
+                                dcc.Store(id="time-window", data={
+                                    "from": date_from_str, "to": date_to_str, "hours": HOURS
+                                }),
+                                dcc.Store(id="t1-selected", data=T1_NETSITES)
+                            
+            ], className="p-1 site boxwithshadow page-cont m-3"),
+            dcc.Store(id="connectivity-summary-initial", data=summary_df.to_dict("records")),
+            dcc.Store(id="missing-summary-initial", data=missing_df.to_dict("records")),
+            # ---- Connectivity sanity check UI ----
+            html.Div(children=[
+                html.H3("Connectivity check (T1 ↔ T1)", className="mt-2"),
+                dbc.Alert(
+                    [
+                        html.Div("Note: every T1 site should have traceroute tests with every other T1 site.", className="mb-1"),
+                        html.Ul([
+                            html.Li("Priority 1 — Missing connections: no test observed in this role (as source / as destination)."),
+                            html.Li("Priority 2 — All tested connections are RED in a role: likely perfSONAR toolkit misconfiguration at the site."),
+                            html.Li("Priority 3 — YELLOW connections: destination never reached but path complete (possible firewall/ICMP filtering)."),
+                        ], className="mb-0")
+                    ],
+                    color="light",
+                    className="mb-2"
+                ),
+
+                # ---------- Per-site combined (src + dest) ----------
+                html.Div([
+                    html.H5("Connectivity ranking", className="mt-2"),
+                    dt.DataTable(
+                        id="connectivity-table",
+                        columns=[
+                            {"name": "Site", "id": "site"},
+                            # Source role
+                            {"name": "Expected (src)", "id": "expected_src", "type": "numeric"},
+                            {"name": "Missing (src)",  "id": "missing_src",  "type": "numeric"},
+                            {"name": "Tested (src)",   "id": "tested_src",   "type": "numeric"},
+                            {"name": "Green (src)",    "id": "green_src",    "type": "numeric"},
+                            {"name": "Yellow (src)",   "id": "yellow_src",   "type": "numeric"},
+                            {"name": "Red (src)",      "id": "red_src",      "type": "numeric"},
+                            {"name": "All tested RED (src)", "id": "all_red_src_flag", "type": "text"},
+                            # Destination role
+                            {"name": "Expected (dest)", "id": "expected_dest", "type": "numeric"},
+                            {"name": "Missing (dest)",  "id": "missing_dest",  "type": "numeric"},
+                            {"name": "Tested (dest)",   "id": "tested_dest",   "type": "numeric"},
+                            {"name": "Green (dest)",    "id": "green_dest",    "type": "numeric"},
+                            {"name": "Yellow (dest)",   "id": "yellow_dest",   "type": "numeric"},
+                            {"name": "Red (dest)",      "id": "red_dest",      "type": "numeric"},
+                            {"name": "All tested RED (dest)", "id": "all_red_dest_flag", "type": "text"},
+                        ],
+                        data=summary_df.to_dict("records"),
+                        sort_action="native",
+                        page_size=16,
+                        style_table={"overflowX": "auto"},
+                        style_cell={"fontFamily": "Inter, system-ui", "fontSize": 13, "padding": "6px"},
+                        style_header={"fontWeight": "600"},
+                        style_data_conditional=[
+                            # Light highlight when any missing in either role
+                            {
+                                'if': {
+                                    'filter_query': '{tested_src} = 0',
+                                    'column_id': 'tested_src'
+                                },
+                                'backgroundColor': '#5957579A',
+                                'color': 'white'
+                            }, 
+                            {
+                                'if': {
+                                    'filter_query': '{tested_dest} = 0',
+                                    'column_id': 'tested_dest'
+                                },
+                                'backgroundColor': "#5957579A",
+                                'color': 'white'
+                            },
+                            # 🔴 Strong highlight when all connections are red (as source)
+                            {
+                                "if": {
+                                    "filter_query": "{all_red_src_flag} = 'True'",
+                                    "column_id": "all_red_src_flag"
+                                },
+                                "backgroundColor": "#ff000077",
+                                "color": "white"
+                            },
+                            # 🔴 Strong highlight when all connections are red (as destination)
+                            {
+                                'if': {
+                                    'filter_query': "{all_red_dest_flag} = 'True'",
+                                },
+                                'backgroundColor': "#ff000077",
+                                'color': 'white'
+                            }
+                        ],
+                    )
+                ], className="mb-3"),
+
+                # ---------- Exactly which connections are missing (role-aware) ----------
+                html.Div([
+                    html.H5("Missing connections", className="mt-2"),
+                    dt.DataTable(
+                        id="missing-table",
+                        columns=[
+                            {"name": "Site", "id": "site"},
+                            {"name": "Role", "id": "role"},  # "as_src" or "as_dest"
+                            {"name": "Missing with (no test observed)", "id": "missing_with"},
+                        ],
+                        data=missing_df.to_dict("records"),
+                        page_size=16,
+                        style_table={"overflowX": "auto"},
+                        style_cell={"fontFamily": "Inter, system-ui", "fontSize": 13, "padding": "6px"},
+                        style_header={"fontWeight": "600"},
+                    ),
+                ], className="mb-4")
+                
+            ], className="p-1 site boxwithshadow page-cont m-3"),
+        ]),
             
-        #     "backgroundColor": "#ff000077",
-        #     "color": "white"
             
-        # },
-    ],
-)
-    ], className="mb-3"),
-    # html.Div(
-    #     className="boxwithshadow page-cont p-3",
-    #     children=[
-    #         dbc.Row([
-    #             dbc.Col(html.H4("Trace Coverage Matrices (last 30 days)"), md=8),
-    #             dbc.Col(
-    #                 dbc.Button("Clear selection", id="btn-clear-matrix", size="sm", color="secondary"),
-    #                 md=4, className="d-flex justify-content-md-end align-items-center mt-2 mt-md-0"
-    #             ),
-    #         ], className="mb-2"),
-
-    #         dbc.Row([
-    #             dbc.Col([
-    #                 html.Label("Filter by Netsite", className="fw-semibold"),
-    #                 dcc.Dropdown(
-    #                     id="dd-netsite",
-    #                     # options=[{"label": s, "value": s} for s in netsites],
-    #                     placeholder="Select a netsite…",
-    #                     value=None,
-    #                     clearable=True,
-    #                 ),
-    #             ], md=6),
-    #             dbc.Col([
-    #                 html.Label("Filter by Host", className="fw-semibold"),
-    #                 dcc.Dropdown(
-    #                     id="dd-host",
-    #                     # options=[{"label": h, "value": h} for h in hosts],
-    #                     placeholder="Select a host…",
-    #                     value=None,
-    #                     clearable=True,
-    #                 ),
-    #             ], md=6),
-    #         ], className="mb-3"),
-
-    #         # dcc.Store(id="store-members-by-group", data=members_by_group),
-    #         # dcc.Store(id="store-host-to-site", data=host_to_site),
-    #         dcc.Store(id="store-groups", data=mesh_config["Groups"]),
-    #         dcc.Store(id="store-types", data=mesh_config["Types"]),
-
-    #         dcc.Loading(
-    #             id="loading-matrices",
-    #             type="default",
-    #             children=html.Div(id="heatmap-matrices")
-    #         ),
-    #     ],
-    # ),
-
-    # ---------- Exactly which connections are missing (role-aware) ----------
-    html.Div([
-        html.H5("Missing connections", className="mt-2"),
-        dt.DataTable(
-            id="missing-table",
-            columns=[
-                {"name": "Site", "id": "site"},
-                {"name": "Role", "id": "role"},  # "as_src" or "as_dest"
-                {"name": "Missing with (no test observed)", "id": "missing_with"},
-            ],
-            data=missing_df.to_dict("records"),  # from compute_connectivity_summaries_directed(...)
-            page_size=16,
-            style_table={"overflowX": "auto"},
-            style_cell={"fontFamily": "Inter, system-ui", "fontSize": 13, "padding": "6px"},
-            style_header={"fontWeight": "600"},
-        ),
-    ], className="mb-4")
-    ], className="p-1 site boxwithshadow page-cont m-3"),
-
-    html.Div(children=[
-        dbc.Row([dbc.Col([dbc.Row(html.H2("pSConfig Web Admin Hosts Audit", className="mt-2")),
-                          html.Div(id="last-audit", className="text-secondary small mb-2")]),
-                 
-                #  dbc.Col(
-                #         html.Div([
-                #             dbc.ButtonGroup([
-                #                 dbc.Button("Audit", id="audit-btn", className="me-2", n_clicks=0),
-                #                 dbc.Button("Open PWA ↗", href="https://psconfig.opensciencegrid.org/#!/configs/58f74a4df5139f0021ac29d6", className="me-2", target="_blank", color="secondary"),
-                #             ])
-                #         ]),
-                #         md=4, className="d-flex align-items-center justify-content-md-end mt-2 mt-md-0"
-                #     )
-                dbc.Row([
-    dbc.Col(
-        dcc.Loading(
-            id="audit-loader",
-            type="default",
-            color="#00245A",
-            children=html.Div(id="last-audit", className="text-secondary small mb-2")
-        ),
-        md=8
-    ),
-    dbc.Col(
-        html.Div(
-            dbc.ButtonGroup([
-                dbc.Button("Audit", id="audit-btn", className="me-2", n_clicks=0),
-                dbc.Button("Open PWA ↗", href="https://psconfig.opensciencegrid.org/#!/configs/58f74a4df5139f0021ac29d6",
-                           className="me-2", target="_blank", color="secondary"),
-            ])
-        ),
-        md=4, className="d-flex align-items-center justify-content-md-end mt-2 mt-md-0"
-    ),
-]),
-dcc.Store(id="audit-data")
-                ]),
-        # dcc.Store(id="audit-data"),
-        # dcc.Store(id="config-data"),
-        # ---------- Filters ----------
-        dbc.Row([
-            dbc.Col([
-                html.Label("Status", className="small text-muted"),
-                dcc.Dropdown(id="f-status", options=[], value=None, multi=True, placeholder="All")
-            ], md=3),
-            dbc.Col([
-                html.Label("Netsite", className="small text-muted"),
-                dcc.Dropdown(
-                    id="f-netsite", options=[], value=None, multi=True, placeholder="All")
-            ], md=3),
-            dbc.Col([
-                html.Label("In CRIC", className="small text-muted"),
-                dcc.Dropdown(
-                    id="f-incric",
-                    options=[{"label":"Yes","value":True}, {"label":"No","value":False}],
-                    value=None, multi=True, placeholder="All"
-                )
-            ], md=3),
-            dbc.Col([
-                html.Label("Found in ES (30d)", className="small text-muted"),
-                dcc.Dropdown(
-                    id="f-found",
-                    options=[{"label":"Yes","value":True}, {"label":"No","value":False}],
-                    value=None, multi=True, placeholder="All"
-                )
-            ], md=3),
-        ], className="mb-2"),
         
-        # ---------- Charts ----------
-        dbc.Row([
-            dbc.Col(
-                dcc.Loading(
-                    id="load-donut",
-                    type="default",  # "default" | "cube" | "circle" | "dot"
-                    color="#00245A",
-                    children=dcc.Graph(id="donut-status")
-                ),
-                md=6
-            ),
-            dbc.Col(
-                dcc.Loading(
-                    id="load-bar",
-                    type="default",
-                    color="#00245A",
-                    children=dcc.Graph(id="bar-status")
-                ),
-                md=6
-            ),
-        ], className="mb-2"),
+        
+        html.Div(id="div-audit", children=[
+            html.H2("pSConfig Web Admin Hosts Audit", className="mt-2"),
+            dbc.Row([
+                        
+                dcc.Store(id="audit-data"),
+                dcc.Store(id="last-audit"),
+                dcc.Store(id="config-hosts", data=all_hosts_in_configs),
+                dcc.Store(id="cric-hosts", data=all_cric_perfsonar_hosts),
+                
+                
+                                
+                dbc.Col([
+                    html.Div(id="last-audit", className="text-secondary small mb-2")
+                    ]),
+                
 
-        # ---------- Table ----------
-        dbc.Row([
+                dbc.Col(
+                    html.Div(
+                        dbc.ButtonGroup([
+                            dbc.Button("Audit", id="audit-btn", className="me-2", n_clicks=0, disabled=True),
+                            dbc.Button("Open PWA ↗", href="https://psconfig.opensciencegrid.org/#!/configs/58f74a4df5139f0021ac29d6",
+                                    className="me-2", target="_blank", color="secondary"),
+                        ])
+                    ),
+                    md=4, className="d-flex align-items-center justify-content-md-end mt-2 mt-md-0"
+                )
+            ]),        
+            
+            # ---------- Filters ----------
+            dbc.Row([
+                dbc.Col([
+                    html.Label("Status", className="small text-muted"),
+                    dcc.Dropdown(id="f-status", options=[], value=None, multi=True, placeholder="All")
+                ], md=3),
+                dbc.Col([
+                    html.Label("Netsite", className="small text-muted"),
+                    dcc.Dropdown(
+                        id="f-netsite", options=[], value=None, multi=True, placeholder="All")
+                ], md=3),
+                dbc.Col([
+                    html.Label("In CRIC", className="small text-muted"),
+                    dcc.Dropdown(
+                        id="f-incric",
+                        options=[{"label":"Yes","value":True}, {"label":"No","value":False}],
+                        value=None, multi=True, placeholder="All"
+                    )
+                ], md=3),
+                dbc.Col([
+                    html.Label("Found in ES (30d)", className="small text-muted"),
+                    dcc.Dropdown(
+                        id="f-found",
+                        options=[{"label":"Yes","value":True}, {"label":"No","value":False}],
+                        value=None, multi=True, placeholder="All"
+                    )
+                ], md=3),
+            ], className="mb-2"),
+
+            # ---------- Charts ----------
             dcc.Loading(
-                id="loading-audit",
+                id="loading-charts",
                 type="default",
                 color="#00245A",
-                children=html.Div(id="audit-table")  # keep this as a single container
-            )
-        ]),
-    ], className="p-1 site boxwithshadow page-cont m-3")
+                delay_show=300,  # optional: avoid flicker
+                children=dbc.Row([
+                    dbc.Col(dcc.Graph(id="donut-status"), md=6),
+                    dbc.Col(dcc.Graph(id="bar-status"), md=6),
+                ], className="mb-2")
+            ),
+
+            # ---------- Table ----------
+            dcc.Loading(
+                id="loading-table",
+                type="default",
+                color="#00245A",
+                delay_show=300,
+                parent_style={"position": "relative"},  # keeps overlay scoped to this block
+                children=html.Div(id="audit-table")
+            ),
+        ], className="p-1 site boxwithshadow page-cont m-3")
  ])
     
+# @dash.callback(
+#     Output("div-loading-configs", "children"),
+#     [
+#         Input("div-configs", "loading_state")
+#     ],
+#     [
+#         State("div-loading-configs", "children"),
+#     ]
+# )
+# def hide_loading_after_startup(loading_state, children):
+#     if children:
+#         time.sleep(1)
+#         return None
+
+#     raise PreventUpdate
 
 def _is_fresh(p: Path, ttl: timedelta) -> bool:
     if not p.exists():
         return False
     mtime = datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc)
     return (datetime.now(timezone.utc) - mtime) < ttl
-
-@dash.callback(
-    Output("audit-data", "data"),
-    Output("last-audit", "children"),
-    Input("audit-btn", "n_clicks"),
-    State("config_hosts", "data"),
-    State("cric_hosts", "data"),
-    prevent_initial_call=False
-)
-def run_audit(n, config_hosts, cric_hosts):
-    if _is_fresh(AUDIT_PARQUET, AUDIT_TTL):
-        df = pd.read_parquet(AUDIT_PARQUET)
-        ts = datetime.fromtimestamp(AUDIT_PARQUET.stat().st_mtime, tz=timezone.utc)
-        return df.to_dict("records"), f"Using cached audit from {ts:%Y-%m-%d %H:%M:%S} UTC"
-
-    # Otherwise compute and cache
-    audited = asyncio.run(audit(config_hosts, cric_hosts))  # <-- your coroutine
-    df = pd.DataFrame(audited)
-    AUDIT_PARQUET.parent.mkdir(parents=True, exist_ok=True)
-    df.to_parquet(AUDIT_PARQUET, index=False)
-    ts = datetime.now(timezone.utc)
-    return df.to_dict("records"), f"Audited at {ts:%Y-%m-%d %H:%M:%S} UTC"
-
-# dash.callback(
-#     Output("config-data", "children"),
-#     Input("audit-data", "data"),
-#     Input("config-data", "data"),
-#     prevent_initial_call=False
-# )
-# def config_data(audit_df,  confid_df):
-#     # Load cache if fresh
-#     if len(audit_df) < 1 or len(confid_df) < 1:
-#         return "One of datasets is empty."
-#     audit_df = pd.DataFrame(audit_df)
-#     print("audit_df")
-#     print(audit_df)
-#     config_df = pd.DataFrame(config_df)
-#     print("\nconfig_df")
-#     print(config_df)
-#     return {}
-
-# pretty mapping for the donut
 
 STATUS_PRETTY = {
     "ACTIVE_HTTP": "Active HTTP — reachable; toolkit/API responds",
@@ -566,38 +545,65 @@ STATUS_COLORS = {
     Output("bar-status", "figure"),
     Output("f-status", "options"),
     Output("f-netsite", "options"),
-    Input("audit-data", "data"),
+    Output("last-audit", "children"),
+    Output("audit-data", "data"),
+
+
+    # Input("audit-btn", "n_clicks"),
     Input("f-status", "value"),
     Input("f-incric", "value"),
     Input("f-found", "value"),
     Input("f-netsite", "value"),
+    
+    State("audit-data", "data"),
+    State("last-audit", "children"),
+    State("config-hosts", "data"),
+    State("cric-hosts", "data"),
+    prevent_initial_call=False
 )
-def render_audit(data, f_status, f_incric, f_found, f_netsite):
-    # Empty state
+def render_audit(f_status, f_incric, f_found, f_netsite, data, last_modified, config_hosts, cric_hosts):
+
+    # print("In run audit...")
+    if _is_fresh(AUDIT_PARQUET, AUDIT_TTL):
+        # print("Using cached audit...")
+        df = pd.read_parquet(AUDIT_PARQUET)
+        ts = datetime.fromtimestamp(AUDIT_PARQUET.stat().st_mtime, tz=timezone.utc)
+        data, last_modified = df.to_dict("records"), f"Using cached audit from {ts:%Y-%m-%d %H:%M:%S} UTC"
+
+    # compute and cache
+    else:
+        # print("Computing audit...")
+        audited = asyncio.run(audit(config_hosts, cric_hosts))  # <-- your coroutine
+        df = pd.DataFrame(audited)
+        AUDIT_PARQUET.parent.mkdir(parents=True, exist_ok=True)
+        df.to_parquet(AUDIT_PARQUET, index=False)
+        ts = datetime.now(timezone.utc)
+        data, last_modified = df.to_dict("records"), f"Audited at {ts:%Y-%m-%d %H:%M:%S} UTC"
+    
+    
     if not data:
-        empty_fig = px.scatter(title="No data yet — click Audit")
-        return html.Div(dt.DataTable(data=[], columns=[])), empty_fig, empty_fig, [], []
+        empty_fig = px.scatter(title="No data found from Audit")
+        return html.Div(dt.DataTable(data=[], columns=[])), empty_fig, empty_fig, [], [], "No found", {}
 
     df = pd.DataFrame(data).copy()
 
-    # Ensure expected columns exist/types
+
     for c in ["status", "in_cric", "found_in_ES"]:
         if c not in df.columns:
             df[c] = np.nan
-    # Normalize boolean-
+    
     if df["in_cric"].dtype != bool:
         df["in_cric"] = df["in_cric"].astype(bool, errors="ignore")
     if df["found_in_ES"].dtype != bool:
         df["found_in_ES"] = df["found_in_ES"].astype(bool, errors="ignore")
 
-    # Build status options dynamically
     all_statuses = sorted(df["status"].dropna().astype(str).unique().tolist())
     status_opts = [{"label": s, "value": s} for s in all_statuses]
     
     all_netsites = sorted(df["netsite"].dropna().astype(str).unique().tolist())
     netstite_opts = [{"label": s, "value": s} for s in all_netsites]
 
-    # Apply filters (None => no filtering)
+    # filters
     fdf = df.copy()
     if f_status:
         fdf = fdf[fdf["status"].astype(str).isin(f_status)]
@@ -608,18 +614,16 @@ def render_audit(data, f_status, f_incric, f_found, f_netsite):
     if f_netsite:
         fdf = fdf[fdf["netsite"].astype(str).isin(f_netsite)]
 
-    # ---------- Table (reacts to filters) ----------
+    # ---------- Table ----------
     tdf = fdf.copy()
-    # display-friendly booleans
     tdf["in_cric"] = np.where(tdf["in_cric"], "Yes", "No")
     tdf["found_in_ES"] = np.where(tdf["found_in_ES"], "Yes", "No")
-    # keep a consistent column order if available
     display_cols = [c for c in ["host","netsite","status","in_cric","found_in_ES","suggestion"] if c in tdf.columns]
     table = dt.DataTable(
         data=tdf[display_cols].to_dict("records"),
         columns=[{"name": c.replace("_"," ").title(), "id": c} for c in display_cols],
         sort_action="native",
-        filter_action="native",  # you still get native table filtering
+        filter_action="native",
         page_size=20,
         style_table={"overflowX": "auto"},
         style_cell={"fontFamily": "Inter, system-ui", "fontSize": 13, "padding": "6px"},
@@ -636,7 +640,7 @@ def render_audit(data, f_status, f_incric, f_found, f_netsite):
         ],
     )
 
-    # ---------- Donut (reacts to filters) ----------
+  
     gdf = fdf.copy()
     # map to pretty groups; unknowns -> "Other"
     gdf["status_group"] = (
@@ -644,20 +648,17 @@ def render_audit(data, f_status, f_incric, f_found, f_netsite):
     )
 
     donut_counts = gdf.groupby("status_group").size().reset_index(name="count")
-    # ensure consistent color order
     donut_counts["color_key"] = donut_counts["status_group"].map(lambda s: STATUS_COLORS.get(s, STATUS_COLORS["Other"]))
     fig_donut = px.pie(
         donut_counts, names="status_group", values="count",
         hole=0.55, title="Hosts by Status"
     )
-    # apply custom colors
+    # custom colors
     fig_donut.update_traces(marker=dict(colors=[STATUS_COLORS.get(s, STATUS_COLORS["Other"])
                                                 for s in donut_counts["status_group"]]),
                             textposition="inside")
     fig_donut.update_layout(showlegend=True)
 
-    # ---------- Grouped Bar (reacts to filters) ----------
-    # Build tidy counts for two metrics: In CRIC and Found in ES
     bar_incric = (
         gdf.groupby(["status","in_cric"]).size().reset_index(name="count")
         .assign(metric="In CRIC",
@@ -692,9 +693,7 @@ def render_audit(data, f_status, f_incric, f_found, f_netsite):
     )
     fig_bar.update_layout(xaxis={'categoryorder': 'total descending'})
 
-    return table, fig_donut, fig_bar, status_opts, netstite_opts
-
-
+    return table, fig_donut, fig_bar, status_opts, netstite_opts, last_modified, data
 
 
 @dash.callback(
@@ -730,17 +729,10 @@ def update_map(search_btn, select_all_btn, clear_btn, selected_sites, tw, df, su
         return sorted(set(vals))
     print("UPDATING MAP...")
     ctx = dash.callback_context.triggered[0]['prop_id']
-    print("selected_sites")
-    print(selected_sites)
-    print("dash.callback_context.triggered")
-    print(ctx)
 
 
     button = ctx.split('.')[0]
-    print("button")
-    print(button)
-    
-    date_from_str, date_to_str = tw["from"], tw["to"]
+
 
     pq = Parquet()
     alarm_cnt = pq.readFile('parquet/alarmsGrouped.parquet')
@@ -790,7 +782,7 @@ def update_map(search_btn, select_all_btn, clear_btn, selected_sites, tw, df, su
 
 
     summary_df, missing_df = pd.DataFrame(summary_df), pd.DataFrame(missing_df)
-    
+
     print("in callback sumarry_df: ")
     # print(summary_df)
     return (
@@ -800,7 +792,6 @@ def update_map(search_btn, select_all_btn, clear_btn, selected_sites, tw, df, su
         summary_df.to_dict("records"),
         missing_df.to_dict("records")
     )
-
 
 
 SEVERITY_ORDER = {"red": 3, "yellow": 2, "green": 1}
