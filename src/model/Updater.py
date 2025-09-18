@@ -238,8 +238,6 @@ class ParquetUpdater(object):
             tasks = config.get("tasks", {})
             tests = config.get("tests", {})
             schedules = config.get("schedules", {})
-            # print(schedules)
-            # Map each group to its test type
             group_type_map = {}
             test_schedule_map = {}
             for task_name, task_info in tasks.items():
@@ -249,12 +247,10 @@ class ParquetUpdater(object):
                     group_type_map[group_name] = test_type
                 schedule = task_info.get("schedule")
                 test_schedule_map[group_name] = schedules.get(schedule, None)
-            # print(test_schedule_map)
             # For each host, find groups it belongs to
             # groups have list of addresses with names
             # Check which groups contain this host
             host_rows = []
-            # print(groups)
             for host in hosts.keys():
                 participating_groups = []
                 participating_types = []
@@ -295,12 +291,8 @@ class ParquetUpdater(object):
         url = "https://psconfig.aglt2.org/pub/config"
         req = request(url)
         config_st = json.loads(req)
-        # mesh_url = "https://psconfig.aglt2.org/pub/config"
-        # mesh_config = psconfig.api.PSConfig(mesh_url)
-        # all_hosts = mesh_config.get_all_hosts()
         configs_df = pd.DataFrame() 
         for e in config_st:
-            # print(e)
             mesh_url = e['include'][0]
             mesh_r = request(mesh_url)
 
@@ -311,25 +303,6 @@ class ParquetUpdater(object):
             configs_df = pd.concat([configs_df, current_df], ignore_index=True)
             
         self.pq.writeToFile(configs_df, f"{self.location}raw/psConfigData.parquet")
-        # def checkTestsForHost(host, mesh_conf):
-        #     """
-        #     Classifies the host as belonging to one of
-        #     the three test groups (latency, trace and throughput).
-        #     """
-        #     try:
-        #         types = mesh_conf.get_test_types(host)
-        #     except Exception:
-        #         return False, False
-        #     latency = any(test in ['latency', 'latencybg'] for test in types)
-        #     trace = 'trace' in types
-        #     throughput = any(test in ['throughput', 'rtt'] for test in types) # as rtt is now in ps_throughput
-        #     return host, latency, trace, throughput
-        
-        # host_test_type = host_test_type['host'].apply(
-        #     lambda host: pd.Series(checkTestsForHost(host, mesh_config))
-        # )
-        # host_test_type.columns = ['host', 'owd', 'trace', 'throughput']
-        # self.pq.writeToFile(host_test_type, f"{self.location}raw/psConfigData.parquet")
         
     @timer
     def storeAlarms(self):
@@ -341,7 +314,6 @@ class ParquetUpdater(object):
         for event,df in pivotFrames.items():
             if event == 'ASN path anomalies per site':
                 print(df.info())
-                # df['all_alarm_ids_src'] = df['all_alarm_ids_src'].eval()
             filename = self.alarms.eventCF(event)
             fdf = frames[event]
             if len(fdf)>0:

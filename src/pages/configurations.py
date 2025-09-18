@@ -1,8 +1,3 @@
-#TODO: automatically update traceroute data @timer?
-#TODO: move Audit to Updater() ?
-#TODO: elasticsearch function: netsite not found but was host still found?
-
-
 #TODO: aggregation of records(I'm not aggregating, the query isn't optimal but represents what I want to do)
 #TODO: make a switch between latency, traceroute, packetloss?
 
@@ -61,7 +56,10 @@ STATUSES = ["ACTIVE_HTTP", "ACTIVE_TCP_ONLY", "UNREACHABLE_CANDIDATE", "RETIRED_
 ES_INDICES = ["ps_trace", "ps_throughput", "ps_owd"]
 LOOKBACK_DAYS = 30
 AUDITED_HOSTS = []
-
+TRC_PARQUET = Path("parquet/raw/traceroutes_valid.parquet")
+TRC_TTL = timedelta(hours=2)
+TO_DATE = datetime.utcnow()
+FROM_DATE = TO_DATE - timedelta(hours=2)
 def readParquetPsConfig(pq):
     """
     The function reads parquet file that is updated every 24 \
@@ -103,23 +101,6 @@ def readParquetSubnetsCRIC(pq):
         print(f"Problems with reading the file {parquet_path}")
 
 
-T1_NETSITES = [
-    "BNL-ATLAS-LHCOPNE", "USCMS-FNAL-WC1-LHCOPNE", "RAL-LCG2-LHCOPN",
-    "JINR-T1-LHCOPNE", "NCBJ-LHCOPN",
-    "NLT1-SARA-LHCOPNE", "INFN-T1-LHCOPNE", "NDGF-T1-LHCOPNE",
-    "KR-KISTI-GSDC-1-LHCOPNE", "IN2P3-CC-LHCOPNE", "pic-LHCOPNE",
-    "FZK-LCG2-LHCOPNE", "CERN-PROD-LHCOPNE", "TRIUMF-LCG2-LHCOPNE"
-]
-
-
-cric_elastic_mapping = {'CERN-PROD-LHCOPNE': 'CERN-PROD-LHCOPNE', 'BNL-ATLAS-LHCOPNE': 'BNL-ATLAS-LHCOPNE', 
-                        'INFN-T1-LHCOPNE': 'INFN-T1-LHCOPNE', 'USCMS-FNAL-WC1-LHCOPNE': 'USCMS-FNAL-WC1-LHCOPNE', 
-                        'FZK-LCG2-LHCOPNE': 'FZK-LCG2-LHCOPNE', 'IN2P3-CC-LHCOPNE': 'IN2P3-CC-LHCOPNE', 'RAL-LCG2-LHCOPN': 'RAL-LCG2-LHCOPN', 
-                        'JINR-T1-LHCOPNE': 'JINR-T1-LHCOPNE', 'PIC-LHCOPNE': 'pic-LHCOPNE', 'RRC-KI-T1-LHCOPNE': 'RRC-KI-T1-LHCOPNE', 
-                        'NLT1-SARA-LHCOPNE': 'NLT1-SARA-LHCOPNE', 'TRIUMF-LCG2-LHCOPNE': 'TRIUMF-LCG2-LHCOPNE', 'NDGF-T1-LHCOPNE': 'NDGF-T1-LHCOPNE', 
-                        'KR-KISTI-GSDC-1-LHCOPNE': 'KR-KISTI-GSDC-1-LHCOPNE', 'NCBJ-LHCOPN': 'NCBJ-LHCOPN'}
-
-
 def ip_in_any(ip, networks):
     return any(ip_address(ip) in ip_network(net) for net in networks)
 
@@ -133,12 +114,8 @@ def query_valid_trace_data(hours, parquet):
       - invalid_ips_perfsonar.json  -> {site: [IPs not in CRIC OPN ranges]}
       - valid_ips_perfsonar_tested.json -> {site: [IPs that match CRIC OPN ranges]}
     """
-    date_to = datetime.utcnow()
-    date_from = date_to - timedelta(hours=hours)
-    date_to_str = date_to.strftime(hp.DATE_FORMAT)
-    date_from_str = date_from.strftime(hp.DATE_FORMAT)
-
-    traceroute_records = qrs.queryOPNTraceroutes(date_from_str, date_to_str, T1_NETSITES)
+    print("Quering data...")
+    traceroute_records = qrs.queryOPNTraceroutes(FROM_DATE.strftime(hp.DATE_FORMAT), TO_DATE.strftime(hp.DATE_FORMAT), T1_NETSITES+["pic-LHCOPNE"]) 
     cric_T1_networks = readParquetSubnetsCRIC(parquet)
     cric_T1_networks = cric_T1_networks.set_index("site")["subnets"].to_dict()
     valid_traceroutes = []
@@ -149,13 +126,13 @@ def query_valid_trace_data(hours, parquet):
         srcs = record.get('src_ipvs', [])
         dsts = record.get('dst_ipvs', [])
 
-        src_site = record['src_netsite']
-        dst_site = record['dest_netsite']
-        src_site_key = cric_elastic_mapping.get(src_site).upper()
-        dst_site_key = cric_elastic_mapping.get(dst_site).upper()
+        src_site = record['src_netsite'].upper()
+        dst_site = record['dest_netsite'].upper()
+        record['src_netsite'] = src_site
+        record['dest_netsite'] = dst_site
         
-        src_cric_info = cric_T1_networks.get(src_site_key, [])
-        dest_cric_info = cric_T1_networks.get(dst_site_key, [])
+        src_cric_info = cric_T1_networks.get(src_site, [])
+        dest_cric_info = cric_T1_networks.get(dst_site, [])
 
         src_nonempty = [ip for ip in srcs if ip]
         dst_nonempty = [ip for ip in dsts if ip]
@@ -175,6 +152,29 @@ def query_valid_trace_data(hours, parquet):
     print(f"After filtering: {len(valid_traceroutes)}")
 
     return valid_traceroutes
+
+def _is_fresh(p: Path, ttl: timedelta) -> bool:
+    if not p.exists():
+        return False
+    mtime = datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc)
+    return (datetime.now(timezone.utc) - mtime) < ttl
+
+def load_or_query_traceroutes(hours: int, parquet: Parquet) -> pd.DataFrame:
+    """
+    Returns a DataFrame of valid traceroute records.
+    Re-queries ES only if the local parquet is older than TRC_TTL.
+    """
+    if _is_fresh(TRC_PARQUET, TRC_TTL):
+        print("Using cached traceroute data...")
+        return pd.read_parquet(TRC_PARQUET)
+
+    # Not fresh – query and persist
+    print("Querying traceroute data...")
+    records = query_valid_trace_data(hours=hours, parquet=parquet)
+    df = pd.DataFrame(records)
+    TRC_PARQUET.parent.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(TRC_PARQUET, index=False)
+    return df
 
 def extract_groups_and_hosts(mesh_config, site=False, host=False):
     """
@@ -196,20 +196,14 @@ def extract_groups_and_hosts(mesh_config, site=False, host=False):
     return grouped
 
 def layout(**other_unknown_query_strings):
-    HOURS = 2 
-    date_to = datetime.utcnow()
-    date_from = date_to - timedelta(hours=HOURS)
-    date_to_str = date_to.strftime(hp.DATE_FORMAT)
-    date_from_str = date_from.strftime(hp.DATE_FORMAT)
-
     pq = Parquet()
     alarm_cnt = pq.readFile('parquet/alarmsGrouped.parquet')
     _, sites_status = generateStatusTable(alarm_cnt)
 
     # initial data
-    traceroute_records = query_valid_trace_data(hours=4, parquet=pq)
+    traceroute_records = load_or_query_traceroutes(hours=4, parquet=pq)
     records_df = pd.DataFrame(traceroute_records)
-    
+    print("All unique sites names: ")
     print(set(list(records_df['dest_netsite'].unique()) + list(records_df['src_netsite'].unique())))
     if not records_df.empty:
         def pct(series):
@@ -237,8 +231,6 @@ def layout(**other_unknown_query_strings):
             'pair','src_netsite','dest_netsite', 'src_host', 'dest_host', 'path_complete',
             'destination_reached','path_complete_stats','destination_reached_stats', 'color'
         ])
-    grouped["src_netsite"] = grouped["src_netsite"].apply(lambda s: s.upper())
-    grouped["dest_netsite"] = grouped["dest_netsite"].apply(lambda s: s.upper())
     traceroutes_dict = grouped.to_dict('records')
     summary_df, missing_df = compute_connectivity_summaries(grouped, T1_NETSITES)
     print(" --- getting hosts from psConfigAdmin ---")
@@ -260,9 +252,11 @@ def layout(**other_unknown_query_strings):
                 # Title
                 dcc.Store(id="valid-data", data=traceroutes_dict),
                 html.H1(id="network-testing-title",
-                                children=f"T1/OPN Disconnections — Last {HOURS} Hours pc_trace Tests"
-                    f"({date_from.strftime('%Y-%m-%d %H:%M')} to {date_to.strftime('%Y-%m-%d %H:%M')} UTC)",
+                                children=f"T1/OPN Disconnections — Last 2 Hours pc_trace Tests"
+                    f"({FROM_DATE.strftime('%Y-%m-%d %H:%M')} to {TO_DATE.strftime('%Y-%m-%d %H:%M')} UTC)",
                                 className="mt-3 mb-1"),
+                
+                html.H4("Traceroute data is updated automatically every 2 hours.", className="text-secondary mb-2", style={"font-style": "italic"}),
 
                 # Controls row
                                 dbc.Row([
@@ -304,7 +298,7 @@ def layout(**other_unknown_query_strings):
                                 ),
 
                                 dcc.Store(id="time-window", data={
-                                    "from": date_from_str, "to": date_to_str, "hours": HOURS
+                                    "from": FROM_DATE.strftime(hp.DATE_FORMAT), "to": TO_DATE.strftime(hp.DATE_FORMAT), "hours": 2
                                 }),
                                 dcc.Store(id="t1-selected", data=T1_NETSITES)
                             
@@ -422,6 +416,7 @@ def layout(**other_unknown_query_strings):
         
         html.Div(id="div-audit", children=[
             html.H2("pSConfig Web Admin Hosts Audit", className="mt-2"),
+            html.H4("Host auditing can take between 2 and 5 minutes and is performed every 24 hours. During the audit, the host undergoes several tests, based on which it is assigned a status.", className="text mt-2", style={"font-style": "italic", "color": "#A60F0F"}),
             dbc.Row([
                         
                 dcc.Store(id="audit-data"),
@@ -432,7 +427,7 @@ def layout(**other_unknown_query_strings):
                 
                                 
                 dbc.Col([
-                    html.Div(id="last-audit", className="text-secondary small mb-2")
+                    html.Div(id="last-audit", className="text-secondary mb-2")
                     ]),
                 
 
@@ -501,28 +496,6 @@ def layout(**other_unknown_query_strings):
         ], className="p-1 site boxwithshadow page-cont m-3")
  ])
     
-# @dash.callback(
-#     Output("div-loading-configs", "children"),
-#     [
-#         Input("div-configs", "loading_state")
-#     ],
-#     [
-#         State("div-loading-configs", "children"),
-#     ]
-# )
-# def hide_loading_after_startup(loading_state, children):
-#     if children:
-#         time.sleep(1)
-#         return None
-
-#     raise PreventUpdate
-
-def _is_fresh(p: Path, ttl: timedelta) -> bool:
-    if not p.exists():
-        return False
-    mtime = datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc)
-    return (datetime.now(timezone.utc) - mtime) < ttl
-
 STATUS_PRETTY = {
     "ACTIVE_HTTP": "Active HTTP — reachable; toolkit/API responds",
     "ACTIVE_TCP_ONLY": "Active TCP only — host up; web check fails; some TCP ports respond",
