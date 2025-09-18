@@ -101,8 +101,10 @@ app.layout = html.Div(children=[
                             [
                                dbc.NavItem(dbc.NavLink("SITES OVERVIEW", href="/",
                                                        id='sites-tab', class_name="nav-item-cls")),
+
                                dbc.NavItem(dbc.NavLink("CONFIGURATIONS", href="/network-testing",
                                                        id='network-testing', class_name="nav-item-cls")),
+
                                 dbc.NavItem(dbc.NavLink("EXPLORE PATHS", href="/explore-paths/all",
                                                         id='paths-tab', class_name="nav-item-cls"
                                                         )),
