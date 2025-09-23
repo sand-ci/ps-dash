@@ -17,3 +17,4 @@ pycountry>=20.7.3
 blinker==1.7.0
 flask-caching
 psconfig-client
+aiohttp==3.12.1

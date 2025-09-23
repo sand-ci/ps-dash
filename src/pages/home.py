@@ -59,7 +59,10 @@ def total_number_of_alarms(sitesDf):
     for s, icon in status.items():
         if icon not in status_count:
             status_count[icon] = 0
-
+    status_explanations = {'critical': "'bandwidth decreased from/to multiple sites' observed",
+                           'warning': "'ASN path anomalies per site (to several destination or from several sources)'\nor 'high delay from/to multiple sites'\nor 'high packet loss on multiple links' observed",
+                           'ok': "no alarms",
+                           'unknown': "other alarms"}
     html_elements = [dbc.Col([
             dbc.Row(
                     html.H1('Status of all sites in the past 48 hours', 
@@ -74,7 +77,15 @@ def total_number_of_alarms(sitesDf):
                                 html.H4(f'{icon}', className='card-title'),
                                 html.H3(f'{s}', className='card-title'),
                                 html.H3(f'{status_count[icon]}', className='card-text'),
-                            ]
+                                # Tooltip target below must match the id of the CardBody
+                                dbc.Tooltip(
+                                    f"{status_explanations[s]}",
+                                    target=f"cardbody-{s}",
+                                    placement="top",
+                                    style={"fontSize":"1.5em"}
+                                )
+                            ],
+                            id=f"cardbody-{s}",  # give each CardBody a unique id
                         ),
                         className='mb-3',
                     ),
@@ -115,14 +126,14 @@ def layout(**other_unknown_query_strings):
     dateFrom, dateTo = hp.defaultTimeRange(2)
     now = hp.defaultTimeRange(days=2, datesOnly=True)
     alarmCnt = pq.readFile('parquet/alarmsGrouped.parquet')
+    # if 'tag' in alarmCnt.columns:
+    #     alarmCnt['tag'] = alarmCnt['tag'].str.upper()
+    # if 'site' in alarmCnt.columns:
+    #     alarmCnt['site'] = alarmCnt['site'].str.upper()
     statusTable, sitesDf = generate_status_table(alarmCnt)
     print("Period:", dateFrom," - ", dateTo)
     print(f'Number of alarms: {len(alarmCnt)}')
     
-    
-    # adding stats calculations for hosts not found
-    dt = datetime.now()
-    hostsNotFoundAlarms, expected_received_stats, stats_date = get_hosts_not_found_stats_data(dt)
 
     total_number = total_number_of_alarms(sitesDf)
     return html.Div([
@@ -139,7 +150,7 @@ def layout(**other_unknown_query_strings):
                                 ),        
                                 dbc.Col(
                                     dcc.Loading(
-                                        html.Div(id="alarms-stacked-bar"),
+                                        html.Div(id="alarms-stacked-bar", className="h-100"),
                                         style={'height': '1rem'}, color='#00245A'
                                 ),
                                 className="boxwithshadow page-cont mb-1 p-2 align-content-around",),
@@ -178,38 +189,38 @@ def layout(**other_unknown_query_strings):
                                             ),
                                         ], className='page-cont mb-1 p-1', xl=12
                                     )
-                                ], className="boxwithshadow page-cont mb-1"),
+                                ], className="boxwithshadow page-cont mb-1")],
 
-                                # Bottom part with the three pie charts
-                                dbc.Row([
-                                    dbc.Row([
-                                        dbc.Row([
-                                            dbc.Row([
-                                                # Title for the section
-                                                dbc.Col([
-                                                    html.H3(children=f'Expected Testing Data Availability (per host) in Elasticsearch [{stats_date.strftime("%d-%m-%Y")}]',
-                                                            className='stats-title'
-                                                        )
-                                                    ], width=10),
-                                                # Button to switch to historical data
-                                                # dbc.Col([
-                                                #     dcc.Store(id='historical-data-for-graph', data=get_data_for_histogram(dt)),
-                                                #     dcc.Store(id='hosts-not-found-stats', data=expected_received_stats),
-                                                #     dcc.Store(id='date', data=dt),
-                                                #     dcc.Dropdown(
-                                                #         id='data-over-time-dropdown',
-                                                #         options=['all (pie charts)', 'all (histograms)'],
-                                                #         value='all (pie charts)',
-                                                #         placeholder="Test Type",
-                                                #         multi=False  # Allow multiple selections
-                                                #     )
-                                                #     ], width=2, style={'align-items':'top'})
-                                                ], className="w-100 mt-2 g-0", style={'justify-content':'space-between'}),
-                                            # adding the pie charts or histogram
-                                            html.Div(id='graph-placeholder', children=[hosts_not_found_stats(expected_received_stats)],style={'margin-left': '15px'}),                          
-                                        ], className="w-100", style={'justify-content':'center'}),
-                                    ], className="mt-2 w-100", style={'justify-content':'center'}),
-                                ], className='boxwithshadow page-cont mb-1 p-2', align="center")],
+                                # # Bottom part with the three pie charts
+                                # dbc.Row([
+                                #     dbc.Row([
+                                #         dbc.Row([
+                                #             dbc.Row([
+                                #                 # Title for the section
+                                #                 dbc.Col([
+                                #                     html.H3(children=f'Expected Testing Data Availability (per host) in Elasticsearch [{stats_date.strftime("%d-%m-%Y")}]',
+                                #                             className='stats-title'
+                                #                         )
+                                #                     ], width=10),
+                                #                 # Button to switch to historical data
+                                #                 # dbc.Col([
+                                #                 #     dcc.Store(id='historical-data-for-graph', data=get_data_for_histogram(dt)),
+                                #                 #     dcc.Store(id='hosts-not-found-stats', data=expected_received_stats),
+                                #                 #     dcc.Store(id='date', data=dt),
+                                #                 #     dcc.Dropdown(
+                                #                 #         id='data-over-time-dropdown',
+                                #                 #         options=['all (pie charts)', 'all (histograms)'],
+                                #                 #         value='all (pie charts)',
+                                #                 #         placeholder="Test Type",
+                                #                 #         multi=False  # Allow multiple selections
+                                #                 #     )
+                                #                 #     ], width=2, style={'align-items':'top'})
+                                #                 ], className="w-100 mt-2 g-0", style={'justify-content':'space-between'}),
+                                #             # adding the pie charts or histogram
+                                #             html.Div(id='graph-placeholder', children=[hosts_not_found_stats(expected_received_stats)],style={'margin-left': '15px'}),                          
+                                #         ], className="w-100", style={'justify-content':'center'}),
+                                #     ], className="mt-2 w-100", style={'justify-content':'center'}),
+                                # ], className='boxwithshadow page-cont mb-1 p-2', align="center")],
                             lg=6, sm=12, className='d-flex flex-column h-100'),
                     # End of top right column      
                     ], className='h-100'),
@@ -324,6 +335,9 @@ def update_output(n_clicks, start_date, end_date, sites, all, events, allevents,
         scntdf = pd.DataFrame()
         for e, df in pivotFrames.items():
             if len(df) > 0:
+                df['tag'] = df['tag'].str.upper()
+                if 'site' in df.columns:
+                    df['site'] = df['site'].str.upper()
                 df = df[df['tag'] != ''].groupby('tag')[['id']].count().reset_index().rename(columns={'id': 'cnt', 'tag': 'site'})
                 df['event'] = e
                 scntdf = pd.concat([scntdf, df])
@@ -356,8 +370,10 @@ def update_output(n_clicks, start_date, end_date, sites, all, events, allevents,
         for event in sorted(events):
             df = pivotFrames[event]
             if 'site' in df.columns:
+                # df['site'] = df['site'].str.upper()
                 df = df[df['site'].isin(sitesState)] if sitesState is not None and len(sitesState) > 0 else df
             elif 'tag' in df.columns:
+                # df['tag'] = df['tag'].str.upper()
                 df = df[df['tag'].isin(sitesState)] if sitesState is not None and len(sitesState) > 0 else df
 
             if len(df) > 0:
@@ -443,7 +459,7 @@ def create_bar_chart(graphData):
                 size=10,
             ),
         ),
-        height=600,
+        # height=600,
         plot_bgcolor='#fff',
         autosize=True,
         width=None,
@@ -477,7 +493,7 @@ def generate_tables(frame, unpacked, event, alarmsInst):
     # Replace NaN or empty values with valid defaults
     dfr = dfr.fillna("")  # Replace NaN with an empty string for all columns
     dfr = dfr.astype({col: str for col in dfr.select_dtypes(include=['object', 'category']).columns})  # Ensure all object columns are strings
-    drop_columns = {"ASN path anomalies per site": ['sites'], 'unresolvable host': ['alarm_link'], 'destination cannot be reached from any': ['alarm_link'], 'destination cannot be reached from multiple': ['alarm_link'], 'source cannot reach any': ['alarm_link']}
+    drop_columns = {"ASN path anomalies per site": ['sites'], 'destination cannot be reached from any': ['alarm_link'], 'destination cannot be reached from multiple': ['alarm_link'], 'source cannot reach any': ['alarm_link']}
     if event in drop_columns:
         dfr.drop(columns=drop_columns[event], inplace=True)
     dfr.sort_values('to', ascending=False, inplace=True)
@@ -520,29 +536,6 @@ def generate_tables(frame, unpacked, event, alarmsInst):
     except Exception as e:
         print('dash_table.DataTable expects each cell to contain a string, number, or boolean value', e)
         return html.Div()
-
-def expected_hosts_PsConfig():
-    """
-    The function reads parquet file with updated every 24 \
-    hours data from psConfig about expected hosts and tests \
-    results in the Elasticsearch.
-    """
-    parquet_path = 'parquet/raw/psConfigData.parquet'
-    try: 
-        print("Reading the parquet file with psConfig data...")
-        df = pq.readFile(parquet_path)
-        expected_tests_types = {
-                                "owd": len(df[df["owd"] == True]),
-                                "trace": len(df[df["trace"] == True]),
-                                "throughput": len(df[df["throughput"] == True])
-                                }
-        df = pd.DataFrame.from_dict(expected_tests_types, orient='index', columns=['Count'])
-        df['date'] = time
-        print(f"psConfigData from parquet file: {df}")
-        return df
-    except Exception as err:
-        print(err)
-        print(f"Problems with reading the file {parquet_path}")
         
 def count_unique_not_found_hosts(df, category):
     """
@@ -560,37 +553,6 @@ def count_unique_not_found_hosts(df, category):
     return (
         len(all_missing_hosts)
     )
-
-def get_hosts_not_found_stats_data(time):
-    """
-    This function extracts the hosts not found alarms\
-    for the last available day and count statistics for \
-    expected and missing tests and hosts.
-    """
-    dayBeforeYesterdayS = (time - timedelta(days=2)).replace(hour=0, minute=0, second=0, microsecond=0)
-    dayBeforeYesterdayE = (time - timedelta(days=2)).replace(hour=23, minute=59, second=59, microsecond=0)
-    alarmsInst = Alarms()
-    alarms, pivotFrames = alarmsInst.loadData(dayBeforeYesterdayS.strftime('%Y-%m-%dT%H:%M:%S.000Z'), dayBeforeYesterdayE.strftime('%Y-%m-%dT%H:%M:%S.000Z'))
-    alarmsWithNotFoundHosts, pivotFrame = alarms['hosts not found'], pivotFrames['hosts not found']
-    tests_types_results = {'owd': None, 'throughput': None, 'trace': None}
-    try: 
-        expected_stats = expected_hosts_PsConfig().to_dict()['Count']
-        all_missing_num = 0
-        for key in tests_types_results.keys():
-            missing_hosts = count_unique_not_found_hosts(alarmsWithNotFoundHosts, key)
-            expected_hosts = expected_stats[key]
-            tests_types_results[key] = (missing_hosts, expected_hosts)
-            all_missing_num += missing_hosts
-        if all_missing_num == 0:
-            print("!!!!!!!!!!!!!!!!!!!!suspicious!!!!!!!!!!!!!!!!!!!!!!!!!")
-            print("Check parquet file existence and data format.")
-        return alarmsWithNotFoundHosts, tests_types_results, dayBeforeYesterdayS
-    except Exception as err:
-        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-        print(err)
-        print("Check parquet file existence and data format.")
-        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-        return alarmsWithNotFoundHosts, tests_types_results, dayBeforeYesterdayS
 
 def build_pie_chart(stats, test_type):
     """
@@ -649,247 +611,3 @@ def build_pie_chart(stats, test_type):
 
     return fig
 
-def build_histogram(dictionary):
-    df = pd.DataFrame(dictionary).T.reset_index()
-    df[['owd', 'throughput', 'trace']] = df[['owd', 'throughput', 'trace']] * -1
-    
-    df.rename(columns={"index": "date", "owd": "latency"}, inplace=True)
-
-    # Normalize the data (percentage change from the first day)
-    # df_normalized = df.copy()
-    # for col in ["owd", "throughput", "trace"]:
-    #     df_normalized[col] = df[col] - df[col].iloc[0]
-
-    df_melted = df.melt(id_vars=['date'], var_name='group', value_name='host_count')
-
-
-    # Create a Plotly line plot
-    fig = px.line(
-        df_melted,
-        x='date',
-        y='host_count',
-        color='group',
-        labels={'date': 'Date', 'host_count': 'Number of Missing Hosts', 'group': 'Group'},
-        line_shape='linear'
-    )
-
-    # Show the plot
-    return fig
-
-def hosts_not_found_stats(pieData):
-    graph = dbc.Row([
-            dbc.Row([
-                # OWD stats
-                dbc.Col([
-                    dcc.Graph(
-                        figure=build_pie_chart(pieData, 'owd'),  
-                        id='owd-stats',
-                        className='cls-owd-stats',
-                        style={'height': '200px', 'width': '200px'} 
-                    ),
-                ], width=2, className='mt-2', style={'width': '200px', 'justify-self':'start'}), 
-
-                # Throughput stats
-                dbc.Col([
-                    dcc.Graph(
-                        figure=build_pie_chart(pieData, 'throughput'), 
-                        id='throughput-stats',
-                        className='cls-throughput-stats',
-                        style={'height': '200px', 'width': '200px'} 
-                    ),
-                ], width=2, className='mt-2', style={'width': '200px', 'justify-self':'center'}),  
-
-                # Trace stats
-                dbc.Col([
-                    dcc.Graph(
-                        figure=build_pie_chart(pieData, 'trace'), 
-                        id='trace-stats',
-                        className='cls-trace-stats',
-                        style={'height': '200px', 'width': '200px'} 
-                    ),
-                ], width=2, className='mt-2', style={'width': '200px', 'justify-self':'end'})
-            ], style={'justify-content':'space-evenly', 'width': '100%'}),  # Added border here
-            
-            # Colored dots and explanations
-            dbc.Row([
-                dbc.Col([
-                    html.Div([
-                        # First colored dot and explanation
-                        html.Div([
-                            html.Span(style={
-                                'display': 'inline-block',
-                                'width': '10px',
-                                'height': '10px',
-                                'border-radius': '50%',
-                                'background-color': '#69c4c4',
-                                'margin-right': '8px',
-                                'margin-left': '8px'
-                            }),
-                            html.Span("expected hosts found in the Elasticsearch", style={'font-size': '10px'})
-                        ]),
-                        # Second colored dot and explanation
-                        html.Div([
-                            html.Span(style={
-                                'display': 'inline-block',
-                                'width': '10px',
-                                'height': '10px',
-                                'border-radius': '50%',
-                                'background-color': '#00245a', 
-                                'margin-right': '8px',
-                                'margin-left': '8px'
-                            }),
-                            html.Span("expected hosts NOT found in the Elasticsearch", style={'font-size': '10px'})
-                        ])
-                    ], style={'background-color': 'transparent'})
-                ], width=2, className='w-100 mb-1'), 
-            ])
-        ]) 
-    return graph
-
-# @dash.callback(
-#     [
-#         Output("graph-placeholder", "children"), 
-#         Output("data-over-time-dropdown", "value")
-#     ],
-#     [
-#         Input("data-over-time-dropdown", "options"),
-#         Input("data-over-time-dropdown", "value"),  
-#         Input("historical-data-for-graph", "data"),
-#         Input("hosts-not-found-stats", "data"),
-#         Input("date", "data"),
-#     ],
-# )
-# def update_hosts_not_found_graphs(options, selected, histData, pieData, dt):
-#     if selected == "all (pie charts)":
-        
-#         # three pie charts
-#         graph = dbc.Row([
-#             dbc.Row([
-#                 # OWD stats
-#                 dbc.Col([
-#                     dcc.Graph(
-#                         figure=build_pie_chart(pieData, 'owd'),  
-#                         id='owd-stats',
-#                         className='cls-owd-stats',
-#                         style={'height': '200px', 'width': '200px'} 
-#                     ),
-#                 ], width=2, className='mt-2', style={'width': '200px', 'justify-self':'start'}), 
-
-#                 # Throughput stats
-    #             dbc.Col([
-    #                 dcc.Graph(
-    #                     figure=build_pie_chart(pieData, 'throughput'), 
-    #                     id='throughput-stats',
-    #                     className='cls-throughput-stats',
-    #                     style={'height': '200px', 'width': '200px'} 
-    #                 ),
-    #             ], width=2, className='mt-2', style={'width': '200px', 'justify-self':'center'}),  
-
-    #             # Trace stats
-    #             dbc.Col([
-    #                 dcc.Graph(
-    #                     figure=build_pie_chart(pieData, 'trace'), 
-    #                     id='trace-stats',
-    #                     className='cls-trace-stats',
-    #                     style={'height': '200px', 'width': '200px'} 
-    #                 ),
-    #             ], width=2, className='mt-2', style={'width': '200px', 'justify-self':'end'})
-    #         ], style={'justify-content':'space-evenly', 'width': '100%'}),  # Added border here
-            
-    #         # Colored dots and explanations
-    #         dbc.Row([
-    #             dbc.Col([
-    #                 html.Div([
-    #                     # First colored dot and explanation
-    #                     html.Div([
-    #                         html.Span(style={
-    #                             'display': 'inline-block',
-    #                             'width': '10px',
-    #                             'height': '10px',
-    #                             'border-radius': '50%',
-    #                             'background-color': '#69c4c4',
-    #                             'margin-right': '8px',
-    #                             'margin-left': '8px'
-    #                         }),
-    #                         html.Span("expected hosts found in the Elasticsearch", style={'font-size': '10px'})
-    #                     ]),
-    #                     # Second colored dot and explanation
-    #                     html.Div([
-    #                         html.Span(style={
-    #                             'display': 'inline-block',
-    #                             'width': '10px',
-    #                             'height': '10px',
-    #                             'border-radius': '50%',
-    #                             'background-color': '#00245a', 
-    #                             'margin-right': '8px',
-    #                             'margin-left': '8px'
-    #                         }),
-    #                         html.Span("expected hosts NOT found in the Elasticsearch", style={'font-size': '10px'})
-    #                     ])
-    #                 ], style={'background-color': 'transparent'})
-    #             ], width=2, className='w-100 mb-1'), 
-    #         ])
-    #     ]) 
-    
-    # else:
-    #     # histogram 14 days data
-    #     graph = dbc.Row([
-    #                 dbc.Row([
-    #                         dbc.Col([
-    #                             dcc.Graph(
-    #                                 figure=build_histogram(histData), 
-    #                                 id='histogram-graph',
-    #                                 style={'height': '400px'}
-    #                             ),
-    #                         ], width=12, className='mt-0') 
-    #                     ]),
-    #                 dbc.Row([
-    #                     dbc.Col([
-    #                         html.Div([
-    #                             # black do explanation of histogram
-    #                             html.Div([
-    #                                 html.Span(style={
-    #                                     'display': 'inline-block',
-    #                                     'width': '10px',
-    #                                     'height': '10px',
-    #                                     'border-radius': '50%',
-    #                                     'background-color': 'black',
-    #                                     'margin-right': '5px',
-    #                                     'margin-left': '5px'
-    #                                 }),
-    #                                 html.Span("number of missing hosts in the Elasticsearch (14 days)", style={'font-size': '12px'})
-    #                             ]),
-    #                         ], style={'background-color': 'transparent'})
-    #                     ], width=2, className='w-100 mb-1'), 
-    #                 ])
-    #                 ])
-    # return graph, "all (pie histograms)"
-
-
-
-def get_data_for_histogram(rn):
-    """
-    The function extracts historical data from last 14 days \
-    about test data availability in Elasticsearch. The data \
-    is further used for the histogram on the home page.
-    """
-    histDateFrom = (rn - timedelta(days=16)).replace(hour=0, minute=0, second=0, microsecond=0)
-    histDateTo = (rn - timedelta(days=2)).replace(hour=23, minute=59, second=59, microsecond=0)
-    histAlarms, histPivotFrames = alarmsInst.loadData(histDateFrom.strftime('%Y-%m-%dT%H:%M:%S.000Z'), histDateTo.strftime('%Y-%m-%dT%H:%M:%S.000Z'))
-    histDf, histFrame = histAlarms['hosts not found'], histPivotFrames['hosts not found']
-    histDf['from'] = pd.to_datetime(histDf['from'])
-    histDf['date'] = histDf['from'].dt.date
-    grouped = histDf.groupby('date')
-    all_dates = dict()
-    # Iterate through each day
-    for date, group in grouped:
-        all_hosts_not_found = {'owd': set(), 'throughput': set(), 'trace': set()}
-        for hosts_dict in group['hosts_not_found']:
-            if isinstance(hosts_dict, dict):
-                for key, hosts_list in hosts_dict.items():
-                    if hosts_list is not None:
-                        all_hosts_not_found[key].update(hosts_list)
-        
-        all_dates[date.strftime("%d/%m/%Y")] = all_hosts_not_found
-    all_dates = {key: {k: len(d) for k, d in dictionary.items()} for key, dictionary in all_dates.items()}
-    return all_dates

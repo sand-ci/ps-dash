@@ -21,8 +21,9 @@ from ml.packet_loss_train_model import packet_loss_train_model
 import os
 from datetime import datetime, timedelta
 import psconfig.api
-
-
+import logging
+import requests
+import json
 @timer
 class ParquetUpdater(object):
     
@@ -44,6 +45,7 @@ class ParquetUpdater(object):
                 # self.storeThroughputDataAndModel()
                 # self.storePacketLossDataAndModel()
                 self.psConfigData()
+                self.storeCRICData()
 
             # Set the schedulers
             Scheduler(60*60*12, self.storeMetaData)
@@ -51,6 +53,7 @@ class ParquetUpdater(object):
 
             Scheduler(60*30, self.storeAlarms)
             Scheduler(60*60*12, self.storeASNPathChanged)
+            Scheduler(60*60*24, self.storeCRICData)
             Scheduler(60*60*24, self.psConfigData)
 
 
@@ -81,13 +84,20 @@ class ParquetUpdater(object):
                 # thus we want to which approx. when the alarms was created,
                 # to be between dateFrom and dateTo
                 df['to'] = pd.to_datetime(df['to'], utc=True)
-                sdf = df[(df['tag'] == site) & (df['to'] >= dateFrom) & (df['to'] <= dateTo)]
-                
+                sdf = df[(df['tag'].str.upper() == site.upper()) & (df['to'] >= dateFrom) & (df['to'] <= dateTo)]
+                # print('e: ', e)
+                # if e == 'high delay from/to multiple sites':
+                #     print(sdf)
                 if len(sdf) > 0:
                     # sdf['id'].unique() returns the number of unique alarms for the given site
                     # those are the documents generated and stored in ES. They can be found in frames folder
                     # While pivotFrames expands the alarms to the level of individual sites
-                    entry = {"event": e, "site": site, 'cnt':  len(sdf['id'].unique()),
+                    if e == 'ASN path anomalies per site':
+                        cnt =sum(sdf['total_paths_anomalies'].tolist())
+                    
+                    else:
+                        cnt = len(sdf['id'].unique())
+                    entry = {"event": e, "site": site, 'cnt':  cnt,
                             "lat": lat, "lon": lon}
                 else:
                     entry = {"event": e, "site": site, 'cnt': 0,
@@ -167,37 +177,132 @@ class ParquetUpdater(object):
     def storeMetaData(self):
         metaDf = qrs.getMetaData()
         self.pq.writeToFile(metaDf, f"{self.location}raw/metaDf.parquet")
+        
+    @timer
+    def storeCRICData(self):
+        all_hosts = []
+        r = requests.get(
+            'https://wlcg-cric.cern.ch/api/core/service/query/?json&state=ACTIVE&type=PerfSonar',
+            verify=False
+        )
+        res = r.json()
+        for _key, val in res.items():
+            if not val['endpoint']:
+                print('no hostname? should not happen:', val)
+                continue
+            p = val['endpoint']
+            all_hosts.append(p)
+        df = pd.DataFrame(all_hosts, columns=['host'])
+        self.pq.writeToFile(df, f"{self.location}raw/CRICDataHosts.parquet")
+        
+        cric_opn_rcsites = {"CERN-PROD":'CERN-PROD-LHCOPNE', "BNL-ATLAS":'BNL-ATLAS-LHCOPNE', "INFN-T1":'INFN-T1-LHCOPNE',
+                    "USCMS-FNAL-WC1":'USCMS-FNAL-WC1-LHCOPNE', "FZK-LCG2":'FZK-LCG2-LHCOPNE', "IN2P3-CC":'IN2P3-CC-LHCOPNE', "RAL-LCG2":'RAL-LCG2-LHCOPN', 
+                    "JINR-T1":'JINR-T1-LHCOPNE', "pic":'PIC-LHCOPNE', "SARA-MATRIX":'NLT1-SARA-LHCOPNE',
+                    "TRIUMF-LCG2":'TRIUMF-LCG2-LHCOPNE', "NDGF-T1":'NDGF-T1-LHCOPNE', "KR-KISTI-GSDC-01":'KR-KISTI-GSDC-1-LHCOPNE',
+                    "NCBJ-CIS":'NCBJ-LHCOPN'}
+        subnets = []
+        r = requests.get(
+        'https://wlcg-cric.cern.ch/api/core/rcsite/query/list/?json', verify=False).json()
+        for site in cric_opn_rcsites.keys():
+            try:
+                for netroute in r[site]['netroutes'].values():
+                    if netroute['lhcone_bandwidth_limit'] > 0:   
+                        content = netroute['networks']
+                        subnets.append([cric_opn_rcsites[site], content.get('ipv4', []) + content.get('ipv6', [])])
+                        
+            except Exception as e:
+                print(e)
+                print(f'While writing CRICDataOPNSubnets.parquet subnet for {site} was not found.\n')
+        df2 = pd.DataFrame(subnets, columns=['site', 'subnets'])
+        df2 = df2.groupby('site').agg('sum').reset_index()
+        self.pq.writeToFile(df2, f"{self.location}raw/CRICDataOPNSubnets.parquet")
+        
+        
 
     @timer
     def psConfigData(self):
-        mesh_url = "https://psconfig.aglt2.org/pub/config"
-        mesh_config = psconfig.api.PSConfig(mesh_url)
-        all_hosts = mesh_config.get_all_hosts()
-        host_test_type = pd.DataFrame({
-                                        'host': list(all_hosts),
-                                        'owd': False,
-                                        'trace': False,
-                                        'throughput': False
-                                        })
-        def checkTestsForHost(host, mesh_conf):
-            """
-            Classifies the host as belonging to one of
-            the three test groups (latency, trace and throughput).
-            """
-            try:
-                types = mesh_conf.get_test_types(host)
-            except Exception:
-                return False, False
-            latency = any(test in ['latency', 'latencybg'] for test in types)
-            trace = 'trace' in types
-            throughput = any(test in ['throughput', 'rtt'] for test in types) # as rtt is now in ps_throughput
-            return host, latency, trace, throughput
+        log = logging.getLogger(__name__)
         
-        host_test_type = host_test_type['host'].apply(
-            lambda host: pd.Series(checkTestsForHost(host, mesh_config))
-        )
-        host_test_type.columns = ['host', 'owd', 'trace', 'throughput']
-        self.pq.writeToFile(host_test_type, f"{self.location}raw/psConfigData.parquet")
+        def request(url, hostcert=None, hostkey=None, verify=False):
+            log.debug('Retrieving {}'.format(url))
+            if hostcert and hostkey:
+                req = requests.get(url, verify=verify, timeout=120, cert=(hostcert, hostkey))
+            else:
+                req = requests.get(url, timeout=120, verify=verify)
+            req.raise_for_status()
+            return req.content
+        
+        def extract_host_info(config):
+            hosts = config.get("hosts", {})
+            groups = config.get("groups", {})
+            tasks = config.get("tasks", {})
+            tests = config.get("tests", {})
+            schedules = config.get("schedules", {})
+            group_type_map = {}
+            test_schedule_map = {}
+            for task_name, task_info in tasks.items():
+                group_name = task_info.get("group")
+                if group_name:
+                    test_type = tests.get(group_name).get("type")
+                    group_type_map[group_name] = test_type
+                schedule = task_info.get("schedule")
+                test_schedule_map[group_name] = schedules.get(schedule, None)
+            # For each host, find groups it belongs to
+            # groups have list of addresses with names
+            # Check which groups contain this host
+            host_rows = []
+            for host in hosts.keys():
+                participating_groups = []
+                participating_types = []
+                participating_schedules = []
+                participating_tests = []
+
+                for group_name, group_info in groups.items():
+                    addr_list = group_info.get("addresses", [])
+                    # check if host is in this group's addresses
+                    if any(addr.get("name") == host for addr in addr_list):
+                        participating_groups.append(group_name)
+                        # get type of test associated with group
+                        test_type = group_type_map.get(group_name, None)
+                        if test_type:
+                            participating_types.append(test_type)
+                        # get schedule(s) from tests that belong to this group
+                        # find tests whose group matches group_name
+                        for task_name, task_info in tasks.items():
+                            if task_info.get("group") == group_name:
+                                schedule = test_schedule_map.get(task_name, {})
+                                participating_schedules.append(schedule)
+                                participating_tests.append(group_name)
+                extract_cric_site = False
+                row = {
+                    "Host": host,
+                    # "Site": queryNetsiteForHost(host),
+                    "Groups": participating_groups,
+                    "Types": participating_types,
+                    "Schedules": participating_schedules,
+                    "Test Count": len(set(participating_tests))
+                }
+                host_rows.append(row)
+            #     print(row)
+            # print("\n\n\n")
+            return host_rows
+        
+        
+        url = "https://psconfig.aglt2.org/pub/config"
+        req = request(url)
+        config_st = json.loads(req)
+        configs_df = pd.DataFrame() 
+        for e in config_st:
+            mesh_url = e['include'][0]
+            mesh_r = request(mesh_url)
+
+            
+            mesh_config = json.loads(mesh_r)
+            host_info_list = extract_host_info(mesh_config)  # list of dicts
+            current_df = pd.DataFrame(host_info_list)
+            configs_df = pd.concat([configs_df, current_df], ignore_index=True)
+            
+        self.pq.writeToFile(configs_df, f"{self.location}raw/psConfigData.parquet")
         
     @timer
     def storeAlarms(self):
@@ -209,7 +314,6 @@ class ParquetUpdater(object):
         for event,df in pivotFrames.items():
             if event == 'ASN path anomalies per site':
                 print(df.info())
-                # df['all_alarm_ids_src'] = df['all_alarm_ids_src'].eval()
             filename = self.alarms.eventCF(event)
             fdf = frames[event]
             if len(fdf)>0:

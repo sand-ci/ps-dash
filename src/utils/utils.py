@@ -110,16 +110,19 @@ def buildMap(mapDf, connectivity=False, grouped=False):
 
 
 def defineStatus(data, key_value, count_value):
-    # remove the path changed between sites event because sites tend to show big numbers for this event
-    # and it dominates the table. Use the summary event "path changed" instead
-    data = data.groupby(['to', key_value]).size().reset_index(name='cnt')
+    print("in defineStatus...")
+    data = (
+    data.groupby(['to', key_value], as_index=False)['cnt']
+    .sum()
+)
     data = data[data[key_value] != 'path changed between sites']
-
+    # print(data)
     red_status = data[(data[key_value].isin(['bandwidth decreased from/to multiple sites']))
             & (data['cnt']>0)][count_value]
 
-    yellow_status = data[(data[key_value].isin(['ASN path anomalies per site', 'ASN path anomalies']))
-                    & (data['cnt']>0)][count_value]
+    yellow_status = data[((data[key_value].isin(['ASN path anomalies per site']))
+                    & (data['cnt']>1)) | ((data[key_value].isin(['high delay from/to multiple sites', 'high packet loss on multiple links']))
+                    & (data['cnt']>0))][count_value]
 
     grey_status = data[(data[key_value].isin(['firewall issue', 'source cannot reach any', 'complete packet loss']))
                     & (data['cnt']>0)][count_value]
@@ -136,19 +139,19 @@ def createDictionaryWithHistoricalData(dframe):
     return site_dict
 
 def generateStatusTable(alarmCnt):
-
+    print("In generateStatusTable...")
     red_sites = alarmCnt[(alarmCnt['event']=='bandwidth decreased from/to multiple sites')
             & (alarmCnt['cnt']>0)]['site'].unique().tolist()
 
-    yellow_sites = alarmCnt[(alarmCnt['event'].isin(['ASN path anomalies']))
-                    & (alarmCnt['cnt']>0)]['site'].unique().tolist()
+    yellow_sites = alarmCnt[((alarmCnt['event'].isin(['high delay from/to multiple sites', 'high packet loss on multiple links']))
+                    & (alarmCnt['cnt']>0)) | (alarmCnt['event'].isin(['ASN path anomalies per site']) & (alarmCnt['cnt']>1))]['site'].unique().tolist()
 
     grey_sites = alarmCnt[(alarmCnt['event'].isin(['firewall issue', 'source cannot reach any', 'complete packet loss']))
                     & (alarmCnt['cnt']>0)]['site'].unique().tolist()
 
     catdf = qrs.getSubcategories()
     catdf = pd.merge(alarmCnt, catdf, on='event', how='left')
-
+    catdf = catdf[catdf['event'] != 'ASN path anomalies per site']
     df = catdf.groupby(['site', 'category'])['cnt'].sum().reset_index()
 
     df_pivot = df.pivot(index='site', columns='category', values='cnt')
@@ -177,7 +180,7 @@ def generateStatusTable(alarmCnt):
     df_pivot['url'] = df_pivot['site'].apply(lambda name: 
                                              f"<a class='btn btn-secondary' role='button' href='{url}/{name}' target='_blank'>See latest alarms</a>" if name else '-')
 
-    status_order = ['🔴', '🟡', '🟢', '⚪']
+    status_order = ['🔴', '🟡', '⚪', '🟢']
     df_pivot = df_pivot.sort_values(by='Status', key=lambda x: x.map({status: i for i, status in enumerate(status_order)}))
     display_columns = [col for col in df_pivot.columns.tolist() if col not in ['Status', 'site']]
     print(display_columns)
@@ -287,7 +290,7 @@ def explainStatuses():
   {
     'status category': 'Global',
       'resulted status': '🟡',
-      'considered alarm types': '\n'.join(['path changed']),
+      'considered alarm types': ',\n'.join(['ASN path anomalies per site (more than 1 pair)', 'high delay from/to multiple sites', 'high packet loss on multiple links']),
       'trigger': 'any type has > 0 alarms'
   },
   {
@@ -1384,8 +1387,6 @@ def make_arc_trace(lat0, lon0, lat1, lon1, color='gray', hovertext='',
 def add_connectivity_status(df, coords_df):
     line_traces = []
     print("in add_connectivity_status...")
-    # print(df)
-    # print(coords_df)
    # Create arced line traces for each traceroute
     line_traces = []
     for _, row in df.iterrows():
@@ -1401,10 +1402,12 @@ def add_connectivity_status(df, coords_df):
         except KeyError:
             continue
 
-        colour = get_color(row)
+        colour = row.get('color', 'grey')
         hovertext = (
             f"Source: {src}<br>"
+            f"Src_host: {row.get('src_host')}<br>"
             f"Destination: {dst}<br>"
+            f"Dest_host: {row.get('dest_host')}<br>"
             f"Destination reached: {row.get('destination_reached')}<br>"
             f"Destination reached stats: {row.get('destination_reached_stats')}<br>"
             f"Path complete: {row.get('path_complete')}<br>"

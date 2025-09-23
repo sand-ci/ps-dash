@@ -24,9 +24,8 @@ import utils.helpers as hp
 from utils.helpers import timer
 import model.queries as qrs
 from utils.parquet import Parquet
-from utils.utils import defineStatus, explainStatuses, create_heatmap, createDictionaryWithHistoricalData, generate_graphs, extractAlarm, getSitePairs, getRawDataFromES
+from utils.utils import defineStatus, explainStatuses, generate_graphs, getSitePairs, getRawDataFromES
 from utils.components import siteMeasurements, pairDetails, loss_delay_kibana, bandwidth_increased_decreased, throughput_graph_components, asnAnomalesPerSiteVisualisation
-import functools
 from collections import Counter
 
 
@@ -127,25 +126,6 @@ def layout(q=None, **other_unknown_query_strings):
             # drop time
             site_df['to'] = site_df['to'].dt.normalize()  # or .dt.floor('D')
             site_df['to'] = site_df['to'].dt.strftime('%Y-%m-%d')
-            if frame == "hosts not found":
-                site_df['hosts'] = None
-                site_df['hosts list'] = None
-                for i, row in site_df.iterrows():
-                    s = set()
-                    hosts_list = row['hosts_not_found'].values()
-                    for item in hosts_list:
-                        if item is not None:
-                            if isinstance(item, np.ndarray):  # Handle numpy arrays
-                                s.update(tuple(item))  # Convert to tuple first
-                            elif isinstance(item, (list, set, tuple)):
-                                s.update(item)
-                            else:
-                                s.add(item)
-                    hosts_list = s
-                    # print("HOSTS LIST")
-                    # print(hosts_list)
-                    site_df.at[i, 'hosts list'] = hosts_list
-                    site_df.at[i, 'hosts'] = hosts_list
             site_df = alarmsInst.formatDfValues(site_df, frame, False, True)
             if 'hosts' in site_df.columns:
                 site_df['hosts'] = site_df['hosts'].apply(lambda x: html.Div([html.Div(item) for item in x.split('\n')]) if isinstance(x, str) else x)
@@ -833,6 +813,8 @@ def create_status_chart_explained(graphData, fromDay, toDay, full_range_dates):
     global statuses
     fromDay = pd.to_datetime(fromDay)
     toDay = pd.to_datetime(toDay)
+    # print("ASN path anomalies cnt: ")
+    # print(graphData[graphData['alarm name'] == 'ASN path anomalies per site']['cnt'].tolist())
     if graphData.empty:
         # Use the last 7 days from full_range_dates or generate last 7 days from toDay
         if full_range_dates is not None and len(full_range_dates) >= 7:
@@ -884,10 +866,6 @@ def create_status_chart_explained(graphData, fromDay, toDay, full_range_dates):
     # 
     red_status, yellow_status, grey_status, graphData = defineStatus(graphData, "alarm name", ['to', 'alarm name'])
     red_status_days, yellow_status_days, grey_status_days = red_status['to'].unique().tolist(), yellow_status['to'].unique().tolist(), grey_status['to'].unique().tolist()
-    # print("STATUSES")
-    # print(red_status_days)
-    # print(yellow_status_days)
-    # print(grey_status_days)
     graphData = full_range_dates_df(full_range_dates, 'alarm name', graphData)
     days = sorted(pd.to_datetime(graphData['day'].unique()))
     # print('DAYS')
@@ -924,6 +902,8 @@ def create_status_chart_explained(graphData, fromDay, toDay, full_range_dates):
     alarm_colors = {
         'bandwidth decreased from multiple': ('darkred','critical'),
         'ASN path anomalies per site': ('goldenrod', 'significant'),
+        'high packet loss on multiple links': ('goldenrod', 'significant'),
+        'high delay from/to multiple sites': ('goldenrod', 'significant'),
         'firewall issue': ('grey', 'moderate'),
         'source cannot reach any': ('grey', 'moderate'),
         'complete packet loss': ('grey', 'moderate')
@@ -1072,7 +1052,7 @@ def update_alarms_table(date_filter, ip_filter, group_filter, type_filter, btn_t
             type_options,
             figure,
             active_btn,
-            str(len(df)))
+            str(df['cnt'].sum()))
 
 @dash.callback(
     [
@@ -1162,8 +1142,6 @@ def update_dynamic_content(site, alarm_clicks, path_clicks, path_clicks_2, hosts
                 id, event = button_id['index'].split(', ')
             if event == 'hosts not found':
                 toDay = now
-            # else:
-            #     date = toDay 
                 
             frames, pivotFrames = alarmsInst.loadData(fromDay, toDay)
             pd_df = pivotFrames[event]
@@ -1174,12 +1152,12 @@ def update_dynamic_content(site, alarm_clicks, path_clicks, path_clicks_2, hosts
                 visibility = {'visibility': 'visible'}
                 
                 #host not found visualisation
-                if event == 'hosts not found':
-                    histData = createDictionaryWithHistoricalData(pd_df)
-                    site_name, id = button_id['index'].split(', ')
-                    fig, test_types, hosts, site = create_heatmap(pd_df, site, fromDay.replace("T", " ").replace(".000Z", ""), toDay.replace("T", " ").replace(".000Z", ""))
-                    alarm = qrs.getAlarm(id)['source']
-                    return dcc.Graph(figure=fig, className="p-3"), event, alarm, visibility
+                # if event == 'hosts not found':
+                #     histData = createDictionaryWithHistoricalData(pd_df)
+                #     site_name, id = button_id['index'].split(', ')
+                #     fig, test_types, hosts, site = create_heatmap(pd_df, site, fromDay.replace("T", " ").replace(".000Z", ""), toDay.replace("T", " ").replace(".000Z", ""))
+                #     alarm = qrs.getAlarm(id)['source']
+                #     return dcc.Graph(figure=fig, className="p-3"), event, alarm, visibility
 
                 #ASN anomalies visualisation
                 if 'ASN path anomalies' in event:
@@ -1224,7 +1202,6 @@ def update_dynamic_content(site, alarm_clicks, path_clicks, path_clicks_2, hosts
                         sitePairs = getSitePairs(alarm_cont)
                         alarmData = alarm_cont['source']
                         dateFrom, dateTo = hp.getPriorNhPeriod(alarmData['to'])
-                        # print('Alarm\'s content:', alarmData)
                         pivotFrames = alarmsInst.loadData(dateFrom, dateTo)[1]
 
                         data = alarmsInst.getOtherAlarms(
@@ -1427,8 +1404,6 @@ def generate_summary(dataFrom, dataTo, alarms):
         ]
         
         return frequent_pairs
-    
-    # print('GENERATE SUMMARY')
     df = pd.DataFrame(statuses, columns=['color', 'date', 'status', 'alarms'])
     df_exploded = df.explode('alarms')
     date_range = f"{dataFrom.strftime('%b %d')} to {dataTo.strftime('%b %d')}"

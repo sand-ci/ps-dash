@@ -1,6 +1,6 @@
 import traceback
 from elasticsearch.helpers import scan
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import pandas as pd
 from dateutil.parser import parse
 
@@ -241,8 +241,6 @@ def queryAlarms(dateFrom, dateTo):
                     'destination cannot be reached from any',
                     'destination cannot be reached from multiple',
                     'source cannot reach any',
-                    'hosts not found',
-                    'unresolvable host',
                     'bandwidth decreased',
                     'bandwidth increased',
                     'bandwidth increased from/to multiple sites',
@@ -292,7 +290,7 @@ def queryAlarms(dateFrom, dateTo):
           desc = item['_source']['source']
           if 'tags' in item['_source'].keys():
             tags = item['_source']['tags']
-            desc['tag'] = tags
+            desc['tag'] = [t.upper() for t in tags]
 
           if 'to' not in desc.keys():
             desc['to'] = pd.to_datetime(item['_source']['created_at'], unit='ms', utc=True)
@@ -413,8 +411,7 @@ def getSubcategories():
   description = {
   'Infrastructure': 	['bad owd measurements','large clock correction',
 	 		 'destination cannot be reached from multiple', 'destination cannot be reached from any',
-			 'source cannot reach any', 'firewall issue', 'complete packet loss',
-                       	 'unresolvable host', 'hosts not found'],
+			 'source cannot reach any', 'firewall issue', 'complete packet loss'],
 
   'Network': 		 ['bandwidth decreased from/to multiple sites', "high delay from/to multiple sites",
                           'high one/way delay', 'high one-way delay', 'ASN path anomalies','ASN path anomalies per site'],
@@ -787,3 +784,209 @@ def queryUnreachableDestination(alarm_name, site, dateTo):
   except Exception as e:
     print('Exception:', e)
     print(traceback.format_exc())
+
+def hostFoundInES(host, lookback_days, indeces):
+    """
+    Checks whether host was found in Elasticsearch in the last lookback_days days in ps_trace, ps_throughout or ps_owd indeces.
+    Returns True if found and rcsite + netsite name if available, False otherwise.
+    """
+    since = (datetime.now(timezone.utc) - timedelta(days=lookback_days)).isoformat()
+    for idx in indeces:
+        q = {
+            "size": 1,
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"range": {"@timestamp": {"gte": since}}},
+                        {"bool": {
+                            "should": [
+                                {"term": {"src_host": host}},
+                                {"term": {"dest_host": host}},
+                                {"term": {"src": host}},
+                                {"term": {"dest": host}},
+                                {"term": {"host": host}}
+                            ],
+                            "minimum_should_match": 1
+                        }}
+                    ]
+                }
+            },
+            "sort": [{"@timestamp": "desc"}]
+        }
+        try:
+            res = hp.es.search(index=idx, body=q)
+            hits = res.get("hits", {}).get("hits", [])
+            if len(hits) > 0:
+                inf = hits[0]['_source']
+                if (host in [inf['src_host'], inf['src']]) and ('src_netsite' in inf.keys()):
+                    return (True, inf['src_netsite'], inf['src_rcsite'])
+                if host in [inf['dest_host'], inf['dest']] and ('dest_netsite' in inf.keys()):
+                    return (True, inf['dest_netsite'], inf['dest_rcsite'])
+                return (True, "-", "-")
+        except Exception as e:
+            print("Host: ", host)
+            print("Exception in Elasticsearch query?")
+            print(e)
+            pass
+    return (False, "-", "-")
+  
+  # def queryOPNTraceroutes(dateFrom, dateTo, allowed_sites=None, page_size=2000):
+    # """
+    # Summarize ps_trace by (ipv6, src, dest, src_host, dest_host, src_site, dest_site)
+    # over [dateFrom, dateTo]. Adds counts of destination_reached True/False.
+
+    # Returns a list of dicts like your throughput fn:
+    #   [
+    #     {
+    #       'hash': 'SRC-DEST',
+    #       'from': dateFrom, 'to': dateTo,
+    #       'ipv6': <ipv6>,
+    #       'src': <SRC>, 'dest': <DEST>,
+    #       'src_host': <src_host>, 'dest_host': <dest_host>,
+    #       'src_site': <SRC_SITE>, 'dest_site': <DEST_SITE>,
+    #       'doc_count': <total docs in bucket>,
+    #       'count_true': <# destination_reached=True>,
+    #       'count_false': <# destination_reached=False>,
+    #     }, ...
+    #   ]
+    # """
+    # # Allowed OPN/T1 sites: default to all T1_NETSITES, narrow if provided
+    # if allowed_sites is None:
+    #     netsite_filter = list(T1_NETSITES)
+    # else:
+    #     netsite_filter = list(set(allowed_sites))
+
+    # query = {
+    #     "bool": {
+    #         "filter": [
+    #             {
+    #                 "range": {
+    #                     "timestamp": {
+    #                         "gt": dateFrom,
+    #                         "lte": dateTo,
+    #                         "format": "strict_date_optional_time"
+    #                     }
+    #                 }
+    #             },
+    #             {"terms": {"src_netsite": netsite_filter}},
+    #             {"terms": {"dest_netsite": netsite_filter}},
+    #         ]
+    #     }
+    # }
+
+    # def make_aggs(after_key=None):
+    #     aggs = {
+    #         "groupby": {
+    #             "composite": {
+    #                 "size": page_size,
+    #                 "sources": [
+    #                     {"ipvs_src":      {"terms": {"field": "source"}}},
+    #                     {"ipv_dest":      {"terms": {"field": "destination"}}},
+    #                     {"src":       {"terms": {"field": "src"}}},
+    #                     {"dest":      {"terms": {"field": "dest"}}},
+    #                     {"src_host":  {"terms": {"field": "src_host"}}},
+    #                     {"dest_host": {"terms": {"field": "dest_host"}}},
+    #                     {"src_netsite":  {"terms": {"field": "src_netsite"}}},
+    #                     {"dest_netsite": {"terms": {"field": "dest_netsite"}}},
+    #                 ]
+    #             },
+    #             "aggs": {
+    #                 "reached_true":  {"filter": {"term": {"destination_reached": True}}},
+    #                 "reached_false": {"filter": {"term": {"destination_reached": False}}},
+    #             }
+    #         }
+    #     }
+    #     if after_key:
+    #         aggs["groupby"]["composite"]["after"] = after_key
+    #     return aggs
+
+    # aggrs = []
+    # after = None
+
+    # while True:
+    #     resp = hp.es.search(
+    #         index='ps_trace',
+    #         query=query,
+    #         aggregations=make_aggs(after),
+    #         _source=False,
+    #         size=0
+    #     )
+    #     group = resp["aggregations"]["groupby"]
+    #     buckets = group.get("buckets", [])
+
+    #     for item in buckets:
+    #         key = item["key"]
+    #         print(key)
+    #         # mirror your throughput return structure + add reached counts
+    #         ipvs_src = [key.get("ipvs_src", {"":""}).get("ipv4", ""), key.get("ipvs_src", {"":""}).get("ipv6", "")]
+    #         aggrs.append({
+    #             "hash": str(key["src"] + "-" + key["dest"]),
+    #             "from": dateFrom,
+    #             "to": dateTo,
+    #             "src_ipvs": ipvs_src,
+    #             # "ipv6": key.get("ipv6"),
+    #             "src": (key.get("src") or "").upper(),
+    #             "dest": (key.get("dest") or "").upper(),
+    #             "src_host": key.get("src_host"),
+    #             "dest_host": key.get("dest_host"),
+    #             "src_netsite": (key.get("src_netsite") or "").upper(),
+    #             "dest_netsite": (key.get("dest_netsite") or "").upper(),
+    #             "doc_count": item.get("doc_count", 0),
+    #             "count_true": item["reached_true"]["doc_count"],
+    #             "count_false": item["reached_false"]["doc_count"],
+    #         })
+
+    #     after = group.get("after_key")
+    #     if not after:
+    #         break
+
+    # return aggrs
+# TODO: implement aggregation
+def queryOPNTraceroutes(date_from_str, date_to_str, allowed):
+
+    q = {
+        "bool": {
+            "filter": [
+                {
+                    "range": {
+                        "timestamp": {
+                            "gte": date_from_str,
+                            "lte": date_to_str,
+                            "format": "strict_date_optional_time"
+                        }
+                    }
+                },
+                # both ends must be in 'allowed' ipv from CRIC OPN subnets
+                {"terms": {"src_netsite": list(allowed)}},
+                {"terms": {"dest_netsite": list(allowed)}},
+            ]
+        }
+    }
+
+    try:
+        es_resp = hp.es.search(index='ps_trace', query=q, size=10000)
+        data = es_resp['hits']['hits']
+    except Exception as exc:
+        print(f"Failed to query ps_trace: {exc}")
+        data = []
+        
+    extracted = []
+    for item in data:
+            src_ipv6 = item['_source'].get('source', {}).get('ipv6')
+            dst_ipv6 = item['_source'].get('destination', {}).get('ipv6')
+            src_ipv4 = item['_source'].get('source', {}).get('ipv4')
+            dst_ipv4 = item['_source'].get('destination', {}).get('ipv4')
+            src_ipvs = [src_ipv6, src_ipv4]
+            dst_ipvs = [dst_ipv4, dst_ipv6]
+            extracted.append({
+                'src_netsite': (item['_source'].get('src_netsite')).upper(),
+                'dest_netsite': (item['_source'].get('dest_netsite')).upper(),
+                'src_host': item['_source'].get('src_host'),
+                'dest_host': item['_source'].get('dest_host'),
+                'destination_reached': item['_source'].get('destination_reached'),
+                'path_complete': item['_source'].get('path_complete'),
+                'src_ipvs': src_ipvs,
+                'dst_ipvs': dst_ipvs,
+                'created_at': item['_source'].get('created_at')
+            })
+    return extracted

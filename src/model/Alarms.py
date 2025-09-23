@@ -65,7 +65,6 @@ class Alarms(object):
 
   def unpackAlarms(self, alarmsData):
     frames, pivotFrames = {}, {}
-    
     try:
       for event, alarms in alarmsData.items():
         if len(alarms)>0:
@@ -89,7 +88,7 @@ class Alarms(object):
                                      listedNewName='src_site')
             df['tag'] = df['site']
             
-          elif event in ['high delay from/to multiple sites', 'unresolvable host']:
+          elif event == 'high delay from/to multiple sites':
             df['tag'] = df['site']
 
           elif event in ['high packet loss on multiple links', 'bandwidth increased from/to multiple sites', 'bandwidth decreased from/to multiple sites']:
@@ -99,7 +98,7 @@ class Alarms(object):
             df['site'] = df['tag'].apply(lambda x: x[1] if len(x) > 1 else x[0])
             df['tag'] = df['site']
             df = df.round(3)
-
+# {'alarm_type': 'multi-site high delay', 'site': 'TECHNION-HEP', 'src_sites': ['FMPhI-UNIBA', 'IEPSAS-Kosice', 'NET2-LHCONE', 'NLT1-SARA-LHCOPNE', 'UKI-SCOTGRID-ECDF', 'UKI-SOUTHGRID-OX-HEP', 'DESY-ZN-LHCONE', 'FR-GRIF_LPNHE', 'IN2P3-CC-LHCOPNE', 'IN2P3-LAPP-LHCONE', 'pic-LHCOPNE', 'praguelcg2-LHCONE', 'MWT2_UC', 'FZK-LCG2-LHCOPNE', 'UKI-LT2-QMUL'], 'dest_sites': [], 'avg_severity_multiplier': 1.9, 'max_delay_p95': 124.73, 'total_affected_pairs': 15, 'alarm_id': '46c1562a9a841a82c29475bc005b7161ba2ec80b95776facb7fc68de', 'from': '2025-07-24 16:50:47.000Z', 'to': '2025-07-25 16:50:47.000Z', 'body': 'Site TECHNION-HEP shows high delay to/from 15 destinations', 'tags': ['TECHNION-HEP'], 'tag': ['TECHNION-HEP']},
           elif event in ['high packet loss',
                          'ASN path anomalies',
                          'ASN path anomalies per site',
@@ -108,12 +107,11 @@ class Alarms(object):
                          'bandwidth decreased',
                          'bandwidth increased',
                          'complete packet loss',
-                         'hosts not found',
+                        #  'hosts not found',
                          'high one-way delay']:
             df = self.list2rows(df)
 
           pivotFrames[event] = df
-
       return [frames, pivotFrames]
 
     except Exception as e:
@@ -220,6 +218,10 @@ class Alarms(object):
 
             df = pq.readFile(f)
             df['to'] = pd.to_datetime(df['to'], utc=True)
+            if 'site' in df.columns:
+              df['site'] = df['site'].str.upper()
+            if 'tag' in df.columns:
+              df['tag'] = df['tag'].str.upper()
             modification_time = os.path.getmtime(f)
 
             # Calculate the time difference in seconds
@@ -359,6 +361,9 @@ class Alarms(object):
     try:
         sign = {'bandwidth increased from/to multiple sites': '+',
                 'bandwidth decreased from/to multiple sites': ''}
+        
+        if 'site' in df.columns:
+          df['site'] = df['site'].str.upper()
 
         df = self.replaceCol('tag', df)
         if ('as_source_to' and 'as_destination_from' in df.columns) and ('sites' not in df.columns):
@@ -435,11 +440,11 @@ class Alarms(object):
 
         if 'configurations' in df.columns:
             df = self.replaceCol('configurations', df, '\n')
-        if 'hosts_not_found' in df.columns or event == 'hosts not found':
-            additionalTable = False
-            if 'hosts_not_found' not in df.columns:
-              additionalTable = True
-            df = self.convertListOfDict('hosts_not_found', df, additionalTable)
+        # if 'hosts_not_found' in df.columns or event == 'hosts not found':
+        #     additionalTable = False
+        #     if 'hosts_not_found' not in df.columns:
+        #       additionalTable = True
+        #     df = self.convertListOfDict('hosts_not_found', df, additionalTable)
             
         drop_columns = {'complete packet loss': ['avg_value'], 'ASN path anomalies': ['asn_count'], 'ASN path anomalies per site': ['all_alarm_ids_src', 'all_alarm_ids_dest'],
                         'high delay from/to multiple sites': ['alarm_type', 'body', 'tags'], 'high one/way delay': ['alarm_type', 'body', 'tags'], 'high one-way delay': ['alarm_type', 'body', 'tags']}
@@ -495,13 +500,13 @@ class Alarms(object):
                       n_clicks=0
                   ) if idx!='-' else '-'
             
-              elif event == 'hosts not found':
-                  return dbc.Button(
-                      "VIEW DETAILS",
-                      id={'type': 'hosts-not-found-btn', 'index': f"{row['site']}, {row['alarm_id']}"},
-                      className="btn btn-secondary",
-                      n_clicks=0
-                  ) if row['site'] else '-'
+              # elif event == 'hosts not found':
+              #     return dbc.Button(
+              #         "VIEW DETAILS",
+              #         id={'type': 'hosts-not-found-btn', 'index': f"{row['site']}, {row['alarm_id']}"},
+              #         className="btn btn-secondary",
+              #         n_clicks=0
+              #     ) if row['site'] else '-'
 
               elif 'alarm_link' in row and row['alarm_link']:
                   return dbc.Button(
@@ -516,19 +521,19 @@ class Alarms(object):
           else:
               if 'ASN path anomalies' in event:
                   if event == 'ASN path anomalies per site':
-                      details = f'site={row['site']}&date={row['to']}&id={row['alarm_id']}' if row['site'] and row['alarm_id'] else '-'
+                      details = f"site={row['site']}&date={row['to']}&id={row['alarm_id']}" if row['site'] and row['alarm_id'] else '-'
                   else:
-                      details = f'src_netsite={row['src_netsite']}&dest_netsite={row['dest_netsite']}&dt={row['to']}' if row['src_netsite'] and row['dest_netsite'] else '-'               
+                      details = f"src_netsite={row['src_netsite']}&dest_netsite={row['dest_netsite']}&dt={row['to']}" if row['src_netsite'] and row['dest_netsite'] else '-'               
                   return (
                       f"<a class='btn btn-secondary' role='button' href='{host_url}{page}{details}' target='_blank'>VIEW IN A NEW TAB</a>"
                       if details!='-' else '-'
                   )
 
-              elif event == 'hosts not found':
-                  return (
-                      f"<a class='btn btn-secondary' role='button' href='{host_url}{page}{row['site']}' target='_blank'>VIEW IN A NEW TAB</a>"
-                      if row['site'] else '-'
-                  )
+              # elif event == 'hosts not found':
+              #     return (
+              #         f"<a class='btn btn-secondary' role='button' href='{host_url}{page}{row['site']}' target='_blank'>VIEW IN A NEW TAB</a>"
+              #         if row['site'] else '-'
+              #     )
 
               elif 'alarm_link' in row and row['alarm_link']:
                   return (
@@ -548,7 +553,7 @@ class Alarms(object):
           'high delay from/to multiple sites': 'loss-delay/',
           'high one/way delay': 'loss-delay/',
           'high one-way delay': 'loss-delay/',
-          'hosts not found': 'hosts_not_found/'
+          # 'hosts not found': 'hosts_not_found/'
       }
 
       page = 'throughput/' if event.startswith('bandwidth') else page_map.get(event, '')
