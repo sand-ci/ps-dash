@@ -1,12 +1,8 @@
-import socket, ssl, json, time, requests
-from datetime import datetime, timedelta, timezone
-import asyncio, socket, ssl, json, time
+import socket, ssl
+import asyncio
 from contextlib import suppress
 import aiohttp
 import pandas as pd
-from elasticsearch import Elasticsearch
-from elasticsearch.helpers import scan
-import psconfig.api
 import urllib3
 import model.queries as qrs
 
@@ -50,10 +46,9 @@ async def http_probe(host):
 
 
 
-async def audit_host(host, cric_perf_hosts):
+async def audit_host(host):
     print(f"Auditing {host}...")
     result = {"host": host}
-    result["in_cric"] = host in cric_perf_hosts
     result["found_in_ES"], result["netsite"], result["rcsite"] = qrs.hostFoundInES(host, LOOKBACK_DAYS, ES_INDICES)
     addrs = await resolve(host)
     if not addrs:
@@ -84,15 +79,15 @@ async def audit_host(host, cric_perf_hosts):
         
     return result
 
-async def hosts_audit(hosts, cric_hosts, concurrency=32):
+async def hosts_audit(hosts, concurrency=32):
     sem = asyncio.Semaphore(concurrency)
     async def wrapped(h):
         async with sem:
-            return await audit_host(h, cric_hosts)
+            return await audit_host(h)
     return await asyncio.gather(*[wrapped(h) for h in hosts])
 
-async def audit(hosts_1, hosts_2):
+async def audit(hosts_1):
     # run the audit and return results
-    audited_hosts = await hosts_audit(hosts_1, hosts_2)
+    audited_hosts = await hosts_audit(hosts_1)
     return audited_hosts
 
