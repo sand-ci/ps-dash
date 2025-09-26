@@ -266,12 +266,21 @@ def layout(**other_unknown_query_strings):
             html.Div(children=[
                 # Title
                 dcc.Store(id="valid-data", data=traceroutes_dict),
-                html.H1(id="network-testing-title",
-                                children=f"T1/OPN Disconnections — Last 2 Hours pc_trace Tests"
-                    f"({FROM_DATE.strftime('%Y-%m-%d %H:%M')} to {TO_DATE.strftime('%Y-%m-%d %H:%M')} UTC)",
-                                className="mt-3 mb-1"),
-                
-                html.H4("Traceroute data is updated automatically every 2 hours.", className="text-secondary mb-2", style={"font-style": "italic"}),
+                html.Div([
+                    html.H1("T1/OPN Network Connectivity Monitor", 
+                            className="mb-1", 
+                            style={"color": "#2c3e50", "font-weight": "bold"}),
+                    html.H3("Traceroute Test Results — Last 2 Hours", 
+                        className="text-secondary", 
+                        style={"font-weight": "normal"}),
+
+                    # Data period displayed directly under the subtitle (compact and centered)
+                    html.Div([
+                    html.I(className="fas fa-clock me-2 text-muted"),
+                    html.Small(f"Data period: {FROM_DATE.strftime('%Y-%m-%d %H:%M')} — {TO_DATE.strftime('%Y-%m-%d %H:%M')} UTC", className="text-muted")
+                    ], className="text-center mb-3", style={"font-size": "0.9rem"}),
+
+                ], className="text-center mt-1 mb-3"),
 
                 # Controls row
                                 dbc.Row([
@@ -281,20 +290,23 @@ def layout(**other_unknown_query_strings):
                                             id="t1-site-filter",
                                             placeholder="Filter T1 sites…",
                                             options= T1_NETSITES,
-                                            closeOnSelect=False,
                                             value=T1_NETSITES
                                         ),
-                                        md=8
+                                        md=8, xl=10
                                     ),
                                     dbc.Col(
                                         html.Div([
-                                            dbc.Button("Search", id="btn-search", className="me-2", n_clicks=0),
-                                            dbc.Button("Select all", id="btn-select-all", className="me-2", n_clicks=0),
-                                            dbc.Button("Clear", id="btn-clear", color="secondary", n_clicks=0),
-                                        ]),
-                                        md=4, className="d-flex align-items-center justify-content-md-end mt-2 mt-md-0"
+                                            # Action buttons first, then compact date/update below (right-aligned)
+                                            html.Div([
+                                                dbc.Button("Search", id="btn-search", className="me-2 mb-1", n_clicks=0),
+                                                dbc.Button("Select all", id="btn-select-all", className="me-2 mb-1", n_clicks=0),
+                                                dbc.Button("Clear", id="btn-clear", color="secondary", n_clicks=0),
+                                            ], className="d-inline-block"),
+
+                                            # compact date removed from here (moved above subtitle)
+                                        ], className="d-flex flex-column align-items-end justify-content-md-end mt-2 mt-md-0")
                                     )
-                                ], className="mb-2"),
+                                ], className="mb-1"),
 
                                 # Graph
                                 dbc.Row(
