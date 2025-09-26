@@ -172,14 +172,14 @@ def layout(q=None, **other_unknown_query_strings):
                         html.Br(),
                         dbc.Row([
                             dbc.Col([
-                                dcc.Dropdown(multi=True, id='paths-sites-dropdown', options=sitesDropdownData, value=sitesDropdownData,
+                                dcc.Dropdown(multi=True, id='paths-sites-dropdown', options=sitesDropdownData,
                                             placeholder="Search for a site"),
                             ]),
                         ]),
                         html.Br(),
                         dbc.Row([
                             dbc.Col([
-                                dcc.Dropdown(multi=True, id='paths-asn-dropdown', options=asnsDropdownData, value=asnsDropdownData,
+                                dcc.Dropdown(multi=True, id='paths-asn-dropdown', options=asnsDropdownData,
                                             placeholder="Search ASNs"),
                             ]),
                         ]),
