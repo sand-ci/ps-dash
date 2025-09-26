@@ -130,7 +130,7 @@ def layout(**other_unknown_query_strings):
     #     alarmCnt['tag'] = alarmCnt['tag'].str.upper()
     # if 'site' in alarmCnt.columns:
     #     alarmCnt['site'] = alarmCnt['site'].str.upper()
-    statusTable, sitesDf = generate_status_table(alarmCnt)
+    statusTable, sitesDf = generateStatusTable(alarmCnt)
     print("Period:", dateFrom," - ", dateTo)
     print(f'Number of alarms: {len(alarmCnt)}')
     
@@ -142,9 +142,9 @@ def layout(**other_unknown_query_strings):
                     dbc.Row([
                         # Top left column with the map and the stacked bar chart
                             dbc.Col([
-                                dbc.Col(dcc.Graph(figure=builMap(sitesDf), id='site-map',
-                                            className='cls-site-map'),
-                                    className='boxwithshadow page-cont mb-1 g-0 p-2 column-margin',
+                                dbc.Col(dcc.Graph(figure=buildMap(sitesDf), id='site-map',
+                                            className='cls-site-map', style={'height': '100%'}),
+                                    className='boxwithshadow page-cont mb-1 g-0 p-2 column-margin h-flex',
                                     xl=12, lg=12, style={"background-color": "#b9c4d4;", "padding-top": "3%"}
                                     # ), className="align-content-start", align='start'),
                                 ),        
