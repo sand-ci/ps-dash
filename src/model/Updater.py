@@ -19,11 +19,11 @@ from ml.create_packet_loss_dataset import createPcktDataset
 from ml.packet_loss_one_month_onehot import one_month_data
 from ml.packet_loss_train_model import packet_loss_train_model
 import os
-from datetime import datetime, timedelta
-import psconfig.api
 import logging
 import requests
 import json
+from utils.hosts_audit import audit
+import asyncio
 @timer
 class ParquetUpdater(object):
     
@@ -44,7 +44,7 @@ class ParquetUpdater(object):
 
                 # self.storeThroughputDataAndModel()
                 # self.storePacketLossDataAndModel()
-                self.psConfigData()
+                self.psConfigDataAndAudit()
                 self.storeCRICData()
 
             # Set the schedulers
@@ -54,7 +54,7 @@ class ParquetUpdater(object):
             Scheduler(60*30, self.storeAlarms)
             Scheduler(60*60*12, self.storeASNPathChanged)
             Scheduler(60*60*24, self.storeCRICData)
-            Scheduler(60*60*24, self.psConfigData)
+            Scheduler(60*60*24, self.psConfigDataAndAudit)
 
 
             # Scheduler(60*60*12, self.storeThroughputDataAndModel)
@@ -220,7 +220,7 @@ class ParquetUpdater(object):
         
 
     @timer
-    def psConfigData(self):
+    def psConfigDataAndAudit(self):
         log = logging.getLogger(__name__)
         
         def request(url, hostcert=None, hostkey=None, verify=False):
@@ -283,6 +283,7 @@ class ParquetUpdater(object):
                     "Test Count": len(set(participating_tests))
                 }
                 host_rows.append(row)
+            
             #     print(row)
             # print("\n\n\n")
             return host_rows
@@ -302,7 +303,12 @@ class ParquetUpdater(object):
             current_df = pd.DataFrame(host_info_list)
             configs_df = pd.concat([configs_df, current_df], ignore_index=True)
             
+        all_hosts = configs_df['Host'].unique()
+        audited = asyncio.run(audit(all_hosts))  # <-- your coroutine
+        audited_df = pd.DataFrame(audited)
+            
         self.pq.writeToFile(configs_df, f"{self.location}raw/psConfigData.parquet")
+        self.pq.writeToFile(audited_df, f"{self.location}audited_hosts.parquet")
         
     @timer
     def storeAlarms(self):

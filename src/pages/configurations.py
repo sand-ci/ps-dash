@@ -19,7 +19,7 @@ import numpy as np
 import plotly.express as px
 
 import urllib3
-import asyncio, socket, ssl
+import asyncio
 from contextlib import suppress
 import aiohttp
 import model.queries as qrs
@@ -37,8 +37,6 @@ dash.register_page(
     title='Network testing',
     description="",
 )
-AUDIT_PARQUET = Path("parquet/audited_hosts.parquet")
-AUDIT_TTL = timedelta(hours=24)
 T1_NETSITES = [
     "BNL-ATLAS-LHCOPNE", "USCMS-FNAL-WC1-LHCOPNE", "RAL-LCG2-LHCOPN",
     "JINR-T1-LHCOPNE", "NCBJ-LHCOPN",
@@ -55,11 +53,12 @@ BACKOFF = [0, 5, 15]
 STATUSES = ["ACTIVE_HTTP", "ACTIVE_TCP_ONLY", "UNREACHABLE_CANDIDATE", "RETIRED_DNS"]
 ES_INDICES = ["ps_trace", "ps_throughput", "ps_owd"]
 LOOKBACK_DAYS = 30
-AUDITED_HOSTS = []
 TRC_PARQUET = Path("parquet/raw/traceroutes_valid.parquet")
 TRC_TTL = timedelta(hours=2)
 TO_DATE = datetime.utcnow()
 FROM_DATE = TO_DATE - timedelta(hours=2)
+
+
 def readParquetPsConfig(pq):
     """
     The function reads parquet file that is updated every 24 \
@@ -75,6 +74,22 @@ def readParquetPsConfig(pq):
     except Exception as err:
         print(err)
         print(f"Problems with reading the file {parquet_path}")
+
+def readParquetAudit(pq):
+        """
+        The function reads parquet file that is updated every 24 \
+        hours with the data from psConfig about expected hosts and tests \
+        results in the Elasticsearch.
+        """
+        parquet_path = 'parquet/audited_hosts.parquet'
+        try: 
+            print("Reading the parquet file with hosts audit...")
+            df = pq.readFile(parquet_path)
+            print(f"Host audit data from parquet file: {df}")
+            return df
+        except Exception as err:
+            print(err)
+            print(f"Problems with reading the file {parquet_path}")
 
 def readParquetHostsCRIC(pq):
     """
@@ -255,15 +270,15 @@ def layout(**other_unknown_query_strings):
                     html.H1("T1/OPN Network Connectivity Monitor", 
                             className="mb-1", 
                             style={"color": "#2c3e50", "font-weight": "bold"}),
-            html.H3("Traceroute Test Results — Last 2 Hours", 
-                className="text-secondary", 
-                style={"font-weight": "normal"}),
+                    html.H3("Traceroute Test Results — Last 2 Hours", 
+                        className="text-secondary", 
+                        style={"font-weight": "normal"}),
 
-            # Data period displayed directly under the subtitle (compact and centered)
-            html.Div([
-            html.I(className="fas fa-clock me-2 text-muted"),
-            html.Small(f"Data period: {FROM_DATE.strftime('%Y-%m-%d %H:%M')} — {TO_DATE.strftime('%Y-%m-%d %H:%M')} UTC", className="text-muted")
-            ], className="text-center mb-3", style={"font-size": "0.9rem"}),
+                    # Data period displayed directly under the subtitle (compact and centered)
+                    html.Div([
+                    html.I(className="fas fa-clock me-2 text-muted"),
+                    html.Small(f"Data period: {FROM_DATE.strftime('%Y-%m-%d %H:%M')} — {TO_DATE.strftime('%Y-%m-%d %H:%M')} UTC", className="text-muted")
+                    ], className="text-center mb-3", style={"font-size": "0.9rem"}),
 
                 ], className="text-center mt-1 mb-3"),
 
@@ -548,23 +563,16 @@ STATUS_COLORS = {
 )
 def render_audit(f_status, f_incric, f_found, f_netsite, data, last_modified, config_hosts, cric_hosts):
 
-    # print("In run audit...")
-    if _is_fresh(AUDIT_PARQUET, AUDIT_TTL):
-        # print("Using cached audit...")
-        df = pd.read_parquet(AUDIT_PARQUET)
-        ts = datetime.fromtimestamp(AUDIT_PARQUET.stat().st_mtime, tz=timezone.utc)
-        data, last_modified = df.to_dict("records"), f"Using cached audit from {ts:%Y-%m-%d %H:%M:%S} UTC"
-
-    # compute and cache
-    else:
-        # print("Computing audit...")
-        audited = asyncio.run(audit(config_hosts, cric_hosts))  # <-- your coroutine
-        df = pd.DataFrame(audited)
-        AUDIT_PARQUET.parent.mkdir(parents=True, exist_ok=True)
-        df.to_parquet(AUDIT_PARQUET, index=False)
-        ts = datetime.now(timezone.utc)
-        data, last_modified = df.to_dict("records"), f"Audited at {ts:%Y-%m-%d %H:%M:%S} UTC"
-    
+    print("In get audit...")
+    try:
+        pq = Parquet()
+        df = readParquetAudit(pq)
+        data, last_modified = df.to_dict("records"), datetime.fromtimestamp(Path("parquet/audited_hosts.parquet").stat().st_mtime, tz=timezone.utc)
+        data, last_modified = df.to_dict("records"), f"Using cached audit from {last_modified:%Y-%m-%d %H:%M:%S} UTC"
+    except Exception as e:
+        print(e)
+        print("Something went wrong in callback while trying to get audit parquet...")
+        
     
     if not data:
         empty_fig = px.scatter(title="No data found from Audit")
@@ -576,7 +584,7 @@ def render_audit(f_status, f_incric, f_found, f_netsite, data, last_modified, co
     for c in ["status", "in_cric", "found_in_ES"]:
         if c not in df.columns:
             df[c] = np.nan
-    
+    df["in_cric"] = df["host"].isin(cric_hosts)
     if df["in_cric"].dtype != bool:
         df["in_cric"] = df["in_cric"].astype(bool, errors="ignore")
     if df["found_in_ES"].dtype != bool:
