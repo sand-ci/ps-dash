@@ -480,7 +480,7 @@ class Alarms(object):
                   if event == 'ASN path anomalies per site':
                       details = f'site={row['site']}&date={row['to']}&id={row['alarm_id']}' if row['site'] and row['alarm_id'] else '-'
                   else:
-                      details = f'`src_netsite`={row['src_netsite']}&dest_netsite={row['dest_netsite']}&dt={row['to']}' if row['src_netsite'] and row['dest_netsite'] else '-'               
+                      details = f'src_netsite={row['src_netsite']}&dest_netsite={row['dest_netsite']}&dt={row['to']}' if row['src_netsite'] and row['dest_netsite'] else '-'
                   return (
                       f"<a class='btn btn-secondary' role='button' href='{host_url}{page}{details}' target='_blank'>VIEW IN A NEW TAB</a>"
                       if details!='-' else '-'
