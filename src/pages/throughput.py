@@ -1,13 +1,9 @@
 import dash
-from dash import dash_table, dcc, html
+from dash import html
 import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, MATCH, State
-import plotly.graph_objects as go
-import plotly.express as px
 
 
-import pandas as pd
-from datetime import datetime
 import requests
 from urllib3.exceptions import InsecureRequestWarning
 import urllib3
@@ -17,7 +13,6 @@ import utils.helpers as hp
 from utils.helpers import timer
 from model.Alarms import Alarms
 import model.queries as qrs
-from utils.parquet import Parquet
 from utils.components import bandwidth_increased_decreased, throughput_graph_components
 from utils.utils import getSitePairs, getRawDataFromES
 

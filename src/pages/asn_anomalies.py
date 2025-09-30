@@ -30,7 +30,6 @@ dash.register_page(
 )
 
 def layout(q=None, **other_unknown_query_strings):
-    print(q)
     return html.Div([
         dcc.Location(id='url', refresh=False),
         dcc.Store(id='alarm-data-store'),
@@ -82,9 +81,7 @@ def addNetworkOwners(asn_list):
 
 def generate_asn_cards(asn_data, anomalies):
     # Create a card for each ASN
-    print('anomalies')
-    print(anomalies)
-    print(asn_data)
+
     cards = [
         dbc.Card(
             dbc.CardBody([

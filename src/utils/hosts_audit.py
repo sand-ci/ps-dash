@@ -2,7 +2,6 @@ import socket, ssl
 import asyncio
 from contextlib import suppress
 import aiohttp
-import pandas as pd
 import urllib3
 import model.queries as qrs
 

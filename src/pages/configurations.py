@@ -7,25 +7,19 @@ import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, State
 import pandas as pd
 from datetime import datetime, timedelta
-from dash.exceptions import PreventUpdate
-import time
 
 import utils.helpers as hp
 from utils.parquet import Parquet
-from utils.hosts_audit import audit
 from utils.utils import buildMap, generateStatusTable, get_color
 from dash import dash_table as dt
 import numpy as np
 import plotly.express as px
 
 import urllib3
-import asyncio
-from contextlib import suppress
 import aiohttp
 import model.queries as qrs
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
-from itertools import combinations
 from ipaddress import ip_address, ip_network
 from collections import defaultdict
 

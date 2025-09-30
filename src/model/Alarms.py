@@ -1,7 +1,6 @@
 import glob
 import os
 import time
-from elasticsearch.helpers import scan
 import numpy as np
 import pandas as pd
 import traceback

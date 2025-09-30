@@ -7,11 +7,10 @@ It summarises all the alarms per site.
 from datetime import datetime, timedelta
 from itertools import combinations
 
-import numpy as np
 import dash
 import dash_bootstrap_components as dbc
 
-from dash import Dash, dash_table, dcc, html
+from dash import dcc, html
 from dash.dependencies import Input, Output, State, ALL, MATCH
 import plotly.graph_objects as go
 import plotly.express as px

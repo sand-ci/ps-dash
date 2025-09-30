@@ -1,18 +1,11 @@
 import dash
 from dash import html
-import dash_bootstrap_components as dbc
 
-from datetime import datetime
 import urllib3
 
-import utils.helpers as hp
-from utils.helpers import DATE_FORMAT
-from model.Alarms import Alarms
 import model.queries as qrs
 import pprint
-from utils.parquet import Parquet
 import plotly.express as px
-import plotly.graph_objects as go
 import pandas as pd
 
 urllib3.disable_warnings()

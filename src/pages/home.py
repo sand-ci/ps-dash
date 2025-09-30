@@ -1,25 +1,20 @@
 import numpy as np
 import dash
-from dash import Dash, dash_table, dcc, html
+from dash import dash_table, dcc, html
 import dash_bootstrap_components as dbc
 
 from dash.dependencies import Input, Output, State
 
-import plotly.graph_objects as go
 import plotly.express as px
 
 import pandas as pd
-from flask import request
-from datetime import date, timedelta, datetime
-from time import time
+from datetime import date
 
 from model.Alarms import Alarms
 import utils.helpers as hp
 from utils.helpers import timer
-import model.queries as qrs
 from utils.parquet import Parquet
 import pycountry
-import os
 from utils.utils import buildMap, generateStatusTable, explainStatuses
 # import psconfig.api
 

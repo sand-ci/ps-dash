@@ -1,14 +1,10 @@
-from datetime import datetime
 
-import numpy as np
 import dash
-from dash import Dash, dash_table, dcc, html
+from dash import dash_table, html
 import dash_bootstrap_components as dbc
-from dash.dependencies import Input, Output
 from utils.components import siteMeasurements
 
 import pandas as pd
-from flask import request
 
 from model.Alarms import Alarms
 import utils.helpers as hp
