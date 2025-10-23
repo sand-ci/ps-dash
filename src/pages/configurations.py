@@ -132,9 +132,13 @@ def toolkits_overloaded_UI():
                             # Controls
                             dbc.Row([
                                 dbc.Col([
-                                    html.Label("Filter by netsite (optional)", className="small text-muted"),
+                                    html.Label("Netsite (optional)", className="small text-muted"),
                                     dcc.Dropdown(id="psc-filter-netsite", multi=True, placeholder="All")
-                                ], md=4),
+                                ], md=2),
+                                dbc.Col([
+                                    html.Label("Host (optional)", className="small text-muted"),
+                                    dcc.Dropdown(id="psc-filter-host", multi=True, placeholder="All")
+                                ], md=2),
                                 dbc.Col([
                                     html.Label("Highlight top N", className="small text-muted"),
                                     dcc.Input(id="psc-top-n", type="number", min=1, step=1, value=20, style={"width": "100%"})
@@ -224,6 +228,99 @@ def layout(**other_unknown_query_strings):
 
         toolkits_overloaded_UI(),
         
+            
+        html.Div([
+                html.Div(
+                    id="audit-header",
+                    n_clicks=0,
+                    style={"cursor": "pointer", "display": "flex", "alignItems": "center", "gap": "8px"},
+                    children=[
+                        html.I(id="audit-caret", className="fas fa-chevron-right", style={"transition": "transform 0.2s ease"}),
+                        html.H3("Hosts Audit (PWA)", className="mt-2"),
+                    ]
+                ),
+                dbc.Collapse(
+                    id={"type": "collapse", "id": "audit-collapse"},
+                    is_open=False,  # hidden by default
+                    children=[
+                                html.Div(id="div-audit", children=[
+                                    
+                                    html.H4("Host auditing is performed every 24 hours. During the audit, the host undergoes several tests, based on which it is assigned a status.", className="text mt-2", style={"font-style": "italic", "color": "#A60F0F"}),
+                                    dbc.Row([
+                                                
+                                        dcc.Store(id="audit-data", data=readParquetToDf(pq, 'parquet/audited_hosts.parquet').to_dict("records")),
+                                        dcc.Store(id="last-audit"),
+                                        dcc.Store(id="config-hosts", data=all_hosts_in_configs),
+                                        dcc.Store(id="cric-hosts", data=all_cric_perfsonar_hosts),
+                                        
+                                        
+                                                        
+                                        dbc.Col([
+                                            html.Div(id="last-audit", className="text-secondary mb-2", style={"font-size": "1.2rem"})
+                                            ]),
+                                        
+
+                                        dbc.Col(
+                                            html.Div(
+                                                    dbc.Button("Open PWA ↗", href="https://psconfig.opensciencegrid.org/#!/configs/58f74a4df5139f0021ac29d6",
+                                                            className="me-2", target="_blank", color="secondary"),
+                                            ),
+                                            md=4, className="d-flex align-items-center justify-content-md-end mt-2 mt-md-0"
+                                        )
+                                    ]),        
+                                    
+                                    dbc.Row([
+                                        dbc.Col([
+                                            html.Label("Status", className="small text-muted"),
+                                            dcc.Dropdown(id="f-status", options=[], value=None, multi=True, placeholder="All")
+                                        ], md=3),
+                                        dbc.Col([
+                                            html.Label("Netsite", className="small text-muted"),
+                                            dcc.Dropdown(
+                                                id="f-netsite", options=[], value=None, multi=True, placeholder="All")
+                                        ], md=3),
+                                        dbc.Col([
+                                            html.Label("In CRIC", className="small text-muted"),
+                                            dcc.Dropdown(
+                                                id="f-incric",
+                                                options=[{"label":"Yes","value":True}, {"label":"No","value":False}],
+                                                value=None, multi=True, placeholder="All"
+                                            )
+                                        ], md=3),
+                                        dbc.Col([
+                                            html.Label("Found in ES (30d)", className="small text-muted"),
+                                            dcc.Dropdown(
+                                                id="f-found",
+                                                options=[{"label":"Yes","value":True}, {"label":"No","value":False}],
+                                                value=None, multi=True, placeholder="All"
+                                            )
+                                        ], md=3),
+                                    ], className="mb-2"),
+
+                                    
+                                    dcc.Loading(
+                                        id="loading-charts",
+                                        type="default",
+                                        color="#00245A",
+                                        delay_show=300,
+                                        children=dbc.Row([
+                                            dbc.Col(dcc.Graph(id="donut-status"), md=6),
+                                            dbc.Col(dcc.Graph(id="bar-status"), md=6),
+                                        ], className="mb-2")
+                                    ),
+
+                                    
+                                    dcc.Loading(
+                                        id="loading-table",
+                                        type="default",
+                                        color="#00245A",
+                                        delay_show=300,
+                                        parent_style={"position": "relative"},
+                                        children=html.Div(id="audit-table")
+                                    ),
+                            ]),
+                    ]),
+                ], className="p-1 site boxwithshadow m-3"),
         # ---- Connectivity sanity check UI ----
             html.Div([
                 html.Div(
@@ -232,7 +329,7 @@ def layout(**other_unknown_query_strings):
                     style={"cursor": "pointer", "display": "flex", "alignItems": "center", "gap": "8px"},
                     children=[
                         html.I(id="connectivity-caret", className="fas fa-chevron-right", style={"transition": "transform 0.2s ease"}),
-                        html.H3("Network connectivity details (T1 ↔ T1)", className="mt-2 mb-0")
+                        html.H3("Network Connectivity Details (T1 ↔ T1)", className="mt-2 mb-0")
                     ]
                 ),
                 dbc.Collapse(
@@ -342,99 +439,6 @@ def layout(**other_unknown_query_strings):
                     )
                 
         ], className="p-1 site boxwithshadow m-3"),
-            
-        html.Div([
-                html.Div(
-                    id="audit-header",
-                    n_clicks=0,
-                    style={"cursor": "pointer", "display": "flex", "alignItems": "center", "gap": "8px"},
-                    children=[
-                        html.I(id="audit-caret", className="fas fa-chevron-right", style={"transition": "transform 0.2s ease"}),
-                        html.H3("Hosts Audit (PWA)", className="mt-2"),
-                    ]
-                ),
-                dbc.Collapse(
-                    id={"type": "collapse", "id": "audit-collapse"},
-                    is_open=False,  # hidden by default
-                    children=[
-                                html.Div(id="div-audit", children=[
-                                    
-                                    html.H4("Host auditing is performed every 24 hours. During the audit, the host undergoes several tests, based on which it is assigned a status.", className="text mt-2", style={"font-style": "italic", "color": "#A60F0F"}),
-                                    dbc.Row([
-                                                
-                                        dcc.Store(id="audit-data", data=readParquetToDf(pq, 'parquet/audited_hosts.parquet').to_dict("records")),
-                                        dcc.Store(id="last-audit"),
-                                        dcc.Store(id="config-hosts", data=all_hosts_in_configs),
-                                        dcc.Store(id="cric-hosts", data=all_cric_perfsonar_hosts),
-                                        
-                                        
-                                                        
-                                        dbc.Col([
-                                            html.Div(id="last-audit", className="text-secondary mb-2", style={"font-size": "1.2rem"})
-                                            ]),
-                                        
-
-                                        dbc.Col(
-                                            html.Div(
-                                                    dbc.Button("Open PWA ↗", href="https://psconfig.opensciencegrid.org/#!/configs/58f74a4df5139f0021ac29d6",
-                                                            className="me-2", target="_blank", color="secondary"),
-                                            ),
-                                            md=4, className="d-flex align-items-center justify-content-md-end mt-2 mt-md-0"
-                                        )
-                                    ]),        
-                                    
-                                    dbc.Row([
-                                        dbc.Col([
-                                            html.Label("Status", className="small text-muted"),
-                                            dcc.Dropdown(id="f-status", options=[], value=None, multi=True, placeholder="All")
-                                        ], md=3),
-                                        dbc.Col([
-                                            html.Label("Netsite", className="small text-muted"),
-                                            dcc.Dropdown(
-                                                id="f-netsite", options=[], value=None, multi=True, placeholder="All")
-                                        ], md=3),
-                                        dbc.Col([
-                                            html.Label("In CRIC", className="small text-muted"),
-                                            dcc.Dropdown(
-                                                id="f-incric",
-                                                options=[{"label":"Yes","value":True}, {"label":"No","value":False}],
-                                                value=None, multi=True, placeholder="All"
-                                            )
-                                        ], md=3),
-                                        dbc.Col([
-                                            html.Label("Found in ES (30d)", className="small text-muted"),
-                                            dcc.Dropdown(
-                                                id="f-found",
-                                                options=[{"label":"Yes","value":True}, {"label":"No","value":False}],
-                                                value=None, multi=True, placeholder="All"
-                                            )
-                                        ], md=3),
-                                    ], className="mb-2"),
-
-                                    
-                                    dcc.Loading(
-                                        id="loading-charts",
-                                        type="default",
-                                        color="#00245A",
-                                        delay_show=300,
-                                        children=dbc.Row([
-                                            dbc.Col(dcc.Graph(id="donut-status"), md=6),
-                                            dbc.Col(dcc.Graph(id="bar-status"), md=6),
-                                        ], className="mb-2")
-                                    ),
-
-                                    
-                                    dcc.Loading(
-                                        id="loading-table",
-                                        type="default",
-                                        color="#00245A",
-                                        delay_show=300,
-                                        parent_style={"position": "relative"},
-                                        children=html.Div(id="audit-table")
-                                    ),
-                            ]),
-                    ]),
-                ], className="p-1 site boxwithshadow m-3"),
         dcc.Location(id="url-networking", refresh=False),
         html.Div(id="div-configs", children=[
             
@@ -505,7 +509,8 @@ def layout(**other_unknown_query_strings):
             ], className="p-1 site boxwithshadow page-cont m-3"),
             dcc.Store(id="connectivity-summary-initial", data=summary_df.to_dict("records")),
             dcc.Store(id="missing-summary-initial", data=missing_df.to_dict("records")),
-        ]),        
+        ]),    
+            
  ])
 
 def explode_psconfig(df: pd.DataFrame) -> pd.DataFrame:
@@ -751,30 +756,39 @@ def toggle_toolkit_overloaded(n, is_open):
     Output("psc-bar-top", "figure"),
     Output("psc-table-wrap", "children"),
     Output("psc-filter-netsite", "options"),
+    Output("psc-filter-host", "options"),
     Output("psc-unique-hosts-line", "children"), 
     Input("psc-top-n", "value"),
     Input("psc-cols", "value"),
     Input("psc-filter-netsite", "value"),
+    Input("psc-filter-host", "value"),
     State("psc-exploded", "data"),
     State("psc-host-stats", "data"),
     State("psc-unique-hosts-total", "data"),
     State("audit-data", "data"),
     prevent_initial_call=False
 )
-def render_psc_host_load(top_n, show_cols, selected_netsites, mesh_records, stats_records, total_unique_hosts, audit_records):
+def render_psc_host_load(top_n, show_cols, selected_netsites, selected_hosts, mesh_records, stats_records, total_unique_hosts, audit_records):
     stats = pd.DataFrame(stats_records or [])
     audit = pd.DataFrame(audit_records or [])
     
     netsite_opts = []
-    if not audit.empty and "netsite" in audit.columns:
-        netsites = sorted(audit["netsite"].dropna().astype(str).unique().tolist())
-        netsite_opts = [{"label": s, "value": s} for s in netsites]
+    if not audit.empty:
+        if "netsite" in audit.columns:
+            netsites = sorted(audit["netsite"].dropna().astype(str).unique().tolist())
+            netsite_opts = [{"label": s, "value": s} for s in netsites]
+        if "host" in audit.columns:
+            hosts = sorted(audit["host"].dropna().astype(str).unique().tolist())
+            host_opts = [{"label": h, "value": h} for h in hosts]
         
 
     if stats.empty:
         empty_fig = px.bar(title="No psConfig data")
         table = dt.DataTable(data=[], columns=[])
-        return empty_fig, table, netsite_opts
+        badge = html.Div([
+                    dbc.Badge(f"Unique hosts in psConfig: 0", color="secondary", className="me-2 size-sm"),
+                ])
+        return empty_fig, table, netsite_opts, host_opts, badge
 
     host_to_site = {}
     if not audit.empty and {"host","netsite"}.issubset(audit.columns):
@@ -788,7 +802,9 @@ def render_psc_host_load(top_n, show_cols, selected_netsites, mesh_records, stat
             site = host_to_site.get(str(h).strip().lower())
             return site in set(selected_netsites)
         stats = stats[stats["Host"].map(belongs_to_selected)]
-            
+    
+    if selected_hosts:
+        stats = stats[stats["Host"].isin(selected_hosts)]
 
     badges = html.Div([
         dbc.Badge(f"Unique hosts in psConfig: {total_unique_hosts}", color="secondary", className="me-2 size-sm"),
@@ -849,7 +865,7 @@ def render_psc_host_load(top_n, show_cols, selected_netsites, mesh_records, stat
         ],
     )
 
-    return fig, table, netsite_opts, badges
+    return fig, table, netsite_opts, host_opts, badges
 
 STATUS_PRETTY = {
     "ACTIVE_HTTP": "Active HTTP — reachable; toolkit/API responds",
