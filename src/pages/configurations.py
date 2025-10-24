@@ -147,9 +147,9 @@ def toolkits_overloaded_UI():
                                     html.Label("Show columns", className="small text-muted"),
                                     dcc.Checklist(
                                         id="psc-cols",
-                                        options=[{"label": c, "value": c} for c in ["Throughput","Trace","Latency","Latencybg","Rtt"]],
+                                        options=[{"label": html.Span(c, style={"padding-right": "10px", "padding-left": "4px", "font-size": "1.0rem"}), "value": c} for c in ["Throughput","Trace","Latency","Latencybg","Rtt"]],
                                         value=["Throughput","Trace","Latency","Latencybg","Rtt"],
-                                        inline=True
+                                        inline=True,           
                                     )
                                 ], md=6),
                             ], className="mb-2"),
