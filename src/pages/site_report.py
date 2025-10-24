@@ -301,7 +301,7 @@ def layout(q=None, **other_unknown_query_strings):
                                                     [
                                                         html.Li(
                                                             [
-                                                                html.Span(f"{host} ", className="font-weight-bold"),
+                                                                html.Span(f"{host} ", className="font-weight-bold", style={"font-size": "1.2vh"}),
                                                                 html.Span(
                                                                     f"({ip_ver})",
                                                                     className="badge badge-pill badge-success" if ip_ver == "ipv6" 
@@ -392,22 +392,20 @@ def layout(q=None, **other_unknown_query_strings):
                                                         "Show Details ⬇",
                                                         id="toggle-alarms-button",
                                                         color="link",
-                                                        style={"font-size": "0.8rem", "padding-top": "3%","background-color": "#ffffff"}
+                                                        style={"font-size": "1rem", "padding-top": "3%","background-color": "#ffffff"}
                                                     ),
                                                 )
                                                  ], style={'margin-bottom': '0px', "background-color": "#ffffff"}),
                                         
                                         # Status graph
-                                        html.Div(
+                                        html.Div(className="h-full", children=[
                                             dcc.Graph(
                                                 id="site-status-alarms",
                                                 figure=create_status_chart_explained(site_alarms, start_date, end_date, full_dates),
                                                 config={'displayModeBar': False},
                                                 style={
-                                                    'width': '100%',
-                                                    'height': '350px'
                                                 }
-                                            ), style={'margin-top': '0px',"background-color": "#ffffff"}
+                                            )], style={'margin-top': '0px',"background-color": "#ffffff"}
                                         ),
                                         dcc.Store(id='site-statuses', data={}),
                                         dbc.Modal(
@@ -575,7 +573,7 @@ def layout(q=None, **other_unknown_query_strings):
                                                     "height": "90%",
                                                     "padding-left": "8%",
                                                     "padding-right": "8%",
-                                                    "font-size": "120%"
+                                                    "font-size": "1.3vh"
                                                     
                                                 })
                                     ], style={"height": "100%"}

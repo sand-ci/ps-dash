@@ -26,7 +26,7 @@ import dash_bootstrap_components as dbc
                 #pages/home.py
 ####################################################
 
-def buildMap(mapDf, connectivity=False, grouped=False):
+def buildMap(mapDf, connectivity=False, grouped=pd.DataFrame()):
     # usually test and production sites are at the same location,
     # so we add some noise to the coordinates to make them visible
     mapDf['lat'] = mapDf['lat'].astype(float) + np.random.normal(scale=0.01, size=len(mapDf))

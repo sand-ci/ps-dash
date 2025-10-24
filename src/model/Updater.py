@@ -24,6 +24,13 @@ import requests
 import json
 from utils.hosts_audit import audit
 import asyncio
+from datetime import datetime, timedelta
+
+CRIC_OPN_RCSITES = {"CERN-PROD":'CERN-PROD-LHCOPNE', "BNL-ATLAS":'BNL-ATLAS-LHCOPNE', "INFN-T1":'INFN-T1-LHCOPNE',
+                    "USCMS-FNAL-WC1":'USCMS-FNAL-WC1-LHCOPNE', "FZK-LCG2":'FZK-LCG2-LHCOPNE', "IN2P3-CC":'IN2P3-CC-LHCOPNE', "RAL-LCG2":'RAL-LCG2-LHCOPN', 
+                    "JINR-T1":'JINR-T1-LHCOPNE', "pic":'PIC-LHCOPNE', "SARA-MATRIX":'NLT1-SARA-LHCOPNE',
+                    "TRIUMF-LCG2":'TRIUMF-LCG2-LHCOPNE', "NDGF-T1":'NDGF-T1-LHCOPNE', "KR-KISTI-GSDC-01":'KR-KISTI-GSDC-1-LHCOPNE',
+                    "NCBJ-CIS":'NCBJ-LHCOPN'}
 @timer
 class ParquetUpdater(object):
     
@@ -44,8 +51,10 @@ class ParquetUpdater(object):
 
                 # self.storeThroughputDataAndModel()
                 # self.storePacketLossDataAndModel()
+                
                 self.psConfigDataAndAudit()
                 self.storeCRICData()
+                self.validOPNTraceroutes()
 
             # Set the schedulers
             Scheduler(60*60*12, self.storeMetaData)
@@ -55,6 +64,7 @@ class ParquetUpdater(object):
             Scheduler(60*60*12, self.storeASNPathChanged)
             Scheduler(60*60*24, self.storeCRICData)
             Scheduler(60*60*24, self.psConfigDataAndAudit)
+            Scheduler(60*60*2, self.validOPNTraceroutes)
 
 
             # Scheduler(60*60*12, self.storeThroughputDataAndModel)
@@ -195,20 +205,15 @@ class ParquetUpdater(object):
         df = pd.DataFrame(all_hosts, columns=['host'])
         self.pq.writeToFile(df, f"{self.location}raw/CRICDataHosts.parquet")
         
-        cric_opn_rcsites = {"CERN-PROD":'CERN-PROD-LHCOPNE', "BNL-ATLAS":'BNL-ATLAS-LHCOPNE', "INFN-T1":'INFN-T1-LHCOPNE',
-                    "USCMS-FNAL-WC1":'USCMS-FNAL-WC1-LHCOPNE', "FZK-LCG2":'FZK-LCG2-LHCOPNE', "IN2P3-CC":'IN2P3-CC-LHCOPNE', "RAL-LCG2":'RAL-LCG2-LHCOPN', 
-                    "JINR-T1":'JINR-T1-LHCOPNE', "pic":'PIC-LHCOPNE', "SARA-MATRIX":'NLT1-SARA-LHCOPNE',
-                    "TRIUMF-LCG2":'TRIUMF-LCG2-LHCOPNE', "NDGF-T1":'NDGF-T1-LHCOPNE', "KR-KISTI-GSDC-01":'KR-KISTI-GSDC-1-LHCOPNE',
-                    "NCBJ-CIS":'NCBJ-LHCOPN'}
         subnets = []
         r = requests.get(
         'https://wlcg-cric.cern.ch/api/core/rcsite/query/list/?json', verify=False).json()
-        for site in cric_opn_rcsites.keys():
+        for site in CRIC_OPN_RCSITES.keys():
             try:
                 for netroute in r[site]['netroutes'].values():
                     if netroute['lhcone_bandwidth_limit'] > 0:   
                         content = netroute['networks']
-                        subnets.append([cric_opn_rcsites[site], content.get('ipv4', []) + content.get('ipv6', [])])
+                        subnets.append([CRIC_OPN_RCSITES[site], content.get('ipv4', []) + content.get('ipv6', [])])
                         
             except Exception as e:
                 print(e)
@@ -216,8 +221,15 @@ class ParquetUpdater(object):
         df2 = pd.DataFrame(subnets, columns=['site', 'subnets'])
         df2 = df2.groupby('site').agg('sum').reset_index()
         self.pq.writeToFile(df2, f"{self.location}raw/CRICDataOPNSubnets.parquet")
-        
-        
+    
+    @timer
+    def validOPNTraceroutes(self):
+        to_date = datetime.utcnow()
+        from_date = to_date - timedelta(hours=2)
+        records = qrs.queryOPNTraceroutes(from_date.strftime(hp.DATE_FORMAT), to_date.strftime(hp.DATE_FORMAT), list(CRIC_OPN_RCSITES.values())+["pic-LHCOPNE"]) 
+        df = pd.DataFrame(records)
+        self.pq.writeToFile(df, f"{self.location}raw/traceroutes_OPN.parquet")
+     
 
     @timer
     def psConfigDataAndAudit(self):
