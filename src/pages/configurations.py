@@ -54,7 +54,7 @@ def readParquetToDf(pq, parquet_path):
     """
     """
     try: 
-        print("Reading the parquet file {parquet_path}...")
+        print(f"Reading the parquet file {parquet_path}...")
         df = pq.readFile(parquet_path)
         return df
     except Exception as err:
@@ -212,8 +212,7 @@ def layout(**other_unknown_query_strings):
     print(" --- getting PerfSonars from WLCG CRIC ---")
     all_cric_perfsonar_hosts = readParquetToDf(pq, 'parquet/raw/CRICDataHosts.parquet')['host'].tolist()
     print(f"All perfSONAR hosts in CRIC: {len(all_cric_perfsonar_hosts)}\n")
-    
-    mesh_config = readParquetToDf(pq, 'parquet/raw/psConfigData.parquet')          # or your read_psconfig_parquet
+              # or your read_psconfig_parquet
     mesh_exploded = explode_psconfig(mesh_config)
     stats_df, host_details = build_psc_stats_table(mesh_exploded)
     total_unique_hosts = mesh_exploded['Host'].nunique()
@@ -225,6 +224,10 @@ def layout(**other_unknown_query_strings):
         dcc.Store(id="psc-host-details", data=host_details),
         dcc.Store(id="psc-unique-hosts-total", data=total_unique_hosts),
         dcc.Store(id="traceroutes-grouped", data={}),
+        dcc.Store(id="audit-data", data=readParquetToDf(pq, 'parquet/audited_hosts.parquet').to_dict("records")),
+        dcc.Store(id="last-audit"),
+        dcc.Store(id="config-hosts", data=all_hosts_in_configs),
+        dcc.Store(id="cric-hosts", data=all_cric_perfsonar_hosts),
 
         toolkits_overloaded_UI(),
         
@@ -247,13 +250,6 @@ def layout(**other_unknown_query_strings):
                                     
                                     html.H4("Host auditing is performed every 24 hours. During the audit, the host undergoes several tests, based on which it is assigned a status.", className="text mt-2", style={"font-style": "italic", "color": "#A60F0F"}),
                                     dbc.Row([
-                                                
-                                        dcc.Store(id="audit-data", data=readParquetToDf(pq, 'parquet/audited_hosts.parquet').to_dict("records")),
-                                        dcc.Store(id="last-audit"),
-                                        dcc.Store(id="config-hosts", data=all_hosts_in_configs),
-                                        dcc.Store(id="cric-hosts", data=all_cric_perfsonar_hosts),
-                                        
-                                        
                                                         
                                         dbc.Col([
                                             html.Div(id="last-audit", className="text-secondary mb-2", style={"font-size": "1.2rem"})
@@ -910,7 +906,7 @@ def render_audit(f_status, f_incric, f_found, f_netsite, data, last_modified, co
     try:
         pq = Parquet()
         df = readParquetToDf(pq, 'parquet/audited_hosts.parquet')
-        data, last_modified = df.to_dict("records"), datetime.fromtimestamp(Path("parquet/audited_hosts.parquet").stat().st_mtime, tz=timezone.utc)
+        last_modified = datetime.fromtimestamp(Path("parquet/audited_hosts.parquet").stat().st_mtime, tz=timezone.utc)
         data, last_modified = df.to_dict("records"), f"Using cached audit from {last_modified:%Y-%m-%d %H:%M:%S} UTC"
     except Exception as e:
         print(e)
@@ -978,7 +974,6 @@ def render_audit(f_status, f_incric, f_found, f_netsite, data, last_modified, co
 
   
     gdf = fdf.copy()
-    # map to pretty groups; unknowns -> "Other"
     gdf["status_group"] = (
         gdf["status"].map(STATUS_PRETTY).fillna("Other")
     )
@@ -1265,4 +1260,3 @@ def compute_connectivity_summaries(grouped_df: pd.DataFrame, sites: list[str]):
     summary_df["all_red_dest_flag"] = summary_df["all_red_dest_flag"].astype(str)
 
     return summary_df, missing_expanded_df
-
