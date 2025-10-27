@@ -24,7 +24,8 @@ import requests
 import json
 from utils.hosts_audit import audit
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 CRIC_OPN_RCSITES = {"CERN-PROD":'CERN-PROD-LHCOPNE', "BNL-ATLAS":'BNL-ATLAS-LHCOPNE', "INFN-T1":'INFN-T1-LHCOPNE',
                     "USCMS-FNAL-WC1":'USCMS-FNAL-WC1-LHCOPNE', "FZK-LCG2":'FZK-LCG2-LHCOPNE', "IN2P3-CC":'IN2P3-CC-LHCOPNE', "RAL-LCG2":'RAL-LCG2-LHCOPN', 
@@ -234,94 +235,99 @@ class ParquetUpdater(object):
     @timer
     def psConfigDataAndAudit(self):
         log = logging.getLogger(__name__)
-        
-        def request(url, hostcert=None, hostkey=None, verify=False):
-            log.debug('Retrieving {}'.format(url))
-            if hostcert and hostkey:
-                req = requests.get(url, verify=verify, timeout=120, cert=(hostcert, hostkey))
-            else:
-                req = requests.get(url, timeout=120, verify=verify)
-            req.raise_for_status()
-            return req.content
-        
-        def extract_host_info(config):
-            hosts = config.get("hosts", {})
-            groups = config.get("groups", {})
-            tasks = config.get("tasks", {})
-            tests = config.get("tests", {})
-            schedules = config.get("schedules", {})
-            group_type_map = {}
-            test_schedule_map = {}
-            for task_name, task_info in tasks.items():
-                group_name = task_info.get("group")
-                if group_name:
-                    test_type = tests.get(group_name).get("type")
-                    group_type_map[group_name] = test_type
-                schedule = task_info.get("schedule")
-                test_schedule_map[group_name] = schedules.get(schedule, None)
-            # For each host, find groups it belongs to
-            # groups have list of addresses with names
-            # Check which groups contain this host
-            host_rows = []
-            for host in hosts.keys():
-                participating_groups = []
-                participating_types = []
-                participating_schedules = []
-                participating_tests = []
+        last_modified = datetime.fromtimestamp(Path("parquet/audited_hosts.parquet").stat().st_mtime, tz=timezone.utc)
+        print(f"Host audit last modified: {last_modified}")
+        if last_modified - datetime.now(timezone.utc) > timedelta(hours=24) or not os.path.exists("parquet/audited_hosts.parquet") or not os.path.exists("parquet/raw/psConfigData.parquet"):
+            print("Updating audit...")
+            def request(url, hostcert=None, hostkey=None, verify=False):
+                log.debug('Retrieving {}'.format(url))
+                if hostcert and hostkey:
+                    req = requests.get(url, verify=verify, timeout=120, cert=(hostcert, hostkey))
+                else:
+                    req = requests.get(url, timeout=120, verify=verify)
+                req.raise_for_status()
+                return req.content
+            
+            def extract_host_info(config):
+                hosts = config.get("hosts", {})
+                groups = config.get("groups", {})
+                tasks = config.get("tasks", {})
+                tests = config.get("tests", {})
+                schedules = config.get("schedules", {})
+                group_type_map = {}
+                test_schedule_map = {}
+                for task_name, task_info in tasks.items():
+                    group_name = task_info.get("group")
+                    if group_name:
+                        test_type = tests.get(group_name).get("type")
+                        group_type_map[group_name] = test_type
+                    schedule = task_info.get("schedule")
+                    test_schedule_map[group_name] = schedules.get(schedule, None)
+                # For each host, find groups it belongs to
+                # groups have list of addresses with names
+                # Check which groups contain this host
+                host_rows = []
+                for host in hosts.keys():
+                    participating_groups = []
+                    participating_types = []
+                    participating_schedules = []
+                    participating_tests = []
 
-                for group_name, group_info in groups.items():
-                    addr_list = group_info.get("addresses", [])
-                    # check if host is in this group's addresses
-                    if any(addr.get("name") == host for addr in addr_list):
-                        participating_groups.append(group_name)
-                        # get type of test associated with group
-                        test_type = group_type_map.get(group_name, None)
-                        if test_type:
-                            participating_types.append(test_type)
-                        # get schedule(s) from tests that belong to this group
-                        # find tests whose group matches group_name
-                        for task_name, task_info in tasks.items():
-                            if task_info.get("group") == group_name:
-                                schedule = test_schedule_map.get(task_name, {})
-                                participating_schedules.append(schedule)
-                                participating_tests.append(group_name)
-                extract_cric_site = False
-                row = {
-                    "Host": host,
-                    # "Site": queryNetsiteForHost(host),
-                    "Groups": participating_groups,
-                    "Types": participating_types,
-                    "Schedules": participating_schedules,
-                    "Test Count": len(set(participating_tests))
-                }
-                host_rows.append(row)
+                    for group_name, group_info in groups.items():
+                        addr_list = group_info.get("addresses", [])
+                        # check if host is in this group's addresses
+                        if any(addr.get("name") == host for addr in addr_list):
+                            participating_groups.append(group_name)
+                            # get type of test associated with group
+                            test_type = group_type_map.get(group_name, None)
+                            if test_type:
+                                participating_types.append(test_type)
+                            # get schedule(s) from tests that belong to this group
+                            # find tests whose group matches group_name
+                            for task_name, task_info in tasks.items():
+                                if task_info.get("group") == group_name:
+                                    schedule = test_schedule_map.get(task_name, {})
+                                    participating_schedules.append(schedule)
+                                    participating_tests.append(group_name)
+                    extract_cric_site = False
+                    row = {
+                        "Host": host,
+                        # "Site": queryNetsiteForHost(host),
+                        "Groups": participating_groups,
+                        "Types": participating_types,
+                        "Schedules": participating_schedules,
+                        "Test Count": len(set(participating_tests))
+                    }
+                    host_rows.append(row)
+                
+                #     print(row)
+                # print("\n\n\n")
+                return host_rows
             
-            #     print(row)
-            # print("\n\n\n")
-            return host_rows
-        
-        
-        url = "https://psconfig.aglt2.org/pub/config"
-        req = request(url)
-        config_st = json.loads(req)
-        configs_df = pd.DataFrame() 
-        for e in config_st:
-            mesh_url = e['include'][0]
-            mesh_r = request(mesh_url)
+            
+            url = "https://psconfig.aglt2.org/pub/config"
+            req = request(url)
+            config_st = json.loads(req)
+            configs_df = pd.DataFrame() 
+            for e in config_st:
+                mesh_url = e['include'][0]
+                mesh_r = request(mesh_url)
 
+                
+                mesh_config = json.loads(mesh_r)
+                host_info_list = extract_host_info(mesh_config)  # list of dicts
+                current_df = pd.DataFrame(host_info_list)
+                configs_df = pd.concat([configs_df, current_df], ignore_index=True)
+                
+            all_hosts = configs_df['Host'].unique()
+            audited = asyncio.run(audit(all_hosts))  # <-- your coroutine
+            audited_df = pd.DataFrame(audited)
+                
+            self.pq.writeToFile(configs_df, f"{self.location}raw/psConfigData.parquet")
+            self.pq.writeToFile(audited_df, f"{self.location}audited_hosts.parquet")
             
-            mesh_config = json.loads(mesh_r)
-            host_info_list = extract_host_info(mesh_config)  # list of dicts
-            current_df = pd.DataFrame(host_info_list)
-            configs_df = pd.concat([configs_df, current_df], ignore_index=True)
+        print("Audit is up-to-date.")
             
-        all_hosts = configs_df['Host'].unique()
-        audited = asyncio.run(audit(all_hosts))  # <-- your coroutine
-        audited_df = pd.DataFrame(audited)
-            
-        self.pq.writeToFile(configs_df, f"{self.location}raw/psConfigData.parquet")
-        self.pq.writeToFile(audited_df, f"{self.location}audited_hosts.parquet")
-        
     @timer
     def storeAlarms(self):
         dateFrom, dateTo = hp.defaultTimeRange(30)
