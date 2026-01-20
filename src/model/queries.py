@@ -145,9 +145,15 @@ def queryThroughputIdx(dateFrom, dateTo):
 
 def query_ASN_paths_pos_probs(src, dest, dt, ipv):
   """
-  Fetch the document with this alarm_id, and render its heatmap.
+  Fetch the document with this alarm and render its heatmap.
+  
+  Added fallback mechanism on 2026-01-20:
+  Due to time discrepancies in alarm creation, we first try the exact datetime,
+  then fall back to date-only format if no results are found. This ensures
+  users can still access alarm data when precise timestamps don't match.
   """
-  try:
+  
+  def build_query(date_value):
       must_conditions = [
           {
             "exists": {
@@ -157,7 +163,7 @@ def query_ASN_paths_pos_probs(src, dest, dt, ipv):
               {
             "range": {
               "to_date": {
-                "gte": dt,
+                "gte": date_value,
                 "format": "strict_date_optional_time"
               }
             }
@@ -182,19 +188,51 @@ def query_ASN_paths_pos_probs(src, dest, dt, ipv):
           }
           must_conditions.append(ipv_q)
 
-      q = {
+      return {
           "bool": {
           "must": must_conditions
           }
       }
-      # print(str(q).replace('\'', '"'))
+  
+  try:
+      # First try with the original datetime
+      q = build_query(dt)
       res = hp.es.search(index='ps_traces_changes', query=q)
+      
+      # If no results found, try with date-only format as fallback
+      # This addresses time discrepancies in alarm creation timestamps
+      if not res['hits']['hits']:
+          print(f"No results found with full datetime {dt}, trying date-only fallback")
+          # Extract date part only (YYYY-MM-DD format)
+          if isinstance(dt, str):
+              try:
+                  dt_parsed = parse(dt)
+                  date_only = dt_parsed.strftime('%Y-%m-%d')
+              except:
+                  date_only = dt[:10] if len(dt) >= 10 else dt
+          else:
+              date_only = str(dt)[:10] if len(str(dt)) >= 10 else str(dt)
+          
+          print(f"Retrying with date-only: {date_only}")
+          q = build_query(date_only)
+          res = hp.es.search(index='ps_traces_changes', query=q)
+      
   except Exception:
       # not found / error
       return []
-
-  doc = res['hits']['hits'][0]["_source"]
-  return doc
+  
+  if res['hits']['hits']:
+      # Check if we have multiple results and warn about it
+      total_hits = len(res['hits']['hits'])
+      if total_hits > 1:
+          print(f"WARNING: Found {total_hits} results for query, returning the first one. "
+                f"This may indicate duplicate or overlapping alarm data for src={src}, dest={dest}, dt={dt}, ipv={ipv}")
+      
+      doc = res['hits']['hits'][0]["_source"]
+      return doc
+  else:
+      print("No results found even with date-only fallback")
+      return []
 
 
 def queryPathAnomaliesDetails(dateFrom, dateTo, idx='ps_traces_changes'):
