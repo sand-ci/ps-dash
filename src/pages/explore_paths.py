@@ -140,7 +140,7 @@ def layout(q=None, **other_unknown_query_strings):
                                 html.P(f'The plot shows how ASNs were replaced in the period from {pd.to_datetime(period_to_display[0]).strftime("%Y-%m-%d")} to {pd.to_datetime(period_to_display[1]).strftime("%Y-%m-%d")}. The data is based on the alarms of type "ASN path anomalies"', style={"font-size": "1.2rem"})
                             ], className="l-h-3 p-2"),
                             dcc.Loading(
-                                dcc.Graph(figure=parallel_cat_fig, id="asn-sankey"), color='#00245A'),
+                                dcc.Graph(figure=parallel_cat_fig, id="asn-sankey", responsive=True), color='#00245A'),
                         ], className="boxwithshadow page-cont ml-1 p-1")
                     ], xl=6, lg=12, md=12, sm=12, className=" mb-1 flex-grow-1",
                     ),
@@ -151,7 +151,7 @@ def layout(q=None, **other_unknown_query_strings):
                                 html.P('The plot shows the number of new ASNs that appeared between two sites. The data is based on the alarms of type "ASN path anomalies"', style={"font-size": "1.2rem"})
                             ], className="l-h-3 p-2"),
                             dcc.Loading(
-                                dcc.Graph(figure=heatmap_fig, id="asn-heatmap", style={"max-width": "1000px", "margin": "0 auto"}),
+                                dcc.Graph(figure=heatmap_fig, id="asn-heatmap", responsive=True, style={"max-width": "1000px", "margin": "0 auto"}),
                                 color='#00245A')
                         ], className="boxwithshadow page-cont ml-1 p-1")
                     ], xl=6, lg=12, md=12, sm=12, className="mb-1 flex-grow-1")

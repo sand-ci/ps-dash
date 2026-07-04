@@ -191,6 +191,7 @@ def layout(q=None, **other_unknown_query_strings):
                                             dcc.Graph(
                                                 id="site-status-alarms",
                                                 figure=create_status_chart_explained(site_alarms, start_date, end_date, full_dates),
+                                                responsive=True,
                                                 config={'displayModeBar': False},
                                                 style={
                                                     'width': '100%',
@@ -260,11 +261,11 @@ def layout(q=None, **other_unknown_query_strings):
                                         'justify-content': 'center'
                                     },
                                     children=[
-                                        html.Div(
-                                            html.I(className="fas fa-check-circle", 
-                                                style={'color': 'green', 'font-size': '48px'}),
-                                            style={'margin-bottom': '15px'}
-                                        ),
+                                        # html.Div(
+                                        #     html.I(className="fas fa-check-circle", 
+                                        #         style={'color': 'green', 'font-size': '48px'}),
+                                        #     style={'margin-bottom': '15px'}
+                                        # ),
                                         html.H4("No Alarms Detected", style={'margin-bottom': '10px'}),
                                         html.P(f"There were no alarms during the last 7 days at {q}")
                                     ]
@@ -473,7 +474,7 @@ def layout(q=None, **other_unknown_query_strings):
                                                         html.Div(
                                                             id="type-of-alarms",
                                                             children=[
-                                                                dcc.Graph(id="bar-graph", figure=create_bar_chart(site_alarms, full_dates, 'alarm group')),
+                                                                dcc.Graph(id="bar-graph", figure=create_bar_chart(site_alarms, full_dates, 'alarm group'), responsive=True),
                                                             ],
                                                             style={"height": "100%", "width": "100%"}
                                                         ),

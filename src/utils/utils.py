@@ -171,8 +171,16 @@ def generateStatusTable(alarmCnt):
             return '⚪'
         return '🟢'
 
+    status_colors = {'🔴': '#e53e3e', '🟡': '#d69e2e', '⚪': '#a0aec0', '🟢': '#38a169'}
     df_pivot['Status'] = df_pivot['site'].apply(give_status)
-    df_pivot['site name'] = df_pivot.apply(lambda row: f"{row['Status']} {row['site']}", axis=1)
+    df_pivot['site name'] = df_pivot.apply(
+        lambda row: (
+            f"<span style='display:inline-block;width:11px;height:11px;"
+            f"border-radius:50%;background:{status_colors[row['Status']]};"
+            f"vertical-align:middle;margin-right:7px;'></span>{row['site']}"
+        ),
+        axis=1
+    )
 
     df_pivot = df_pivot[['site', 'site name', 'Status', 'Network', 'Infrastructure', 'Other']]
 
@@ -569,7 +577,7 @@ def asnAnomaliesGroupedAlarmVisualisation(alarm, site, src_alarms, dest_alarms, 
                                     "You can see visualisation for all the path anomalies below or explore paths for a given site and date here: ",
                                     html.A("Explore paths", href=f"{request.host_url}/explore-paths/site={site}&dt={date}", target="_blank")
                                 ], className='subtitle'),
-                                dcc.Graph(figure=fig, style={'height': '400px'}),
+                                dcc.Graph(figure=fig, responsive=True, style={'height': '400px'}),
                                 asn_legend
                             ], justify="start"),
                         ])
@@ -851,7 +859,7 @@ def generate_graphs(data, src, dest, dt):
         return html.Div([
             dbc.Row([
                 dbc.Col([
-                    dcc.Graph(figure=heatmap_figure, id="asn-sankey-ipv4", className="full-height-graph"),
+                    dcc.Graph(figure=heatmap_figure, id="asn-sankey-ipv4", responsive=True, className="full-height-graph"),
                     html.P(
                         'This is a sample of the paths between the pair of sites. '
                         'The plot shows new (anomalous) ASNs framed in white. '
@@ -860,7 +868,7 @@ def generate_graphs(data, src, dest, dt):
                     ),
                 ], xxl=6, className="responsive-col"),
                 dbc.Col([
-                    dcc.Graph(figure=path_prob_figure, id="asn-path-prob-ipv4", className="full-height-graph"),
+                    dcc.Graph(figure=path_prob_figure, id="asn-path-prob-ipv4", responsive=True, className="full-height-graph"),
                     html.P(
                         'The plot shows how often each ASN appears on a position, '
                         'where 1 is 100% of time.',
@@ -892,7 +900,7 @@ def generate_graphs(data, src, dest, dt):
         figures = html.Div([
             dbc.Row([
                 dbc.Col([
-                    dcc.Graph(figure=heatmap_figure, id="asn-sankey-ipv4", className="full-height-graph"),
+                    dcc.Graph(figure=heatmap_figure, id="asn-sankey-ipv4", responsive=True, className="full-height-graph"),
                     html.P(
                         'This is a sample of the paths between the pair of sites. '
                         'The plot shows new (anomalous) ASNs framed in white. '
@@ -901,7 +909,7 @@ def generate_graphs(data, src, dest, dt):
                     ),
                 ], xxl=6, className="responsive-col"),
                 dbc.Col([
-                    dcc.Graph(figure=path_prob_figure, id="asn-path-prob-ipv4", className="full-height-graph"),
+                    dcc.Graph(figure=path_prob_figure, id="asn-path-prob-ipv4", responsive=True, className="full-height-graph"),
                     html.P(
                         'The plot shows how often each ASN appears on a position, '
                         'where 1 is 100% of time.',

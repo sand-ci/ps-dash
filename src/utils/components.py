@@ -73,9 +73,10 @@ def siteMeasurements(q, pq):
                                                 className="card-title text-center", style={'color': 'white'}), style={'background-color': '#00245a'}),
                         dbc.CardBody([
                             html.Div(
-                                dcc.Graph(id="site-plots-in-out", 
+                                dcc.Graph(id="site-plots-in-out",
                                 figure=SitesOverviewPlots(q, pq),
-                                config={'displayModeBar': False},# remove Plotly buttons so that they don't ovelap with the legend
+                                responsive=True,
+                                config={'displayModeBar': False},
                                 className="site-plots site-inner-cont p-05")
                             )
                         ], className="text-dark p-1")
@@ -191,7 +192,7 @@ def pairDetails(pair, alarm, chdf, baseline, altpaths, hopPositions, pivotFrames
 
               dbc.Col([
                 dbc.Row([
-                  dcc.Graph(id="graph-hops", figure=singlePlotPositions(hopPositions), className="p-1 bordered-box mb-0"),
+                  dcc.Graph(id="graph-hops", figure=singlePlotPositions(hopPositions), responsive=True, className="p-1 bordered-box mb-0"),
                   html.P(
                       f"The plot shows the AS numbers for every hop and the frequency of their occurences at each position (source and destination not included).",
                       className="text-center mb-0 fs-5"),
@@ -406,7 +407,7 @@ def throughput_graph_components(alrmData, df, otherAlarms):
             ], width={"size":"4"}, align="center"),
             dbc.Col([
               dcc.Loading([
-                html.Div(dcc.Graph(className="site-plots site-inner-cont", figure=buildPlot(df))),
+                html.Div(dcc.Graph(className="site-plots site-inner-cont", figure=buildPlot(df), responsive=True)),
               ], className='loader-tp', color='#00245A', style = {"position": "relative", "top": "10rem"})
             ], width=7)
           ], className="", justify="evenly"),
