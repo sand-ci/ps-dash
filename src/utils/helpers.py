@@ -1,37 +1,103 @@
 import multiprocessing as mp
 from datetime import datetime, timedelta
 import time
-import requests 
+import requests
 import os
 import pandas as pd
 import functools
 
 from elasticsearch import Elasticsearch
-import getpass
 
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.000Z"
 INDICES = ['ps_packetloss', 'ps_owd', 'ps_throughput', 'ps_trace']
 
-user, passwd, mapboxtoken = None, None, None
-with open("/etc/ps-dash/creds.key") as f:
-    user = f.readline().strip()
-    passwd = f.readline().strip()
-    mapboxtoken = f.readline().strip()
+user, passwd, mapboxtoken, creds_source = None, None, None, 'none'
+
+_es_user = os.environ.get('ES_USER')
+_es_pass = os.environ.get('ES_PASS')
+if _es_user and _es_pass:
+    user, passwd, creds_source = _es_user, _es_pass, 'env'
+    mapboxtoken = os.environ.get('MAPBOX_TOKEN', '')
+else:
+    try:
+        with open("/etc/ps-dash/creds.key") as f:
+            user = f.readline().strip()
+            passwd = f.readline().strip()
+            mapboxtoken = f.readline().strip()
+        creds_source = 'file'
+    except FileNotFoundError:
+        print(">>>>>> /etc/ps-dash/creds.key not found and ES_USER/ES_PASS not set.")
+        print(">>>>>> Set ES_USER, ES_PASS (and optionally ES_HOST) as environment variables.")
+
+
+def _env_int(name, default, minimum=0):
+    try:
+        return max(minimum, int(os.environ.get(name, default)))
+    except (ValueError, TypeError):
+        return default
+
+
+def _env_bool(name, default):
+    val = os.environ.get(name)
+    if val is None:
+        return default
+    return val.lower() in ('1', 'true', 'yes')
+
 
 def ConnectES():
-    global user, passwd
-    credentials = (user, passwd)
+    global user, passwd, creds_source
+    if not user or not passwd:
+        print(">>>>>> No ES credentials — cannot connect.")
+        return None
+
+    es_host = os.environ.get('ES_HOST') or (
+        'localhost:9200' if creds_source == 'file' else 'atlas-kibana.mwt2.org:9200'
+    )
+    es_url = f'https://{es_host}'
+    request_timeout = _env_int('ES_REQUEST_TIMEOUT_SECONDS', 30, minimum=1)
+    max_retries = _env_int('ES_MAX_RETRIES', 3, minimum=0)
+    retry_on_timeout = _env_bool('ES_RETRY_ON_TIMEOUT', True)
 
     try:
-        if getpass.getuser() == 'petya':
-            es = Elasticsearch('https://localhost:9200', verify_certs=False, http_auth=credentials, max_retries=20)
-        else:
-            es = Elasticsearch([{'host': 'atlas-kibana.mwt2.org', 'port': 9200, 'scheme': 'https'}],
-                                http_auth=credentials, max_retries=10)
-        print('Success' if es.ping()==True else 'Fail')
+        es = Elasticsearch(
+            es_url,
+            basic_auth=(user, passwd),
+            verify_certs=False,
+            ssl_show_warn=False,
+            max_retries=max_retries,
+            retry_on_timeout=retry_on_timeout,
+            request_timeout=request_timeout,
+        )
+        try:
+            es.info()
+            print(f'Connected to Elasticsearch ({es_host}, timeout={request_timeout}s, retries={max_retries})')
+        except Exception as ping_err:
+            print(f">>>>>> ES connection check failed ({es_host}): {ping_err}")
+            if creds_source == 'file':
+                print(">>>>>> Ensure the SSH tunnel is up: ssh -NL 9200:atlas-kibana.mwt2.org:9200 <user>@lxplus.cern.ch")
         return es
     except Exception as error:
-        print (">>>>>> Elasticsearch Client Error:", error)
+        print(f">>>>>> Elasticsearch Client Error ({es_host}): {error}")
+        return None
+
+
+class _LazyElasticsearchClient:
+    """Defers ES connection to first use so the app starts without ES available."""
+    def __init__(self):
+        self._client = None
+        self._attempted = False
+
+    def _get_client(self):
+        if not self._attempted:
+            self._attempted = True
+            self._client = ConnectES()
+        return self._client
+
+    def __getattr__(self, name):
+        client = self._get_client()
+        if client is None:
+            raise RuntimeError("Elasticsearch is not available — check credentials and connection")
+        return getattr(client, name)
 
 
 
@@ -48,14 +114,7 @@ def timer(func):
 
 
 def convertDate(dt):
-    try:
-        parsed_date = datetime.strptime(dt, DATE_FORMAT)
-        formatted_date = parsed_date.strftime(DATE_FORMAT)
-    except ValueError:
-        parsed_date = datetime.strptime(dt, DATE_FORMAT)
-        formatted_date = parsed_date.strftime(DATE_FORMAT)
-
-    return formatted_date
+    return datetime.strptime(dt, DATE_FORMAT).strftime(DATE_FORMAT)
 
 
 def getPriorNhPeriod(end, daysBefore=2, midPoint=True):
@@ -158,4 +217,4 @@ def getValueField(idx):
 
 
 
-es = ConnectES()
+es = _LazyElasticsearchClient()
