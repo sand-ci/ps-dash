@@ -18,7 +18,6 @@ from ml.thrpt_dataset_model_train import trainMLmodel
 from ml.create_packet_loss_dataset import createPcktDataset
 from ml.packet_loss_one_month_onehot import one_month_data
 from ml.packet_loss_train_model import packet_loss_train_model
-import os
 import logging
 import requests
 import json
@@ -235,9 +234,14 @@ class ParquetUpdater(object):
     @timer
     def psConfigDataAndAudit(self):
         log = logging.getLogger(__name__)
-        last_modified = datetime.fromtimestamp(Path("parquet/audited_hosts.parquet").stat().st_mtime, tz=timezone.utc)
-        print(f"Host audit last modified: {last_modified}")
-        if last_modified - datetime.now(timezone.utc) > timedelta(hours=24) or not os.path.exists("parquet/audited_hosts.parquet") or not os.path.exists("parquet/raw/psConfigData.parquet"):
+        audit_path = "parquet/audited_hosts.parquet"
+        config_path = "parquet/raw/psConfigData.parquet"
+        needs_update = not os.path.exists(audit_path) or not os.path.exists(config_path)
+        if not needs_update:
+            last_modified = datetime.fromtimestamp(Path(audit_path).stat().st_mtime, tz=timezone.utc)
+            print(f"Host audit last modified: {last_modified}")
+            needs_update = datetime.now(timezone.utc) - last_modified > timedelta(hours=24)
+        if needs_update:
             print("Updating audit...")
             def request(url, hostcert=None, hostkey=None, verify=False):
                 log.debug('Retrieving {}'.format(url))
@@ -417,7 +421,7 @@ class ParquetUpdater(object):
         model_pkl_file = f'{self.location}ml-datasets/XGB_Classifier_model_packet_loss.pkl'
         with open(model_pkl_file, 'wb') as file:
             pickle.dump(model, file)
-        del plsDf_onehot, model
+        del plsDf_onehot_month, model
         gc.collect()
         end_time = time.time()
         print(f"Finished storePacketLossDataAndModel in {end_time - start_time} seconds")
