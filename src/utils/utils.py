@@ -8,6 +8,7 @@ import hashlib
 import pandas as pd
 
 import model.queries as qrs
+import utils.helpers as hp
 from dash import dash_table, html, dcc
 from flask import request
 from datetime import datetime, timedelta
@@ -75,7 +76,7 @@ def buildMap(mapDf, connectivity=False, grouped=pd.DataFrame()):
     fig.update_layout(
         margin=dict(t=0, b=0, l=0, r=0),
         mapbox=dict(
-            accesstoken='pk.eyJ1IjoicGV0eWF2IiwiYSI6ImNraDNwb3k2MDAxNnIyeW85MTMwYTU1eWoifQ.1QQ1E5mPh3hoZjK5X5LH7Q',
+            accesstoken=hp.mapboxtoken,
             bearing=0,
             center=go.layout.mapbox.Center(
                 lat=43,
