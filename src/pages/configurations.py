@@ -156,7 +156,7 @@ def toolkits_overloaded_UI():
 
                             # Viz + table
                             dbc.Row([
-                                dbc.Col(dcc.Graph(id="psc-bar-top"), md=6),
+                                dbc.Col(dcc.Graph(id="psc-bar-top", responsive=True), md=6),
                                 dbc.Col(html.Div(id="psc-table-wrap"), md=6)
                             ]),
                             *configs_details
@@ -300,8 +300,8 @@ def layout(**other_unknown_query_strings):
                                         color="#00245A",
                                         delay_show=300,
                                         children=dbc.Row([
-                                            dbc.Col(dcc.Graph(id="donut-status"), md=6),
-                                            dbc.Col(dcc.Graph(id="bar-status"), md=6),
+                                            dbc.Col(dcc.Graph(id="donut-status", responsive=True), md=6),
+                                            dbc.Col(dcc.Graph(id="bar-status", responsive=True), md=6),
                                         ], className="mb-2")
                                     ),
 
@@ -490,7 +490,7 @@ def layout(**other_unknown_query_strings):
                                             color='#00245A',
                                             children=[
                                                     dcc.Graph(id='traceroute-map', figure=buildMap(sites_status[sites_status['site'].isin(T1_NETSITES)], True, grouped),
-                                                            style={'height': '75vh'})
+                                                            responsive=True, style={'height': '75vh'})
                                                     ]
                                         ),
                                         width=12

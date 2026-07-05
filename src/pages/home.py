@@ -44,71 +44,71 @@ def total_number_of_alarms(sitesDf):
 
     highest_site = site_totals.sum(axis=1).idxmax()
     highest_site_alarms = site_totals.sum(axis=1).max()
-    
+
     country_totals = sitesDf.groupby('country')[['Infrastructure', 'Network', 'Other']].sum()
     highest_country = country_totals.sum(axis=1).idxmax()
     highest_country_alarms = country_totals.sum(axis=1).max()
-    
-    status = {'critical': '🔴', 'warning': '🟡', 'ok': '🟢', 'unknown':'⚪'}
+
+    status = {'critical': '🔴', 'warning': '🟡', 'ok': '🟢', 'unknown': '⚪'}
     status_count = sitesDf[['Status', 'site']].groupby('Status').count().to_dict()['site']
     for s, icon in status.items():
         if icon not in status_count:
             status_count[icon] = 0
-    status_explanations = {'critical': "'bandwidth decreased from/to multiple sites' observed",
-                           'warning': "'ASN path anomalies per site (to several destination or from several sources)'\nor 'high delay from/to multiple sites'\nor 'high packet loss on multiple links' observed",
-                           'ok': "no alarms",
-                           'unknown': "other alarms"}
-    html_elements = [dbc.Col([
-            dbc.Row(
-                    html.H1('Status of all sites in the past 48 hours', 
-                            className='card-title align-items-stretch'),
-                align="center", className='w-100 p-2', style={"text-align": "center"}
-            ),
-            dbc.Row(children=[
-                *[dbc.Col(
-                    dbc.Card(
-                        dbc.CardBody(
-                            [
-                                html.H4(f'{icon}', className='card-title'),
-                                html.H3(f'{s}', className='card-title'),
-                                html.H3(f'{status_count[icon]}', className='card-text'),
-                                # Tooltip target below must match the id of the CardBody
-                                dbc.Tooltip(
-                                    f"{status_explanations[s]}",
-                                    target=f"cardbody-{s}",
-                                    placement="top",
-                                    style={"fontSize":"1.5em"}
-                                )
-                            ],
-                            id=f"cardbody-{s}",  # give each CardBody a unique id
-                        ),
-                        className='mb-3',
-                    ),
-                    md=3, xs=3, xl=3, className='status-count-numbers'
-                ) for s, icon in status.items()]
-            ], className='w-100 status-box gx-4', align="center", justify='center'),
-        ], className='boxwithshadowhidden g-0 mb-1', style={"background-color": "#ffffff"})]
+    status_explanations = {
+        'critical': "'bandwidth decreased from/to multiple sites' observed",
+        'warning': ("'ASN path anomalies per site (to several destination or from several sources)'\n"
+                    "or 'high delay from/to multiple sites'\nor 'high packet loss on multiple links' observed"),
+        'ok': "no alarms",
+        'unknown': "other alarms",
+    }
 
-    # add the highest number of alarms based on site name to the html
-    country_code = get_country_code(sitesDf[sitesDf['site']==highest_site]['country'].values[0])
-    html_elements.append(
-    dbc.Row([
-        dbc.Col([
-            dbc.Row([
-                html.H3(f'Highest number of alarms from site', className='status-title'),
-                html.H1(f' {highest_site} ({country_code}): {highest_site_alarms}', className='status-number')
-            ], align="center", className='h-100'),
-            ], className='status-box boxwithshadow mb-1', md=6, sm=12),
-        dbc.Col([
-            dbc.Row([
-                html.H3(f'Highest number of alarms from country', className='status-title'),
-                html.H1(f'{highest_country}: {highest_country_alarms}', className='status-number'),
-            ], align="center", className='h-100'),
-            ], className='status-box boxwithshadow mb-1', md=6, sm=12)
-        ], className='g-0')
-    )
+    status_box = html.Div([
+        html.H6('Status of all sites · past 48 hours',
+                className='text-center text-muted pt-3 pb-2 mb-2',
+                style={'font-size': '0.78rem', 'text-transform': 'uppercase',
+                       'letter-spacing': '0.06em', 'border-bottom': '1px solid #dee2e6'}),
+        html.Div([
+            html.Div([
+                html.Div(className=f'status-bar status-bar-{s} me-2'),
+                html.Div([
+                    html.P(s, className='text-muted mb-0', style={'font-size': '1rem'}),
+                    html.H3(f'{status_count[icon]}', className='mb-0 fw-bold'),
+                ]),
+                dbc.Tooltip(
+                    f"{status_explanations[s]}",
+                    target=f"status-cell-{s}",
+                    placement="top",
+                )
+            ], id=f"status-cell-{s}", className='status-cell d-flex align-items-center py-2 px-2')
+            for s, icon in status.items()
+        ], className='d-flex gap-3 px-3 pb-3'),
+    ], className='boxwithshadowhidden mb-2')
 
-    return html_elements
+    country_code = get_country_code(sitesDf[sitesDf['site'] == highest_site]['country'].values[0])
+    highest_row = dbc.Row([
+        dbc.Col([
+            html.Div([
+                html.H6('Highest alarms from site',
+                        className='text-center text-muted pb-1 mb-2',
+                        style={'font-size': '0.78rem', 'text-transform': 'uppercase',
+                               'letter-spacing': '0.06em', 'border-bottom': '1px solid #dee2e6'}),
+                html.H4(f'{highest_site} ({country_code}): {highest_site_alarms}',
+                        className='fw-bold mb-0', style={'color': '#2d3748'}),
+            ], className='boxwithshadow p-3 text-center h-100'),
+        ], md=6, sm=12, className='mb-2'),
+        dbc.Col([
+            html.Div([
+                html.H6('Highest alarms from country',
+                        className='text-center text-muted pb-1 mb-2',
+                        style={'font-size': '0.78rem', 'text-transform': 'uppercase',
+                               'letter-spacing': '0.06em', 'border-bottom': '1px solid #dee2e6'}),
+                html.H4(f'{highest_country}: {highest_country_alarms}',
+                        className='fw-bold mb-0', style={'color': '#2d3748'}),
+            ], className='boxwithshadow p-3 text-center h-100'),
+        ], md=6, sm=12, className='mb-2'),
+    ], className='mb-2')
+
+    return status_box, highest_row
  
 
 dash.register_page(__name__, path='/')
@@ -121,178 +121,104 @@ def layout(**other_unknown_query_strings):
     dateFrom, dateTo = hp.defaultTimeRange(2)
     now = hp.defaultTimeRange(days=2, datesOnly=True)
     alarmCnt = pq.readFile('parquet/alarmsGrouped.parquet')
-    # if 'tag' in alarmCnt.columns:
-    #     alarmCnt['tag'] = alarmCnt['tag'].str.upper()
-    # if 'site' in alarmCnt.columns:
-    #     alarmCnt['site'] = alarmCnt['site'].str.upper()
     statusTable, sitesDf = generateStatusTable(alarmCnt)
-    print("Period:", dateFrom," - ", dateTo)
+    print("Period:", dateFrom, " - ", dateTo)
     print(f'Number of alarms: {len(alarmCnt)}')
-    
 
-    total_number = total_number_of_alarms(sitesDf)
-    return html.Div([
-        dbc.Col([
+    status_box, highest_row = total_number_of_alarms(sitesDf)
+
+    return dbc.Container([
+        # Top section: map + bar on the left, status info on the right
+        dbc.Row([
+            dbc.Col([
+                html.Div(
+                    dcc.Graph(figure=buildMap(sitesDf), id='site-map',
+                              responsive=True, className='cls-site-map'),
+                    className='boxwithshadow mb-2 p-2',
+                ),
+                html.Div(
+                    dcc.Loading(
+                        html.Div(id="alarms-stacked-bar"),
+                        style={'height': '1rem'}, color='#00245A'
+                    ),
+                    className='boxwithshadow flex-grow-1 p-2',
+                ),
+            ], lg=6, md=12, className='d-flex flex-column'),
+
+            dbc.Col([
+                status_box,
+                highest_row,
+                html.Div([
+                    html.Div(children=statusTable, id='site-status', className='status-table-cls'),
+                    html.Div([
+                        dbc.Button(
+                            "How was the status determined?",
+                            id="how-status-collapse-button",
+                            className="mb-3",
+                            color="secondary",
+                            n_clicks=0,
+                        ),
+                        dbc.Modal([
+                            dbc.ModalHeader(dbc.ModalTitle("How was the status determined?")),
+                            dbc.ModalBody(id="how-status-modal-body"),
+                            dbc.ModalFooter(
+                                dbc.Button("Close", id="close-how-status-modal", className="ml-auto", n_clicks=0)
+                            ),
+                        ],
+                        id="how-status-modal",
+                        size="lg",
+                        is_open=False,
+                        ),
+                    ], className="how-status-div"),
+                ], className='boxwithshadow flex-grow-1 p-2'),
+            ], lg=6, md=12, className='d-flex flex-column'),
+        ], className='g-3 mb-2'),
+
+        # Search section
+        dbc.Row([
+            dbc.Col([
                 dbc.Row([
-                    dbc.Row([
-                        # Top left column with the map and the stacked bar chart
-                            dbc.Col([
-                                dbc.Col(dcc.Graph(figure=buildMap(sitesDf), id='site-map',
-                                            className='cls-site-map', style={'height': '100%'}),
-                                    className='boxwithshadow page-cont mb-1 g-0 p-2 column-margin h-flex',
-                                    xl=12, lg=12, style={"background-color": "#b9c4d4;", "padding-top": "3%"}
-                                    # ), className="align-content-start", align='start'),
-                                ),        
-                                dbc.Col(
-                                    dcc.Loading(
-                                        html.Div(id="alarms-stacked-bar", className="h-100"),
-                                        style={'height': '1rem'}, color='#00245A'
-                                ),
-                                className="boxwithshadow page-cont mb-1 p-2 align-content-around",),
-                            ], lg=6, md=12, className='d-flex flex-column', align='around'),# d-flex and flex-column make the columns the same size
-                            # end of top left column
+                    dbc.Col(
+                        html.H3([
+                            html.I(className="fas fa-search"),
+                            " Search the Networking Alarms"
+                        ], className="l-h-3"),
+                        align="center", md=12, xl=6
+                    ),
+                    dbc.Col(
+                        dcc.DatePickerRange(
+                            id='date-picker-range',
+                            month_format='M-D-Y',
+                            min_date_allowed=date.today() - pd.Timedelta(days=30),
+                            initial_visible_month=now[0],
+                            start_date=now[0],
+                            end_date=now[1]
+                        ),
+                        md=12, xl=6, className="mb-2 text-right"
+                    ),
+                ], className='flex-wrap mb-2'),
+                dcc.Dropdown(multi=True, id='sites-dropdown',
+                             placeholder="Search for a site", className='mb-3'),
+                dcc.Dropdown(multi=True, id='events-dropdown',
+                             placeholder="Search for an event type", className='mb-3'),
+                dbc.Button("Search", id="search-button", color="secondary",
+                           style={"width": "100%", "font-size": "1.5em"}),
+            ], className='p-3')
+        ], className='boxwithshadow mb-2 g-0'),
 
-                            # Top right column with status table, status statistics, and the search fields
-                            dbc.Col([
-                                dbc.Row(children=total_number, className="h-100"),
-                                dbc.Row([
-                                    dbc.Col(
-                                        [
-                                            html.Div(children=statusTable, id='site-status', className='status-table-cls'),
-                                            html.Div(
-                                                [
-                                                    dbc.Button(
-                                                        "How was the status determined?",
-                                                        id="how-status-collapse-button",
-                                                        className="mb-3",
-                                                        color="secondary",
-                                                        n_clicks=0,
-                                                    ),
-                                                    dbc.Modal(
-                                                        [
-                                                            dbc.ModalHeader(dbc.ModalTitle("How was the status determined?")),
-                                                            dbc.ModalBody(id="how-status-modal-body"),
-                                                            dbc.ModalFooter(
-                                                                dbc.Button("Close", id="close-how-status-modal", className="ml-auto", n_clicks=0)
-                                                            ),
-                                                        ],
-                                                        id="how-status-modal",
-                                                        size="lg",
-                                                        is_open=False,
-                                                    ),
-                                                ], className="how-status-div",
-                                            ),
-                                        ], className='page-cont mb-1 p-1', xl=12
-                                    )
-                                ], className="boxwithshadow page-cont mb-1")],
+        # Alarms list
+        dbc.Row([
+            dbc.Col([
+                html.H1("List of alarms", className="text-center mt-1"),
+                html.Hr(className="my-2"),
+                dcc.Loading(
+                    html.Div(id='results-table'),
+                    style={'height': '0.5rem'}, color='#00245A'
+                )
+            ], className='p-3')
+        ], className='boxwithshadow mb-2 g-0'),
 
-                                # # Bottom part with the three pie charts
-                                # dbc.Row([
-                                #     dbc.Row([
-                                #         dbc.Row([
-                                #             dbc.Row([
-                                #                 # Title for the section
-                                #                 dbc.Col([
-                                #                     html.H3(children=f'Expected Testing Data Availability (per host) in Elasticsearch [{stats_date.strftime("%d-%m-%Y")}]',
-                                #                             className='stats-title'
-                                #                         )
-                                #                     ], width=10),
-                                #                 # Button to switch to historical data
-                                #                 # dbc.Col([
-                                #                 #     dcc.Store(id='historical-data-for-graph', data=get_data_for_histogram(dt)),
-                                #                 #     dcc.Store(id='hosts-not-found-stats', data=expected_received_stats),
-                                #                 #     dcc.Store(id='date', data=dt),
-                                #                 #     dcc.Dropdown(
-                                #                 #         id='data-over-time-dropdown',
-                                #                 #         options=['all (pie charts)', 'all (histograms)'],
-                                #                 #         value='all (pie charts)',
-                                #                 #         placeholder="Test Type",
-                                #                 #         multi=False  # Allow multiple selections
-                                #                 #     )
-                                #                 #     ], width=2, style={'align-items':'top'})
-                                #                 ], className="w-100 mt-2 g-0", style={'justify-content':'space-between'}),
-                                #             # adding the pie charts or histogram
-                                #             html.Div(id='graph-placeholder', children=[hosts_not_found_stats(expected_received_stats)],style={'margin-left': '15px'}),                          
-                                #         ], className="w-100", style={'justify-content':'center'}),
-                                #     ], className="mt-2 w-100", style={'justify-content':'center'}),
-                                # ], className='boxwithshadow page-cont mb-1 p-2', align="center")],
-                            lg=6, sm=12, className='d-flex flex-column h-100'),
-                    # End of top right column      
-                    ], className='h-100'),
-                    
-                    
-                    # Bottom part with search field and the list of alarms
-                    # row with two rows: 1) search field and 2) list of alarms
-                    dbc.Row([
-                        dbc.Col([
-                            dbc.Row([
-                                dbc.Row([
-                                    dbc.Col([
-                                        dbc.Row([
-                                            dbc.Col([
-                                                html.H3([
-                                                    html.I(className="fas fa-search"),
-                                                    "Search the Networking Alarms"
-                                                ], className="l-h-3"),
-                                            ], align="center", className="text-left rounded-border-1"
-                                                , md=12, xl=6),
-                                            dbc.Col([
-                                                dcc.DatePickerRange(
-                                                    id='date-picker-range',
-                                                    month_format='M-D-Y',
-                                                    min_date_allowed=date.today() - pd.Timedelta(days=30),
-                                                    initial_visible_month=now[0],
-                                                    start_date=now[0],
-                                                    end_date=now[1]
-                                                )
-                                            ], md=12, xl=6, className="mb-1 text-right")
-                                        ], className="flex-wrap"),
-                                        dbc.Row([
-                                            dbc.Col([
-                                                dcc.Dropdown(multi=True, id='sites-dropdown', placeholder="Search for a site"),
-                                            ]),
-                                        ]),
-                                        html.Br(),
-                                        dbc.Row([
-                                            dbc.Col([
-                                                dcc.Dropdown(multi=True, id='events-dropdown', placeholder="Search for an event type"),
-                                            ]),
-                                        ]),
-                                        html.Br(),
-                                        dbc.Row([
-                                            dbc.Col([
-                                                dbc.Button("Search", id="search-button", color="secondary",
-                                                        className="mlr-2", style={"width": "100%", "font-size": "1.5em"})
-                                            ])
-                                        ]),
-                                    ], lg=12, md=12, className="p-1"),
-                                ], className=""),
-                            ], className='boxwithshadow page-cont', style={"margin-bottom": "10px"}),
-                            # end of the search row
-                                
-                                
-                            # list of alarms row
-                            dbc.Row([
-                                dbc.Row([
-                                    dbc.Col([
-                                        html.H1(f"List of alarms", className="text-center mt-1"),
-                                        html.Hr(className="my-2"),
-                                        html.Br(),
-                                        dcc.Loading(
-                                            html.Div(id='results-table'),
-                                            style={'height': '0.5rem'}, color='#00245A')
-                                    ])
-                                ], className=""),
-                            ], className="boxwithshadow page-cont p-2"), 
-                            #end of the list of alarms
-                        ], lg=12, md=12)
-                    ], style={"padding-left":'15px'})
-                ], className="m-1"),
-   
-        
-        ], className=""),
-    #html.Div ends
-    ], className='', style={"margin-top": "5px"})
+    ], fluid=True, className='px-3 py-3')
     
 @dash.callback(
     [
@@ -337,6 +263,15 @@ def update_output(n_clicks, start_date, end_date, sites, all, events, allevents,
                 df['event'] = e
                 scntdf = pd.concat([scntdf, df])
 
+        no_alarms_msg = html.Div(
+            html.P("No alarms in this period", className='text-muted mb-0',
+                   style={'font-size': '1rem'}),
+            className='text-center py-4'
+        )
+
+        if scntdf.empty:
+            return [[], [], no_alarms_msg, no_alarms_msg]
+
         # sites
         graphData = scntdf
         if (sitesState is not None and len(sitesState) > 0):
@@ -355,6 +290,8 @@ def update_output(n_clicks, start_date, end_date, sites, all, events, allevents,
         for e in sorted(scntdf['event'].unique()):
             events_dropdown_items.append({"label": e, "value": e})
 
+        if len(graphData) == 0:
+            return [sites_dropdown_items, events_dropdown_items, no_alarms_msg, no_alarms_msg]
 
         bar_chart = create_bar_chart(graphData)
 
@@ -365,18 +302,16 @@ def update_output(n_clicks, start_date, end_date, sites, all, events, allevents,
         for event in sorted(events):
             df = pivotFrames[event]
             if 'site' in df.columns:
-                # df['site'] = df['site'].str.upper()
                 df = df[df['site'].isin(sitesState)] if sitesState is not None and len(sitesState) > 0 else df
             elif 'tag' in df.columns:
-                # df['tag'] = df['tag'].str.upper()
                 df = df[df['tag'].isin(sitesState)] if sitesState is not None and len(sitesState) > 0 else df
 
             if len(df) > 0:
                 dataTables.append(generate_tables(frames[event], df, event, alarmsInst))
-        dataTables = html.Div(dataTables)
 
+        dataTables = html.Div(dataTables) if dataTables else no_alarms_msg
 
-        return [sites_dropdown_items, events_dropdown_items, dcc.Graph(figure=bar_chart), dataTables]
+        return [sites_dropdown_items, events_dropdown_items, dcc.Graph(figure=bar_chart, responsive=True), dataTables]
     else:
         raise dash.exceptions.PreventUpdate 
 
@@ -495,32 +430,50 @@ def generate_tables(frame, unpacked, event, alarmsInst):
     print('Home page,', event, "Number of alarms:", len(dfr))
     try:
         element = html.Div([
-            html.Br(),
-            html.H3(event.upper()),
+            html.H6(event.upper(),
+                    className='text-muted pb-2 mb-3 mt-2',
+                    style={'font-size': '0.78rem', 'text-transform': 'uppercase',
+                           'letter-spacing': '0.06em', 'border-bottom': '1px solid #dee2e6'}),
             dash_table.DataTable(
                 data=dfr.to_dict('records'),
                 columns=[{"name": i, "id": i, "presentation": "markdown"} for i in dfr.columns],
                 markdown_options={"html": True},
-                id=f'search-tbl-{event.replace(" ", "-")}',  # Replace spaces with dashes for consistency
+                id=f'search-tbl-{event.replace(" ", "-")}',
                 page_current=0,
                 page_size=10,
+                style_as_list_view=True,
                 style_cell={
-                    'padding': '2px',
+                    'padding': '10px 14px',
                     'font-size': '13px',
-                    'whiteSpace': 'pre-line'
+                    'whiteSpace': 'pre-line',
+                    'fontFamily': 'inherit',
+                    'color': '#2d3748',
                 },
                 style_header={
-                    'backgroundColor': 'white',
-                    'fontWeight': 'bold'
+                    'backgroundColor': '#f8f9fa',
+                    'fontWeight': '600',
+                    'fontSize': '11px',
+                    'textTransform': 'uppercase',
+                    'letterSpacing': '0.05em',
+                    'color': '#6c757d',
+                    'borderBottom': '2px solid #dee2e6',
                 },
                 style_data={
                     'height': 'auto',
-                    'lineHeight': '15px',
-                    'overflowX': 'auto'
+                    'lineHeight': '20px',
+                    'overflowX': 'auto',
                 },
+                style_data_conditional=[
+                    {
+                        'if': {'row_index': 'odd'},
+                        'backgroundColor': '#f8f9fc',
+                    },
+                ],
                 style_table={
                     'overflowY': 'auto',
-                    'overflowX': 'auto'
+                    'overflowX': 'auto',
+                    'border': '1px solid #dee2e6',
+                    'borderRadius': '0.5rem',
                 },
                 filter_action="native",
                 filter_options={"case": "insensitive"},
@@ -573,9 +526,7 @@ def build_pie_chart(stats, test_type):
     )
 
     fig.update_layout(
-        height=200,  # Height of the chart
-        width=200,   # Width of the chart
-        autosize=False,  # Disable autosizing to enforce custom dimensions
+        autosize=True,
         margin=dict(l=20, r=20, t=20, b=20),
         title={
             'text': title.upper(),  

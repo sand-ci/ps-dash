@@ -128,7 +128,7 @@ def queryThroughputIdx(dateFrom, dateTo):
     #     print(idx, str(query).replace("\'", "\""))
   aggrs = []
 
-  aggdata = hp.es.search(index='ps_throughput', query=query, aggregations=aggregations, _source=False)
+  aggdata = hp.es.search(index='ps_throughput', query=query, aggregations=aggregations, source=False)
   for item in aggdata['aggregations']['groupby']['buckets']:
       aggrs.append({'hash': str(item['key']['src'] + '-' + item['key']['dest']),
                     'from': dateFrom, 'to': dateTo,
@@ -616,7 +616,7 @@ def query4Avg(idx, dateFrom, dateTo):
 
   aggrs = []
 
-  aggdata = hp.es.search(index=idx, body=query, _source=False)
+  aggdata = hp.es.search(index=idx, query=query["query"], aggregations=query["aggregations"], size=0, source=False)
   for item in aggdata['aggregations']['groupby']['buckets']:
       aggrs.append({'pair': str(item['key']['src']+'-'+item['key']['dest']),
                     'src': item['key']['src'], 'dest': item['key']['dest'],
@@ -699,32 +699,27 @@ def getSiteMetadata(site, date_from=None, date_to=None, index='ps_meta'):
     date_from_str = date_from.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
     date_to_str = date_to.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
     query = {
-        "query": {
-            "bool": {
-                "filter": [
-                    {"match_phrase": {"netsite": site}},
-                    {"range": {
-                        "timestamp": {
-                            "format": date_format,
-                            "gte": date_from_str,
-                            "lte": date_to_str
-                        }
-                    }}
-                ]
-            }
-        },
-        "sort": [{"timestamp": {"order": "desc", "format": date_format}}],
-        "_source": {
-            "includes": ["*", "cpu_cores", "cpus", "wlcg-role"],  # Include all fields plus our specific ones
-            "excludes": []  # No exclusions
+        "bool": {
+            "filter": [
+                {"match_phrase": {"netsite": site}},
+                {"range": {
+                    "timestamp": {
+                        "format": date_format,
+                        "gte": date_from_str,
+                        "lte": date_to_str
+                    }
+                }}
+            ]
         }
     }
-    
+
     try:
         results = scan(
             hp.es,
             index=index,
             query=query,
+            sort=[{"timestamp": {"order": "desc", "format": date_format}}],
+            source_includes=["*", "cpu_cores", "cpus", "wlcg-role"],
             preserve_order=True
         )
         
@@ -852,7 +847,7 @@ def hostFoundInES(host, lookback_days, indeces):
             "sort": [{"@timestamp": "desc"}]
         }
         try:
-            res = hp.es.search(index=idx, body=q)
+            res = hp.es.search(index=idx, query=q["query"], sort=q["sort"], size=q["size"])
             hits = res.get("hits", {}).get("hits", [])
             if len(hits) > 0:
                 inf = hits[0]['_source']
