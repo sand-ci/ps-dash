@@ -15,7 +15,7 @@ spec:
   selector:
     k8s-app: ps-dash
 ---
-apiVersion: extensions/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: ps-dash
@@ -26,6 +26,7 @@ metadata:
     cert-manager.io/cluster-issuer: letsencrypt-prod-nginx
     kubernetes.io/ingress.class: nginx
 spec:
+  ingressClassName: nginx
   tls:
     - hosts:
         - ps-dash.uc.ssl-hep.org
@@ -35,9 +36,12 @@ spec:
       http:
         paths:
           - path: /
+            pathType: Prefix
             backend:
-              serviceName: ps-dash
-              servicePort: 8050
+              service:
+                name: ps-dash
+                port:
+                  number: 8050
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -47,11 +51,11 @@ metadata:
   labels:
     k8s-app: ps-dash
 spec:
-  replicas: 3
+  replicas: 2
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 1
+      maxUnavailable: 0
       maxSurge: 1
   selector:
     matchLabels:
@@ -61,19 +65,35 @@ spec:
       labels:
         k8s-app: ps-dash
     spec:
-      terminationGracePeriodSeconds: 200  # wait for 15 minuted before forcibly terminating the pod
+      terminationGracePeriodSeconds: 300
       containers:
         - name: ps-dash
           image: sandci/ps-dash:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8050
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: 8050
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 90
           readinessProbe:
             httpGet:
               path: /ready
               port: 8050
-            initialDelaySeconds: 200
+            initialDelaySeconds: 5
             periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: 8050
+            periodSeconds: 30
+            timeoutSeconds: 3
+            failureThreshold: 3
           volumeMounts:
             - name: frontend-conf-volume
               mountPath: "/etc/ps-dash/"
@@ -91,3 +111,16 @@ spec:
             items:
               - key: conf
                 path: creds.key
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ps-dash
+  namespace: perfsonar-platform
+  labels:
+    k8s-app: ps-dash
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      k8s-app: ps-dash
