@@ -4,6 +4,7 @@ It summarises all the alarms per site.
 """
 
 
+import json
 from datetime import datetime, timedelta
 from itertools import combinations
 
@@ -48,6 +49,33 @@ dash.register_page(
 
 # site = None
 alarmsInst = Alarms()
+
+def parse_stored_date_list(value):
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError:
+            return []
+
+    if not isinstance(value, list):
+        return []
+
+    return [date for date in value if isinstance(date, str)]
+
+
+def get_triggered_component_id(ctx):
+    triggered_id = getattr(ctx, "triggered_id", None)
+    if triggered_id is not None:
+        return triggered_id
+
+    if not ctx.triggered:
+        return None
+
+    prop_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    try:
+        return json.loads(prop_id)
+    except json.JSONDecodeError:
+        return prop_id
 
 def layout(q=None, **other_unknown_query_strings):
     # global site
@@ -186,6 +214,26 @@ def layout(q=None, **other_unknown_query_strings):
                             },
                         children=[
                                 dbc.Col([
+                                        html.Div(
+                                                html.I(
+                                                    className="fas fa-question-circle",
+                                                    id="how-status-modal-trigger",
+                                                    n_clicks=0,
+                                                    style={
+                                                        "position": "absolute",
+                                                        "top": "10px",
+                                                        "right": "10px",
+                                                        "cursor": "pointer",
+                                                        "font-size": "20px",
+                                                        "color": "#6c757d",
+                                                        "z-index": "1000"
+                                                    }
+                                                ),
+                                                style={
+                                                    "position": "relative",
+                                                    'margin-bottom': '0px'
+                                                }
+                                            ),
                                         html.H3(f"{q} Daily Status", style={"padding-left": "3%", "padding-top": "3%", 'margin-bottom': '0px',"background-color": "#ffffff"}),
                                         html.Div(
                                             dcc.Graph(
@@ -457,7 +505,7 @@ def layout(q=None, **other_unknown_query_strings):
                             ),
                             
                             dcc.Store(id='alarms-data-compressed', data=site_alarms.to_dict('records')), 
-                            dcc.Store(id='all-dates', data=str([date.strftime('%Y-%m-%d') for date in full_dates])), 
+                            dcc.Store(id='all-dates', data=[date.strftime('%Y-%m-%d') for date in full_dates]),
                             # bar chart: alarms name and categories distrubion
                             dbc.Col(html.Div(className="boxwithshadowhidden p-2 h-100", style={"background-color": "#ffffff"}, 
                                                 children=[
@@ -996,7 +1044,7 @@ def update_alarms_table(date_filter, ip_filter, group_filter, type_filter, btn_t
     print("Debugging update_alarms_table")
     
     df = pd.DataFrame(df)
-    all_dates = eval(all_dates) # all dates to visualise graphs for all days of the week, not only those who had alarms
+    all_dates = parse_stored_date_list(all_dates)
     if len(df) > 0:
         ctx = dash.callback_context
         print(f"ctx.triggered: {ctx.triggered}")
@@ -1129,10 +1177,13 @@ def update_dynamic_content(site, alarm_clicks, path_clicks, path_clicks_2, hosts
                               }
     if len(ctx.triggered) == 1:
         print(f"ctx.triggered: {ctx.triggered}")
-        button_id = ctx.triggered[0]['prop_id'].split('.')[0]
-        if button_id:
-            button_id = eval(button_id)
-            if sum(button_clicks[button_id['type']]) == 0:
+        button_id = get_triggered_component_id(ctx)
+        if not isinstance(button_id, dict) or 'type' not in button_id or 'index' not in button_id:
+            return dash.no_update, dash.no_update, {}, visibility
+
+        if isinstance(button_id, dict) and 'type' in button_id and 'index' in button_id:
+            clicks = button_clicks.get(button_id['type']) or []
+            if sum(click or 0 for click in clicks) == 0:
                 return dash.no_update, dash.no_update, {}, visibility
             if button_id['type'] in button_content_mapping:
                 event = button_content_mapping[button_id['type']]
