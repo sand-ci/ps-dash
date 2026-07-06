@@ -144,8 +144,124 @@ def createDictionaryWithHistoricalData(dframe):
     ).to_dict()
     return site_dict
 
+
+def _site_locations_from_metadata():
+    pq = Parquet()
+    meta_df = pq.readFile('parquet/raw/metaDf.parquet')
+    if hasattr(meta_df, "compute"):
+        meta_df = meta_df.compute()
+
+    required_columns = {'site', 'lat', 'lon'}
+    if meta_df is None or not required_columns.issubset(meta_df.columns):
+        return pd.DataFrame(columns=['site', 'lat', 'lon'])
+
+    nodes = meta_df[
+        meta_df['site'].notna()
+        & (meta_df['site'] != '')
+        & meta_df['lat'].notna()
+        & (meta_df['lat'] != '')
+        & meta_df['lon'].notna()
+        & (meta_df['lon'] != '')
+    ].drop_duplicates()
+
+    if nodes.empty:
+        return pd.DataFrame(columns=['site', 'lat', 'lon'])
+
+    lat_lon_count = nodes.groupby(['site', 'lat', 'lon']).size().reset_index(name='count')
+    return lat_lon_count.loc[lat_lon_count.groupby('site')['count'].idxmax(), ['site', 'lat', 'lon']]
+
+
+def _empty_status_table():
+    locations = _site_locations_from_metadata()
+    status_colors = {'🟢': '#38a169'}
+
+    df_pivot = locations.copy()
+    for column in ['Network', 'Infrastructure', 'Other']:
+        df_pivot[column] = 0
+
+    df_pivot['Status'] = '🟢'
+    df_pivot['site name'] = df_pivot['site'].apply(
+        lambda site: (
+            f"<span style='display:inline-block;width:11px;height:11px;"
+            f"border-radius:50%;background:{status_colors['🟢']};"
+            f"vertical-align:middle;margin-right:7px;'></span>{site}"
+        )
+    )
+    url = f'{request.host_url}site_report'
+    df_pivot['url'] = df_pivot['site'].apply(
+        lambda name: f"<a class='btn btn-secondary' role='button' href='{url}/{name}' target='_blank'>See latest alarms</a>"
+        if name else '-'
+    )
+    df_pivot = df_pivot[['site', 'site name', 'Status', 'Network', 'Infrastructure', 'Other', 'url', 'lat', 'lon']]
+
+    display_columns = ['site name', 'Network', 'Infrastructure', 'Other', 'url']
+    if df_pivot.empty:
+        element = html.Div(html.H3('No alarms data is currently available'), style={'textAlign': 'center'})
+    else:
+        element = html.Div([
+            dash_table.DataTable(
+                df_pivot.to_dict('records'),
+                [{"name": i.upper(), "id": i, "presentation": "markdown"} for i in display_columns],
+                filter_action="native",
+                filter_options={"case": "insensitive"},
+                sort_action="native",
+                is_focused=True,
+                markdown_options={"html": True},
+                page_size=10,
+                style_cell={
+                    'padding': '10px',
+                    'font-size': '1.2em',
+                    'textAlign': 'center',
+                    'backgroundColor': '#ffffff',
+                    'border': '1px solid #ddd',
+                },
+                style_header={
+                    'backgroundColor': '#ffffff',
+                    'fontWeight': 'bold',
+                    'color': 'black',
+                    'border': '1px solid #ddd',
+                },
+                style_data={
+                    'height': 'auto',
+                    'overflowX': 'auto',
+                },
+                style_table={
+                    'overflowY': 'auto',
+                    'overflowX': 'auto',
+                    'border': '1px solid #ddd',
+                    'borderRadius': '5px',
+                    'boxShadow': '0 2px 5px rgba(0,0,0,0.1)',
+                },
+                style_data_conditional=[
+                    {
+                        'if': {'row_index': 'odd'},
+                        'backgroundColor': '#f7f7f7',
+                    },
+                    {
+                        'if': {'column_id': 'SITE NAME'},
+                        'textAlign': 'left !important',
+                    }
+                ],
+                id='status-tbl'
+            )
+        ], className='table-container')
+
+    return element, df_pivot
+
+
 def generateStatusTable(alarmCnt):
     print("In generateStatusTable...")
+    if alarmCnt is None:
+        alarmCnt = pd.DataFrame()
+    elif hasattr(alarmCnt, "compute"):
+        alarmCnt = alarmCnt.compute()
+    else:
+        alarmCnt = pd.DataFrame(alarmCnt)
+
+    required_columns = {'event', 'site', 'cnt', 'lat', 'lon'}
+    if alarmCnt.empty or not required_columns.issubset(alarmCnt.columns):
+        return _empty_status_table()
+
     red_sites = alarmCnt[(alarmCnt['event']=='bandwidth decreased from/to multiple sites')
             & (alarmCnt['cnt']>0)]['site'].unique().tolist()
 

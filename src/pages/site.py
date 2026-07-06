@@ -132,7 +132,10 @@ def layout(q=None, **other_unknown_query_strings):
   frames, pivotFrames = alarmsInst.loadData(dateFrom, dateTo)
 
   alarmCnt = pq.readFile('parquet/alarmsGrouped.parquet')
-  alarmCnt = alarmCnt[alarmCnt['site'] == q]
+  if alarmCnt is None or 'site' not in alarmCnt.columns:
+    alarmCnt = pd.DataFrame()
+  else:
+    alarmCnt = alarmCnt[alarmCnt['site'] == q]
 
   if q:
     print('URL query:', q)

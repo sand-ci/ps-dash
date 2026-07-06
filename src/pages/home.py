@@ -39,18 +39,27 @@ def get_country_code(country_name):
 
 def total_number_of_alarms(sitesDf):
     metaDf = pq.readFile('parquet/raw/metaDf.parquet')
-    sitesDf = pd.merge(sitesDf, metaDf[['lat', 'lon', 'country']], on=['lat', 'lon'], how='left').drop_duplicates()
-    site_totals = sitesDf.groupby('site')[['Infrastructure', 'Network', 'Other']].sum()
+    if sitesDf.empty:
+        highest_site = None
+        highest_site_alarms = 0
+        highest_country = None
+        highest_country_alarms = 0
+    else:
+        sitesDf = pd.merge(sitesDf, metaDf[['lat', 'lon', 'country']], on=['lat', 'lon'], how='left').drop_duplicates()
+        site_totals = sitesDf.groupby('site')[['Infrastructure', 'Network', 'Other']].sum()
 
-    highest_site = site_totals.sum(axis=1).idxmax()
-    highest_site_alarms = site_totals.sum(axis=1).max()
+        highest_site = site_totals.sum(axis=1).idxmax()
+        highest_site_alarms = site_totals.sum(axis=1).max()
 
-    country_totals = sitesDf.groupby('country')[['Infrastructure', 'Network', 'Other']].sum()
-    highest_country = country_totals.sum(axis=1).idxmax()
-    highest_country_alarms = country_totals.sum(axis=1).max()
+        country_totals = sitesDf.groupby('country')[['Infrastructure', 'Network', 'Other']].sum()
+        highest_country = country_totals.sum(axis=1).idxmax()
+        highest_country_alarms = country_totals.sum(axis=1).max()
 
     status = {'critical': '🔴', 'warning': '🟡', 'ok': '🟢', 'unknown': '⚪'}
-    status_count = sitesDf[['Status', 'site']].groupby('Status').count().to_dict()['site']
+    if {'Status', 'site'}.issubset(sitesDf.columns):
+        status_count = sitesDf[['Status', 'site']].groupby('Status').count().to_dict()['site']
+    else:
+        status_count = {}
     for s, icon in status.items():
         if icon not in status_count:
             status_count[icon] = 0
@@ -84,7 +93,9 @@ def total_number_of_alarms(sitesDf):
         ], className='d-flex gap-3 px-3 pb-3'),
     ], className='boxwithshadowhidden mb-2')
 
-    country_code = get_country_code(sitesDf[sitesDf['site'] == highest_site]['country'].values[0])
+    highest_site_label = highest_site or 'No sites'
+    highest_country_label = highest_country or 'No countries'
+    country_code = get_country_code(sitesDf[sitesDf['site'] == highest_site]['country'].values[0]) if highest_site else ''
     highest_row = dbc.Row([
         dbc.Col([
             html.Div([
@@ -92,7 +103,7 @@ def total_number_of_alarms(sitesDf):
                         className='text-center text-muted pb-1 mb-2',
                         style={'font-size': '0.78rem', 'text-transform': 'uppercase',
                                'letter-spacing': '0.06em', 'border-bottom': '1px solid #dee2e6'}),
-                html.H4(f'{highest_site} ({country_code}): {highest_site_alarms}',
+                html.H4(f'{highest_site_label} ({country_code}): {highest_site_alarms}',
                         className='fw-bold mb-0', style={'color': '#2d3748'}),
             ], className='boxwithshadow p-3 text-center h-100'),
         ], md=6, sm=12, className='mb-2'),
@@ -102,7 +113,7 @@ def total_number_of_alarms(sitesDf):
                         className='text-center text-muted pb-1 mb-2',
                         style={'font-size': '0.78rem', 'text-transform': 'uppercase',
                                'letter-spacing': '0.06em', 'border-bottom': '1px solid #dee2e6'}),
-                html.H4(f'{highest_country}: {highest_country_alarms}',
+                html.H4(f'{highest_country_label}: {highest_country_alarms}',
                         className='fw-bold mb-0', style={'color': '#2d3748'}),
             ], className='boxwithshadow p-3 text-center h-100'),
         ], md=6, sm=12, className='mb-2'),
@@ -556,4 +567,3 @@ def build_pie_chart(stats, test_type):
     )
 
     return fig
-

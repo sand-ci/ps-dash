@@ -5,6 +5,7 @@ from dash import html
 import dash_loading_spinners
 from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output, State
+from flask import jsonify, request
 from model.Updater import ParquetUpdater
 
 
@@ -27,6 +28,25 @@ server = app.server
 @server.route('/ready')
 def ready():
     return 'OK', 200
+
+
+@server.before_request
+def handle_legacy_manifest_store_callback():
+    if request.path != "/_dash-update-component":
+        return None
+
+    payload = request.get_json(silent=True) or {}
+    if payload.get("output") == "manifest-store.data":
+        return jsonify({
+            "multi": True,
+            "response": {
+                "manifest-store": {
+                    "data": {}
+                }
+            }
+        })
+
+    return None
 
 
 nav_item_inline_css = {"color": "white",
@@ -157,14 +177,6 @@ def hide_loading_after_startup(n_intervals, children):
         return None
 
     raise PreventUpdate
-
-
-@app.callback(
-    Output("manifest-store", "data"),
-    Input("url", "pathname"),
-)
-def populate_manifest_store(pathname):
-    return {}
 
 
 @app.callback(

@@ -82,7 +82,10 @@ def layout(q=None, **other_unknown_query_strings):
     pq = Parquet()
     site = q
     alarmCnt = pq.readFile('parquet/alarmsGrouped.parquet')
-    alarmCnt = alarmCnt[alarmCnt['site'] == site]
+    if alarmCnt is None or 'site' not in alarmCnt.columns:
+        alarmCnt = pd.DataFrame()
+    else:
+        alarmCnt = alarmCnt[alarmCnt['site'] == site]
     if q is not None:
         metaData = qrs.getSiteMetadata(q)
         print(metaData)
