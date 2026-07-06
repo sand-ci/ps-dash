@@ -31,17 +31,61 @@ def ready():
 
 
 @server.before_request
-def handle_legacy_manifest_store_callback():
+def handle_legacy_callbacks():
     if request.path != "/_dash-update-component":
         return None
 
     payload = request.get_json(silent=True) or {}
-    if payload.get("output") == "manifest-store.data":
+    output = payload.get("output")
+    if output == "manifest-store.data":
         return jsonify({
             "multi": True,
             "response": {
                 "manifest-store": {
                     "data": {}
+                }
+            }
+        })
+
+    if output == "status-line.children":
+        return jsonify({
+            "multi": True,
+            "response": {
+                "status-line": {
+                    "children": ""
+                }
+            }
+        })
+
+    if output == "period-buttons.children":
+        return jsonify({
+            "multi": True,
+            "response": {
+                "period-buttons": {
+                    "children": []
+                }
+            }
+        })
+
+    if output == "selected-snapshot-store.data":
+        return jsonify({
+            "multi": True,
+            "response": {
+                "selected-snapshot-store": {
+                    "data": None
+                }
+            }
+        })
+
+    if output == "..history-snapshot-slider.min...history-snapshot-slider.max...history-snapshot-slider.marks...history-snapshot-slider.value..":
+        return jsonify({
+            "multi": True,
+            "response": {
+                "history-snapshot-slider": {
+                    "min": 0,
+                    "max": 0,
+                    "marks": {0: ""},
+                    "value": 0
                 }
             }
         })

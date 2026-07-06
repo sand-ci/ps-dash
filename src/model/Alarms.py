@@ -156,8 +156,10 @@ class Alarms(object):
 
   def getAllAlarms(self, dateFrom, dateTo):
     data = qrs.queryAlarms(dateFrom, dateTo)
+    if data is None:
+      data = {}
     if 'indexing' in data.keys(): del data['indexing']
-    frames, pivotFrames = self.unpackAlarms(data)
+    frames, pivotFrames = self.unpackAlarms(data) or ({}, {})
     return [frames, pivotFrames]
 
 

@@ -352,6 +352,7 @@ def queryAlarms(dateFrom, dateTo):
   except Exception as e:
     print('Exception:', e)
     print(traceback.format_exc())
+    return {}
 
 
 
