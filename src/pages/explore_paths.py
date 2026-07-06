@@ -12,7 +12,6 @@ import model.queries as qrs
 from model.Alarms import Alarms
 from utils.parquet import Parquet
 from utils.helpers import timer
-import time
 import dash_loading_spinners
 from dash.exceptions import PreventUpdate
 
@@ -119,6 +118,7 @@ def layout(q=None, **other_unknown_query_strings):
 
 
         return html.Div(children=[
+            dcc.Interval(id="startup-loading-paths-interval", interval=1000, n_intervals=0, max_intervals=1),
             html.Div(
                 id="div-loading-paths",
                 children=[
@@ -239,15 +239,14 @@ def load_initial_data(selected_keys, asn_anomalies):
 @dash.callback(
     Output("div-loading-paths", "children"),
     [
-        Input("explore-path-div", "loading_state")
+        Input("startup-loading-paths-interval", "n_intervals")
     ],
     [
         State("div-loading-paths", "children"),
     ]
 )
-def hide_loading_after_startup(loading_state, children):
-    if children:
-        time.sleep(1)
+def hide_loading_after_startup(n_intervals, children):
+    if n_intervals and children:
         return None
 
     raise PreventUpdate
