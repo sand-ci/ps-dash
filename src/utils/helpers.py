@@ -2,7 +2,6 @@ import multiprocessing as mp
 from datetime import datetime, timedelta
 import time
 import requests
-import os
 import pandas as pd
 import functools
 
@@ -10,45 +9,27 @@ from elasticsearch import Elasticsearch
 
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.000Z"
 INDICES = ['ps_packetloss', 'ps_owd', 'ps_throughput', 'ps_trace']
+DEFAULT_ES_HOST = 'atlas-kibana.mwt2.org:9200'
 
-user, passwd, mapboxtoken, creds_source = None, None, None, 'none'
+user, passwd, mapboxtoken, es_host = None, None, None, DEFAULT_ES_HOST
 try:
     with open("/etc/ps-dash/creds.key") as f:
         user = f.readline().strip()
         passwd = f.readline().strip()
         mapboxtoken = f.readline().strip()
-    creds_source = 'file'
+        es_host = f.readline().strip() or DEFAULT_ES_HOST
 except FileNotFoundError:
     print(">>>>>> /etc/ps-dash/creds.key not found.")
 
 
-def _env_int(name, default, minimum=0):
-    try:
-        return max(minimum, int(os.environ.get(name, default)))
-    except (ValueError, TypeError):
-        return default
-
-
-def _env_bool(name, default):
-    val = os.environ.get(name)
-    if val is None:
-        return default
-    return val.lower() in ('1', 'true', 'yes')
-
-
 def ConnectES():
-    global user, passwd, creds_source
+    global user, passwd, es_host
     if not user or not passwd:
         print(">>>>>> No ES credentials — cannot connect.")
         return None
 
-    es_host = os.environ.get('ES_HOST') or (
-        'localhost:9200' if creds_source == 'file' else 'atlas-kibana.mwt2.org:9200'
-    )
     es_url = f'https://{es_host}'
-    request_timeout = _env_int('ES_REQUEST_TIMEOUT_SECONDS', 30, minimum=1)
-    max_retries = _env_int('ES_MAX_RETRIES', 3, minimum=0)
-    retry_on_timeout = _env_bool('ES_RETRY_ON_TIMEOUT', True)
+    max_retries = 20 if es_host.startswith('localhost') else 10
 
     try:
         es = Elasticsearch(
@@ -57,15 +38,15 @@ def ConnectES():
             verify_certs=False,
             ssl_show_warn=False,
             max_retries=max_retries,
-            retry_on_timeout=retry_on_timeout,
-            request_timeout=request_timeout,
+            retry_on_timeout=True,
+            request_timeout=30,
         )
         try:
             es.info()
-            print(f'Connected to Elasticsearch ({es_host}, timeout={request_timeout}s, retries={max_retries})')
+            print(f'Connected to Elasticsearch ({es_host}, timeout=30s, retries={max_retries})')
         except Exception as ping_err:
             print(f">>>>>> ES connection check failed ({es_host}): {ping_err}")
-            if creds_source == 'file':
+            if es_host.startswith('localhost'):
                 print(">>>>>> Ensure the SSH tunnel is up: ssh -NL 9200:atlas-kibana.mwt2.org:9200 <user>@lxplus.cern.ch")
         return es
     except Exception as error:
