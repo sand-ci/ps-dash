@@ -570,6 +570,28 @@ html {
     border: none !important;
 }
 
+.date-picker-range-compact {
+    display: inline-block;
+}
+
+.date-picker-range-compact .DateRangePicker,
+.date-picker-range-compact .DateRangePickerInput {
+    display: inline-flex;
+    align-items: center;
+    width: auto;
+}
+
+.date-picker-range-compact .DateInput {
+    width: 116px;
+}
+
+.date-picker-range-compact .DateInput_input {
+    padding: 6px 8px;
+    font-size: 13px;
+    line-height: 1.4;
+    text-align: center;
+}
+
 .page-cont {
     min-height: 0;
 }
@@ -767,4 +789,3 @@ count-box {
     padding: 0.25em 0.6em;
     color:#00245a
 }
-

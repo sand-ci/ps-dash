@@ -77,6 +77,19 @@ def handle_legacy_callbacks():
             }
         })
 
+    if output == "pair-score-timeline.figure":
+        return jsonify({
+            "multi": True,
+            "response": {
+                "pair-score-timeline": {
+                    "figure": {
+                        "data": [],
+                        "layout": {}
+                    }
+                }
+            }
+        })
+
     if output == "..history-snapshot-slider.min...history-snapshot-slider.max...history-snapshot-slider.marks...history-snapshot-slider.value..":
         return jsonify({
             "multi": True,
