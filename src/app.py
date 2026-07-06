@@ -1,4 +1,3 @@
-import time
 import dash
 from dash import Dash, dcc, html
 import dash_bootstrap_components as dbc
@@ -40,6 +39,7 @@ nav_item_inline_css = {"color": "white",
 
 
 app.layout = html.Div(children=[
+    dcc.Interval(id="startup-loading-interval", interval=1000, n_intervals=0, max_intervals=1),
     html.Div(
         id="div-loading",
         children=[
@@ -145,15 +145,14 @@ def update_active_tab(pathname):
 @app.callback(
     Output("div-loading", "children"),
     [
-        Input("div-app", "loading_state")
+        Input("startup-loading-interval", "n_intervals")
     ],
     [
         State("div-loading", "children"),
     ]
 )
-def hide_loading_after_startup(loading_state, children):
-    if children:
-        time.sleep(1)
+def hide_loading_after_startup(n_intervals, children):
+    if n_intervals and children:
         return None
 
     raise PreventUpdate
