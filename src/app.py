@@ -55,6 +55,7 @@ app.layout = html.Div(children=[
         children = [
             dcc.Location(id='change-url', refresh=False),
             dcc.Store(id='store-dropdown'),
+            dcc.Store(id='manifest-store'),
             dbc.Row([
                 dbc.Col(dbc.Button(
                     "perfSONAR Toolkit Information",
@@ -156,6 +157,14 @@ def hide_loading_after_startup(n_intervals, children):
         return None
 
     raise PreventUpdate
+
+
+@app.callback(
+    Output("manifest-store", "data"),
+    Input("url", "pathname"),
+)
+def populate_manifest_store(pathname):
+    return {}
 
 
 @app.callback(
