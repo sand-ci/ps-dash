@@ -12,22 +12,14 @@ DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.000Z"
 INDICES = ['ps_packetloss', 'ps_owd', 'ps_throughput', 'ps_trace']
 
 user, passwd, mapboxtoken, creds_source = None, None, None, 'none'
-
-_es_user = os.environ.get('ES_USER')
-_es_pass = os.environ.get('ES_PASS')
-if _es_user and _es_pass:
-    user, passwd, creds_source = _es_user, _es_pass, 'env'
-    mapboxtoken = os.environ.get('MAPBOX_TOKEN', '')
-else:
-    try:
-        with open("/etc/ps-dash/creds.key") as f:
-            user = f.readline().strip()
-            passwd = f.readline().strip()
-            mapboxtoken = f.readline().strip()
-        creds_source = 'file'
-    except FileNotFoundError:
-        print(">>>>>> /etc/ps-dash/creds.key not found and ES_USER/ES_PASS not set.")
-        print(">>>>>> Set ES_USER, ES_PASS (and optionally ES_HOST) as environment variables.")
+try:
+    with open("/etc/ps-dash/creds.key") as f:
+        user = f.readline().strip()
+        passwd = f.readline().strip()
+        mapboxtoken = f.readline().strip()
+    creds_source = 'file'
+except FileNotFoundError:
+    print(">>>>>> /etc/ps-dash/creds.key not found.")
 
 
 def _env_int(name, default, minimum=0):
