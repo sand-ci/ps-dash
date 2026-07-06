@@ -32,6 +32,20 @@ def buildMap(mapDf, connectivity=False, grouped=pd.DataFrame()):
     # so we add some noise to the coordinates to make them visible
     mapDf['lat'] = mapDf['lat'].astype(float) + np.random.normal(scale=0.01, size=len(mapDf))
     mapDf['lon'] = mapDf['lon'].astype(float) + np.random.normal(scale=0.01, size=len(mapDf))
+    mapbox_config = dict(
+        bearing=0,
+        center=go.layout.mapbox.Center(
+            lat=43,
+            lon=-6
+        ),
+        pitch=0,
+        style='open-street-map'
+    )
+    if hp.mapboxtoken:
+        mapbox_config.update(
+            accesstoken=hp.mapboxtoken,
+            style='mapbox://styles/petyav/ckh3spvk002i419mzf8m9ixzi'
+        )
 
     # Sort so that '🔴' and '🟡' are last (drawn on top)
     status_order = {'⚪': 0, '🟢': 1, '🟡': 2, '🔴': 3}
@@ -75,16 +89,7 @@ def buildMap(mapDf, connectivity=False, grouped=pd.DataFrame()):
 
     fig.update_layout(
         margin=dict(t=0, b=0, l=0, r=0),
-        mapbox=dict(
-            accesstoken=hp.mapboxtoken,
-            bearing=0,
-            center=go.layout.mapbox.Center(
-                lat=43,
-                lon=-6
-            ),
-            pitch=0,
-            style='mapbox://styles/petyav/ckh3spvk002i419mzf8m9ixzi'
-        ),
+        mapbox=mapbox_config,
         showlegend=False,
         title = 'Status of all sites in the past 48 hours',
         template='plotly_white'
