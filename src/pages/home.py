@@ -145,14 +145,14 @@ def layout(**other_unknown_query_strings):
                 html.Div(
                     dcc.Graph(figure=buildMap(sitesDf), id='site-map',
                               responsive=True, className='cls-site-map'),
-                    className='boxwithshadow mb-2 p-2',
+                    className='boxwithshadow p-2',
                 ),
                 html.Div(
                     dcc.Loading(
                         html.Div(id="alarms-stacked-bar"),
                         style={'height': '1rem'}, color='#00245A'
                     ),
-                    className='boxwithshadow flex-grow-1 p-2',
+                    className='boxwithshadow flex-grow-1 p-3',
                 ),
             ], lg=6, md=12, className='d-flex flex-column'),
 
@@ -217,7 +217,7 @@ def layout(**other_unknown_query_strings):
                 dbc.Button("Search", id="search-button", color="secondary",
                            style={"width": "100%", "font-size": "1.5em"}),
             ], className='p-3')
-        ], className='boxwithshadow mb-2 g-0'),
+        ], className='boxwithshadow g-0'),
 
         # Alarms list
         dbc.Row([
@@ -229,7 +229,7 @@ def layout(**other_unknown_query_strings):
                     style={'height': '0.5rem'}, color='#00245A'
                 )
             ], className='p-3')
-        ], className='boxwithshadow mb-2 g-0'),
+        ], className='boxwithshadow g-0'),
 
     ], fluid=True, className='px-3 py-3')
     
@@ -307,6 +307,10 @@ def update_output(n_clicks, start_date, end_date, sites, all, events, allevents,
             return [sites_dropdown_items, events_dropdown_items, no_alarms_msg, no_alarms_msg]
 
         bar_chart = create_bar_chart(graphData)
+        chart_component = html.Div([
+            html.H6("Alarm distribution across sites · past 48 h", className="section-title mt-2"),
+            dcc.Graph(figure=bar_chart, responsive=True),
+        ])
 
         dataTables = []
         events = list(pivotFrames.keys()) if not eventsState or events else eventsState
@@ -324,7 +328,7 @@ def update_output(n_clicks, start_date, end_date, sites, all, events, allevents,
 
         dataTables = html.Div(dataTables) if dataTables else no_alarms_msg
 
-        return [sites_dropdown_items, events_dropdown_items, dcc.Graph(figure=bar_chart, responsive=True), dataTables]
+        return [sites_dropdown_items, events_dropdown_items, chart_component, dataTables]
     else:
         raise dash.exceptions.PreventUpdate 
 
@@ -359,25 +363,18 @@ def toggle_modal(n1, n2, is_open):
 
 
 def create_bar_chart(graphData):
-    # Calculate the total counts for each event type
-    # event_totals = graphData.groupby('event')['cnt'].transform('sum')
-    # Calculate percentage for each site relative to the event total
-    # graphData['percentage'] = (graphData['cnt'] / event_totals) * 100
-
     graphData['percentage'] = graphData.groupby(['site', 'event'])['cnt'].transform(lambda x: x / x.sum() * 100)
 
-    # Create the bar chart using percentage as the y-axis
     fig = px.bar(
-        graphData, 
-        x='site', 
-        y='percentage', 
-        color='event', 
-        labels={'percentage': 'Percentage (%)', 'site': '', 'event': 'Event Type'},
+        graphData,
+        x='site',
+        y='percentage',
+        color='event',
+        labels={'percentage': '', 'site': '', 'event': 'Event Type'},
         barmode='stack',
         color_discrete_sequence=px.colors.qualitative.Prism
     )
 
-    # Add custom tooltip with original counts
     fig.update_traces(
         hovertemplate="<br>".join([
             "<span style='font-size:15px'>Site: %{x}</span>",
@@ -386,34 +383,29 @@ def create_bar_chart(graphData):
         customdata=graphData[['cnt', 'event']].values
     )
 
-    # Update layout parameters
     fig.update_layout(
-        margin=dict(t=20, b=20, l=0, r=0),
+        margin=dict(t=20, b=20, l=10, r=10),
         showlegend=True,
         legend_orientation='h',
         legend_title_text='Alarm Type',
         legend=dict(
             x=0,
-            y=1.35,
+            y=1.0,
             orientation="h",
             xanchor='left',
-            yanchor='top',
+            yanchor='bottom',
             font=dict(
                 size=10,
             ),
         ),
-        # height=600,
         plot_bgcolor='#fff',
         autosize=True,
         width=None,
-        title={
-            'y': 0.01,
-            'x': 0.95,
-            'xanchor': 'right',
-            'yanchor': 'bottom'
-        },
+
+        yaxis=dict(
+            visible=False,
+        ),
         xaxis=dict(
-            # tickangle=-45,
             automargin=True
         ),
         modebar={
@@ -443,10 +435,7 @@ def generate_tables(frame, unpacked, event, alarmsInst):
     print('Home page,', event, "Number of alarms:", len(dfr))
     try:
         element = html.Div([
-            html.H6(event.upper(),
-                    className='text-muted pb-2 mb-3 mt-2',
-                    style={'font-size': '0.78rem', 'text-transform': 'uppercase',
-                           'letter-spacing': '0.06em', 'border-bottom': '1px solid #dee2e6'}),
+            html.H6(event.upper(), className='section-title mt-2'),
             dash_table.DataTable(
                 data=dfr.to_dict('records'),
                 columns=[{"name": i, "id": i, "presentation": "markdown"} for i in dfr.columns],

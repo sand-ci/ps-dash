@@ -77,7 +77,7 @@ def layout(q=None, **other_unknown_query_strings):
                     html.Div([
                         html.H1("No Data Available", className="text-center"),
                         html.P("There is currently no data to display on this page. Please check back later.", className="text-center")
-                    ], className="boxwithshadow page-cont ml-1 p-1")
+                    ], className="boxwithshadow page-cont ml-1 p-1 g-0")
                 ], xl=12, lg=12, md=12, sm=12, className="mb-1 flex-grow-1")
             ])
     if q:
@@ -135,81 +135,49 @@ def layout(q=None, **other_unknown_query_strings):
                 dbc.Row([
                     dbc.Col([
                         html.Div([
-                            html.Div([
-                                html.H1("ASN Transition Effects"),
-                                html.P(f'The plot shows how ASNs were replaced in the period from {pd.to_datetime(period_to_display[0]).strftime("%Y-%m-%d")} to {pd.to_datetime(period_to_display[1]).strftime("%Y-%m-%d")}. The data is based on the alarms of type "ASN path anomalies"', style={"font-size": "1.2rem"})
-                            ], className="l-h-3 p-2"),
+                            html.H2("ASN Transition Effects", className="panel-title"),
+                            html.P(f'The plot shows how ASNs were replaced in the period from {pd.to_datetime(period_to_display[0]).strftime("%Y-%m-%d")} to {pd.to_datetime(period_to_display[1]).strftime("%Y-%m-%d")}. The data is based on the alarms of type "ASN path anomalies"', style={"font-size": "1.1rem"}, className="text-muted mb-3"),
                             dcc.Loading(
                                 dcc.Graph(figure=parallel_cat_fig, id="asn-sankey", responsive=True), color='#00245A'),
-                        ], className="boxwithshadow page-cont ml-1 p-1")
-                    ], xl=6, lg=12, md=12, sm=12, className=" mb-1 flex-grow-1",
+                        ], className="boxwithshadow p-3 h-100")
+                    ], xl=6, lg=12, md=12, sm=12, className="mb-3 pe-2",
                     ),
                     dbc.Col([
                         html.Div(id="asn-alarms-container", children=[
-                            html.Div([
-                                html.H1(f"ASN-path Anomalies Affected Links"),
-                                html.P('The plot shows the number of new ASNs that appeared between two sites. The data is based on the alarms of type "ASN path anomalies"', style={"font-size": "1.2rem"})
-                            ], className="l-h-3 p-2"),
+                            html.H2("ASN-path Anomalies Affected Links", className="panel-title"),
+                            html.P('The plot shows the number of new ASNs that appeared between two sites. The data is based on the alarms of type "ASN path anomalies"', style={"font-size": "1.1rem"}, className="text-muted mb-3"),
                             dcc.Loading(
-                                dcc.Graph(figure=heatmap_fig, id="asn-heatmap", responsive=True, style={"max-width": "1000px", "margin": "0 auto"}),
+                                dcc.Graph(figure=heatmap_fig, id="asn-heatmap", responsive=True),
                                 color='#00245A')
-                        ], className="boxwithshadow page-cont ml-1 p-1")
-                    ], xl=6, lg=12, md=12, sm=12, className="mb-1 flex-grow-1")
-                ], className="gx-4 d-flex", justify="between", align="start"),
+                        ], className="boxwithshadow p-3 h-100")
+                    ], xl=6, lg=12, md=12, sm=12, className="mb-3 ps-2")
+                ], className="g-0", align="stretch"),
                 dbc.Row([
                     dbc.Col([
-                        dbc.Row([
-                            dbc.Col([
-                                html.H1(f"Search for specific site and/or ASN and get all related alarms based on the traceroute measurements",
-                                        className="l-h-3 pl-2"),
-                                html.P(
-                                    f'Alarms generated in the period: {pd.to_datetime(period_to_display[0]).strftime("%Y-%m-%d %H:%M")} - {pd.to_datetime(period_to_display[1]).strftime("%Y-%m-%d %H:%M")}.',
-                                    style={"padding-left": "1.5%", "font-size": "14px"})
-                            ], align="center", className="text-left pair-details rounded-border-1"),
-                        ], justify="start", align="center"),
-                        html.Br(),
-                        html.Br(),
-                        html.Br(),
-                        dbc.Row([
-                            dbc.Col([
-                                dcc.Dropdown(multi=True, id='paths-sites-dropdown', options=sitesDropdownData,
-                                            placeholder="Search for a site"),
-                            ]),
-                        ]),
-                        html.Br(),
-                        dbc.Row([
-                            dbc.Col([
-                                dcc.Dropdown(multi=True, id='paths-asn-dropdown', options=asnsDropdownData,
-                                            placeholder="Search ASNs"),
-                            ]),
-                        ]),
-                        html.Br(),
-                        dbc.Row([
-                            dbc.Col([
-                                dbc.Button("Search", id="search-button", color="secondary", 
-                                        className="mlr-2", style={"width": "100%", "font-size": "1.5em"},
-                                        title="Click to apply the selected filters to the plots and tables.")
-                            ])
-                        ]),
+                        html.H1("Search for specific site and/or ASN and get all related alarms based on the traceroute measurements",
+                                className="mb-1"),
+                        html.P(
+                            f'Alarms generated in the period: {pd.to_datetime(period_to_display[0]).strftime("%Y-%m-%d %H:%M")} - {pd.to_datetime(period_to_display[1]).strftime("%Y-%m-%d %H:%M")}.',
+                            className="text-muted mb-3", style={"font-size": "14px"}),
+                        dcc.Dropdown(multi=True, id='paths-sites-dropdown', options=sitesDropdownData,
+                                    placeholder="Search for a site", className="mb-3"),
+                        dcc.Dropdown(multi=True, id='paths-asn-dropdown', options=asnsDropdownData,
+                                    placeholder="Search ASNs", className="mb-3"),
+                        dbc.Button("Search", id="search-button", color="secondary",
+                                   style={"width": "100%", "font-size": "1.5em"},
+                                   title="Click to apply the selected filters to the plots and tables."),
                     ], lg=12, md=12),
-                ], className="p-1 site boxwithshadow page-cont mb-1", justify="center", align="center"),
-                html.Br(),
-                html.Br(),
+                ], className="boxwithshadow p-3 mb-3 g-0"),
                 dbc.Row([
-                    html.Div([
-                        dbc.Row([
-                            html.H1(f"List of alarms", className="text-center"),
-                            html.Hr(className="my-2"),
-                            html.Br(),
-                            dcc.Loading(
-                                html.Div(id='paths-results-table', children=dataTables),
-                                style={'height': '0.5rem'}, color='#00245A')
-                        ], className="m-2"),
-                    ], className="site page-cont"),
-                ], className="p-1 site boxwithshadow page-cont mb-1", justify="center", align="center"),
-                html.Br(),
-                html.Br(),
-            ], className=' main-cont', align="center", style={"padding": "0.5% 1.5%"})
+                    dbc.Col([
+                        html.H1("List of alarms", className="text-center"),
+                        html.Hr(className="my-2"),
+                        dcc.Loading(
+                            html.Div(id='paths-results-table', children=dataTables),
+                            style={'height': '0.5rem'}, color='#00245A')
+                    ]),
+                ], className="boxwithshadow p-3 mb-3 g-0"),
+            ], className='main-cont', align="center", style={"padding": ".5% 2%"})
             ])
         ])
     else:
@@ -412,14 +380,29 @@ def create_anomalies_heatmap(asn_anomalies, dateFrom, dateTo, selected_asns=[], 
             ])
         )
 
-        # Update layout for better appearance
+        n_rows = len(heatmap_pivot.index)
+        n_cols = len(heatmap_pivot.columns)
+        cell_size = 50
+        dynamic_height = max(350, n_rows * cell_size + 200)
+
         fig.update_layout(
-            # title="ASN path anomalies summary",
             xaxis_title="Destination",
             yaxis_title="Source",
-            xaxis=dict(title=dict(text="Destination", font=dict(size=16))),
-            height=600,
+            xaxis=dict(
+                title=dict(text="Destination", font=dict(size=14)),
+                tickangle=-45,
+                automargin=True,
+                tickfont=dict(size=11),
+            ),
+            yaxis=dict(
+                title=dict(text="Source", font=dict(size=14)),
+                automargin=True,
+                tickfont=dict(size=11),
+            ),
+            height=dynamic_height,
+            margin=dict(l=20, r=20, t=20, b=20),
             plot_bgcolor='rgba(0,0,0,0)',
+            coloraxis_colorbar=dict(thickness=14, len=0.6),
         )
 
     else:
@@ -452,8 +435,7 @@ def generate_tables(frame, pivotFrame, event, alarmsInst):
     # print('Paths page,', event, "Number of alarms:", len(dfr))
 
     element = html.Div([
-        html.Br(),
-        html.H3(event.upper()),
+        html.H6(event.upper(), className='section-title mt-2'),
         dash_table.DataTable(
             data=dfr.to_dict('records'),
             columns=[{"name": i, "id": i, "presentation": "markdown"} for i in dfr.columns],

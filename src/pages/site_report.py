@@ -525,7 +525,7 @@ def layout(q=None, **other_unknown_query_strings):
                                                         html.Div(
                                                             id="type-of-alarms",
                                                             children=[
-                                                                dcc.Graph(id="bar-graph", figure=create_bar_chart(site_alarms, full_dates, 'alarm group'), responsive=True),
+                                                                dcc.Graph(id="bar-graph", figure=create_bar_chart(site_alarms, full_dates, 'alarm group'), className="dash-graph-compact", style={'height': '290px'}),
                                                             ],
                                                             style={"height": "100%", "width": "100%"}
                                                         ),
@@ -610,7 +610,7 @@ def layout(q=None, **other_unknown_query_strings):
                             dbc.Col([
                                 
                                 html.Div(
-                                    className="boxwithshadow page-cont p-2 h-100",
+                                    className="boxwithshadowhidden page-cont p-2 h-100",
                                     children=[
                                         html.H3("Summary", 
                                                 style={
@@ -647,8 +647,8 @@ def layout(q=None, **other_unknown_query_strings):
                                             "background-color": "#ffffff"
                                         },
                                     children=[
-                                        html.H1(f"List of alarms", className="text-center pt-2", style={"background-color": "#ffffff"}),
-                                        html.H5("Filters", style={"padding-top": "1%"}, className="pl-1"),
+                                        html.H1(f"List of alarms", className="text-center mt-4"),
+                                        html.H5("Filters", className="pl-2"),
                                         dbc.Row([
                                             dbc.Col(
                                                 dcc.Dropdown(
@@ -683,7 +683,7 @@ def layout(q=None, **other_unknown_query_strings):
                                                     multi=True,
                                                     clearable=True
                                                 ))
-                                        ], className="p-1 mb-2"),
+                                        ], className="px-3 mb-2"),
                                         dbc.Col([
                                                 dcc.Loading(
                                                     html.Div(
@@ -763,10 +763,10 @@ def layout(q=None, **other_unknown_query_strings):
                     # ])                 
                 ),
                
-        ], className="ml-1 mt-0 mr-0 mb-1"),
+        ], className="px-3 mb-3 mt-0"),
     
        
-    ], className="mt-1")
+    ], className="px-3 pt-3")
     
 def full_range_dates_df(all_dates, column, df):
     """
@@ -816,33 +816,32 @@ def create_bar_chart(graphData, full_range_dates, column_name='alarm group'):
     )
 
     fig.update_layout(
-        margin=dict(t=20, b=20, l=0, r=0),
+        # margin=dict(t=50, b=45, l=40, r=10),
         showlegend=True,
         legend_orientation='h',
         legend=dict(
             x=0,
-            y=1.35,
+            y=1.0,
             orientation="h",
             xanchor='left',
-            yanchor='top',
+            yanchor='bottom',
             font=dict(
                 size=10,
             ),
             
         ),
-        height=250,
+        height=290,
         plot_bgcolor='#fff',
         autosize=True,
         width=None,
-        title={
-            'y': 0.01,
-            'x': 0.95,
-            'xanchor': 'right',
-            'yanchor': 'bottom'
-        },
+        yaxis=dict(
+            rangemode='tozero',
+            automargin=True,
+        ),
         xaxis=dict(
-            # tickangle=-45,
+            tickformat='%b %d',
             categoryorder='category ascending',
+            tickangle=-30,
             automargin=True,
         ),
         modebar={

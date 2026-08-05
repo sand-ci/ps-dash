@@ -98,14 +98,39 @@ html {
     border-color: #00245a;
 }
 
-/**********   Sites   **********/
-
+/* Default bottom spacing so all boxes are evenly separated */
 .boxwithshadow {
     border: 1px solid rgba(0,0,0,.07);
     border-radius: 1rem;
     box-shadow: 0 4px 16px rgba(0,0,0,0.07), 0 1px 4px rgba(0,0,0,0.04);
     background-color: #fff;
+    margin-bottom: 1rem;
 }
+
+/* Prominent heading for a card/panel — use on H2 */
+.panel-title {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #1a202c;
+    padding-bottom: 0.6rem;
+    margin-bottom: 0.75rem;
+    border-bottom: 2px solid #00245a;
+    letter-spacing: 0.01em;
+}
+
+/* Small overline label above tables/charts — use on H6 */
+.section-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #718096;
+    padding-bottom: 0.45rem;
+    margin-bottom: 0.75rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+/**********   Sites   **********/
 
 .bordered-box {
     border: 1px solid rgba(0,0,0,.125);
@@ -179,7 +204,7 @@ html {
 }
 
 .cls-site-map {
-    min-height: clamp(300px, 40vh, 540px);
+    height: clamp(420px, 48vh, 580px);
 }
 
 .mapboxgl-ctrl-bottom-right {
@@ -594,6 +619,26 @@ html {
 
 .page-cont {
     min-height: 0;
+}
+
+/* Prevent Bootstrap link/text styles from bleeding into Plotly SVG */
+.js-plotly-plot .legendtext {
+    fill: #2d3748 !important;
+}
+.dash-graph {
+    min-height: 450px;
+}
+
+.dash-graph .js-plotly-plot,
+.dash-graph .plot-container {
+    min-height: 450px;
+}
+
+/* Opt-out class for charts that have their own explicit height */
+.dash-graph-compact,
+.dash-graph-compact .js-plotly-plot,
+.dash-graph-compact .plot-container {
+    min-height: 0 !important;
 }
 
 
